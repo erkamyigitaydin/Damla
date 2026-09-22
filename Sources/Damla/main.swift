@@ -1,5 +1,19 @@
 import AppKit
 
+if let index = CommandLine.arguments.firstIndex(of: "--agent-event") {
+    // No AppKit session is started by hooks, and stdout never alters an agent's decisions.
+    if CommandLine.arguments.indices.contains(index + 1),
+       let provider = AgentProvider(rawValue: CommandLine.arguments[index + 1]) {
+        var data = Data()
+        while let chunk = try? FileHandle.standardInput.read(upToCount: 65_536), !chunk.isEmpty {
+            data.append(chunk)
+            if data.count > 2 * 1024 * 1024 { exit(0) }
+        }
+        try? AgentEventStore.receive(provider: provider, input: data)
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--self-test") {
     exit(runSelfTests())
 }

@@ -115,9 +115,9 @@ struct DamlaView: View {
             // Always present so its top padding animates with the shape: the pill rides down with the panel.
             TabPill(model: model)
                 .padding(.top, size.height + Layout.pillGap)
-                .opacity(open ? 1 : 0)
+                .opacity(open && !model.cleaning.active ? 1 : 0)
                 .scaleEffect(open ? 1 : 0.8, anchor: .top)
-                .allowsHitTesting(open)
+                .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactContent, dropping: dropping, metrics: metrics))
@@ -133,41 +133,53 @@ struct DamlaView: View {
     private var ambientColor: Color { media.accent.map { Color(nsColor: $0) } ?? .clear }
     /// How strongly the artwork colour fills the panel: full on Özet, a hint on other tabs, none in settings.
     private var ambientStrength: Double {
-        guard open, media.accent != nil, !model.settingsVisible else { return 0 }
+        guard open, media.accent != nil, !model.settingsVisible, !model.cleaning.active else { return 0 }
         return model.selectedTab == .home ? 1 : 0.45
     }
 
-    /// Black glass: solid over the notch, then the artwork colour takes over as the black thins out,
-    /// so the notch never reads as a separate block. A dark scrim above the colour keeps text legible;
-    /// the clear glass shows through at the bottom.
+    /// Opaque at the notch, artwork colour through the middle, native clear glass at the foot.
+    /// The artwork also tints the glass itself, carrying its colour into the exposed lower rim.
+    /// One shared clip keeps the glass and outgoing media inside the same animated silhouette.
     private var surface: some View {
-        let notchEdge = Layout.headerHeight(metrics) / size.height
+        let notchEdge = min(1, Layout.headerHeight(metrics) / size.height)
+        let bodyHeight = 1 - notchEdge
         return ZStack(alignment: .top) {
-            if glassVisible { Color.clear.glassEffect(.clear.tint(.black.opacity(0.48)), in: shape) }
-            LinearGradient(stops: [
-                .init(color: ambientColor.opacity(0), location: max(0, notchEdge - 0.04)),
-                .init(color: ambientColor.opacity(0.75), location: notchEdge + 0.3),
-                .init(color: ambientColor.opacity(0.85), location: 0.72),
-                .init(color: ambientColor.opacity(0.7), location: 1)
-            ], startPoint: .top, endPoint: .bottom)
+            if glassVisible {
+                Color.clear
+                    .glassEffect(.clear.tint(ambientColor.opacity(0.28 * ambientStrength)), in: shape)
+                    .animation(.easeInOut(duration: 0.9), value: media.accent)
+            }
+            shape.inset(by: 1.5).fill(LinearGradient(stops: [
+                .init(color: .clear, location: notchEdge),
+                .init(color: ambientColor.opacity(0.78), location: notchEdge + bodyHeight * 0.28),
+                .init(color: ambientColor.opacity(0.72), location: notchEdge + bodyHeight * 0.48),
+                .init(color: ambientColor.opacity(0.28), location: notchEdge + bodyHeight * 0.70),
+                .init(color: .clear, location: notchEdge + bodyHeight * 0.94),
+                .init(color: .clear, location: 1)
+            ], startPoint: .top, endPoint: .bottom))
                 .animation(.easeInOut(duration: 0.9), value: media.accent)
                 .opacity(ambientStrength)
-            RadialGradient(colors: [.white.opacity(0.10 * ambientStrength), .clear], center: UnitPoint(x: 0.2, y: 0.5), startRadius: 0, endRadius: 200)
             shape.fill(LinearGradient(stops: [
                 .init(color: .black, location: 0),
-                .init(color: .black.opacity(open ? 0.98 : 1), location: notchEdge),
-                .init(color: .black.opacity(open ? 0.5 : 1), location: notchEdge + 0.36),
-                .init(color: .black.opacity(open ? 0.18 : 1), location: 1)
+                .init(color: .black, location: notchEdge),
+                .init(color: .black.opacity(open ? 0.78 : 1), location: notchEdge + bodyHeight * 0.20),
+                .init(color: .black.opacity(open ? 0.38 : 1), location: notchEdge + bodyHeight * 0.50),
+                .init(color: .black.opacity(open ? 0.32 : 1), location: notchEdge + bodyHeight * 0.74),
+                .init(color: .black.opacity(open ? 0 : 1), location: notchEdge + bodyHeight * 0.97),
+                .init(color: .black.opacity(open ? 0 : 1), location: 1)
             ], startPoint: .top, endPoint: .bottom))
             content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
         }
         .clipShape(shape)
         .overlay {
-            shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.02), .white.opacity(open ? 0.14 : 0)], startPoint: .top, endPoint: .bottom), lineWidth: 0.6)
             if dropping { shape.strokeBorder(Theme.accent.opacity(0.9), lineWidth: 1.5) }
         }
         .shadow(color: .black.opacity(open ? 0.45 : 0), radius: 24, y: 12)
         .contentShape(shape)
+        .accessibilityAction(named: Text("Paneli aç")) {
+            model.activeScreenID = screen.id
+            model.expanded = true; model.pinnedOpen = true
+        }
         .onTapGesture { if state != .expanded { model.activeScreenID = screen.id; model.expanded = true } }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropping) { providers in
             model.activeScreenID = screen.id
@@ -188,7 +200,17 @@ struct DamlaView: View {
     @ViewBuilder private var content: some View {
         switch state {
         case .expanded:
-            ExpandedView(model: model, metrics: metrics).transition(.blurReplace)
+            Group {
+                if model.cleaning.active {
+                    CleaningPanelView(cleaning: model.cleaning)
+                        .padding(.top, Layout.headerHeight(metrics))
+                } else { ExpandedView(model: model, metrics: metrics) }
+            }
+                .frame(width: Layout.panelWidth, height: Layout.headerHeight(metrics) + Layout.contentHeight)
+                .transition(AnyTransition.asymmetric(
+                    insertion: AnyTransition(.blurReplace),
+                    removal: .opacity.animation(.easeOut(duration: 0.12))
+                ))
         case .hud:
             if let hud = model.hud { HUDRow(hud: hud, metrics: metrics).transition(.blurReplace) }
         case .drop:
@@ -218,13 +240,19 @@ struct CompactRow: View {
                     } else if let art = media.artwork {
                         Image(nsImage: art).resizable().scaledToFill().frame(width: 20, height: 20)
                             .clipShape(RoundedRectangle(cornerRadius: 5.5, style: .continuous))
+                    } else if model.agentBadge != nil {
+                        Image(systemName: "terminal").font(.system(size: 11, weight: .semibold))
                     } else {
                         Image(systemName: "music.note").font(.system(size: 11, weight: .semibold))
                     }
                 }.frame(width: side)
                 Spacer(minLength: 0).frame(width: m.notchWidth)
                 Group {
-                    if media.hasTrack { Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55) }
+                    if let agent = model.agentBadge {
+                        Image(systemName: agent.phase.icon).font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(agent.phase == .waiting || agent.phase == .failed ? Theme.amber : Theme.accent)
+                            .help("\(agent.provider.title) · \(agent.project) · \(agent.phase.title)")
+                    } else if media.hasTrack { Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55) }
                     else { Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim) }
                 }.frame(width: side)
             }
@@ -378,6 +406,7 @@ struct ExpandedView: View {
                     case .files: ShelfView(model: model)
                     case .clipboard: ClipboardView(model: model)
                     case .focus: FocusView(model: model)
+                    case .agents: AgentPanelView(service: model.agents)
                     }
                 }
             }
@@ -421,6 +450,9 @@ struct TabPill: View {
                             .frame(width: 34, height: 28)
                         if tab == .files, !model.files.isEmpty {
                             Circle().fill(Theme.accent).frame(width: 5, height: 5).offset(x: -6, y: 5)
+                        }
+                        if tab == .agents, let badge = model.agentBadge {
+                            Circle().fill(badge.phase == .waiting ? Theme.amber : Theme.accent).frame(width: 5, height: 5).offset(x: -6, y: 5)
                         }
                     }
                     .foregroundStyle(selected ? Color.white : Theme.dim)
@@ -644,6 +676,7 @@ struct ShelfView: View {
                     Text("\(model.files.count) öğe").font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Theme.dim)
                     Spacer()
                     IconButton(icon: "trash", label: "Rafı boşalt") { model.clearFiles() }
+                    IconButton(icon: "square.and.arrow.up", label: "Seçili dosyayı paylaş") { model.shareFile() }
                     IconButton(icon: "plus", label: "Dosya ekle") { model.chooseFiles() }
                 }.frame(height: 18)
                 ScrollView(.horizontal) {
@@ -705,6 +738,7 @@ struct FileTile: View {
         .contextMenu {
             Button("Aç") { model.openFile(item) }
             Button("Önizle") { model.quickLook(item) }
+            Button("Paylaş…") { model.shareFile(item) }
             Button("Finder’da göster") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
             Divider()
             Button("Raftan kaldır") { model.removeFile(item) }
@@ -875,10 +909,18 @@ struct SettingsView: View {
     @ObservedObject var keys: MediaKeyInterceptor
     init(model: AppState) { self.model = model; keys = model.keys }
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 8) {
             Toggle("Üzerine gelince aç", isOn: $model.automaticOpen).onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
             Toggle("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
             Toggle("Pano geçmişi", isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) }))
+            HStack {
+                Text("Temizlik modu")
+                Spacer()
+                Button("Klavyeyi kilitle · 60 sn") { model.startCleaning() }
+                    .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+                    .help("Tüm klavyeler 60 saniye kilitlenir. Fare çalışır. Esc’yi 2 saniye tutarak çıkabilirsin.")
+            }
             Toggle("Sistem ses/parlaklık baloncuğunu gizle", isOn: Binding(get: { model.hideSystemHUD }, set: { model.setHideSystemHUD($0) }))
                 .help("Ses, sessiz ve parlaklık tuşlarını Damla uygular; macOS kendi göstergesini çizmez. Erişilebilirlik izni ister.")
             if model.hideSystemHUD && !keys.active {
@@ -913,7 +955,8 @@ struct SettingsView: View {
                 Spacer()
                 Button("Çıkış") { NSApp.terminate(nil) }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.dim)
             }
-        }
+          }
+        }.scrollIndicators(.hidden)
         .font(.system(size: 12)).toggleStyle(.switch).controlSize(.small).tint(Theme.accent)
         .padding(.horizontal, 4).padding(.top, 2).frame(maxHeight: .infinity)
     }

@@ -4,10 +4,10 @@ import ServiceManagement
 import UniformTypeIdentifiers
 
 enum PanelTab: String, CaseIterable, Identifiable {
-    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak"
+    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", agents = "Agent’lar"
     var id: String { rawValue }
     var icon: String {
-        switch self { case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer" }
+        switch self { case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"; case .agents: return "terminal" }
     }
 }
 
@@ -50,6 +50,9 @@ final class AppState: ObservableObject {
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
     let media = MediaService()
     let monitor = SystemMonitor()
+    let cleaning = KeyboardCleaning()
+    let agents = AgentStatusService()
+    @Published private(set) var agentBadge: AgentSession?
     lazy var keys = MediaKeyInterceptor(monitor: monitor)
     private var timer: Timer?
     private var clipboardTimer: Timer?
@@ -60,12 +63,14 @@ final class AppState: ObservableObject {
     var requestKeyFocus: (() -> Void)?
     var setDialogMode: ((Bool) -> Void)?
     var requestQuickLook: ((Int?) -> Void)?
+    var requestShare: ((URL) -> Void)?
+    private var pinnedBeforeCleaning = false
 
     func state(for screenID: UInt32) -> NotchState {
-        expanded && activeScreenID == screenID ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
+        cleaning.active || (expanded && activeScreenID == screenID) ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
     }
     /// True when the closed notch has something to show beside the physical notch.
-    var compactContent: Bool { session.hasStarted || media.hasTrack }
+    var compactContent: Bool { session.hasStarted || media.hasTrack || agentBadge != nil }
 
     func start() {
         monitor.onBattery = { [weak self] value in self?.battery = value }
@@ -74,6 +79,22 @@ final class AppState: ObservableObject {
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
         monitor.start(); media.start()
+        cleaning.$active.dropFirst().sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
+        cleaning.onEnd = { [weak self] in
+            guard let self else { return }
+            self.pinnedOpen = self.pinnedBeforeCleaning
+            if self.hideSystemHUD { self.keys.start(prompt: false) }
+        }
+        agents.onRefresh = { [weak self] in
+            guard let self else { return }
+            let badge = self.agents.sessions.first { $0.visibleInNotch(at: Date()) }
+            if self.agentBadge != badge { self.agentBadge = badge }
+        }
+        agents.onChange = { [weak self] record in
+            guard let self, !self.cleaning.active else { return }
+            self.showHUD(record.phase.icon, "\(record.provider.title) · \(record.phase.title)", 1)
+        }
+        agents.start()
         keys.onDenied = { [weak self] in
             self?.showNotice("Erişilebilirlik izni gerekli · ayarları açmak için dokun", duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
         }
@@ -129,7 +150,18 @@ final class AppState: ObservableObject {
     func setHideSystemHUD(_ enabled: Bool) {
         hideSystemHUD = enabled
         UserDefaults.standard.set(enabled, forKey: "hideSystemHUD")
-        if enabled { keys.start(prompt: true) } else { keys.stop() }
+        if enabled && !cleaning.active { keys.start(prompt: true) } else { keys.stop() }
+    }
+    func startCleaning() {
+        guard !cleaning.active else { return }
+        guard MediaKeyInterceptor.trusted else {
+            showNotice("Temizlik modu için Erişilebilirlik izni gerekli · ayarları aç", duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
+            return
+        }
+        pinnedBeforeCleaning = pinnedOpen
+        guard cleaning.start() else { showNotice("Klavye kilitlenemedi. Erişilebilirlik iznini kontrol et.", duration: 6); return }
+        keys.stop()
+        pinnedOpen = true; expanded = true
     }
     func select(_ tab: PanelTab) {
         settingsVisible = false
@@ -207,6 +239,11 @@ final class AppState: ObservableObject {
     }
     func openFile(_ item: ShelfItem) {
         if !NSWorkspace.shared.open(item.url) { showNotice("Dosya bulunamadı. Rafa yeniden ekleyebilirsin.") }
+    }
+    func shareFile(_ item: ShelfItem? = nil) {
+        guard let item = item ?? files.first(where: { $0.id == selectedFile }) ?? files.first else { return }
+        selectedFile = item.id
+        requestShare?(item.url)
     }
     func chooseFiles() {
         pinnedOpen = true; requestKeyFocus?()

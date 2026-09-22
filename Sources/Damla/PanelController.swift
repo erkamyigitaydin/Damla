@@ -175,6 +175,7 @@ final class PanelController {
     }
 
     private func trackHover() {
+        guard !model.cleaning.active else { return }
         let now = Date()
         let location = NSEvent.mouseLocation
         if fixedScreen == nil, model.displayMode == .followMouse, state == .closed, !model.pinnedOpen,
@@ -233,6 +234,7 @@ final class PanelController {
 /// Owns one controller per screen (or a single roaming one), plus everything that must exist once:
 /// keyboard shortcuts, system-wide drag detection, Quick Look ownership.
 final class PanelManager {
+    private let sharing = ShelfSharing()
     let model: AppState
     private(set) var controllers: [PanelController] = []
     private var cancellables = Set<AnyCancellable>()
@@ -254,6 +256,10 @@ final class PanelManager {
             self.quickLookOwner = owner
             owner.toggleQuickLook(index: index)
         }
+        model.requestShare = { [weak self] url in
+            guard let self, let owner = self.focusController else { return }
+            self.sharing.show(url, from: owner.host, model: model)
+        }
         rebuild()
         model.$displayMode.dropFirst().receive(on: RunLoop.main).sink { [weak self] _ in self?.rebuild() }.store(in: &cancellables)
         model.$externalStyle.dropFirst().receive(on: RunLoop.main)
@@ -271,6 +277,7 @@ final class PanelManager {
             .sink { [weak self] _ in self?.quickLookOwner?.quickLookDidClose() }.store(in: &cancellables)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+            if self.model.cleaning.active { return nil }
             if event.keyCode == 53 { // Esc: Quick Look first, then the notch
                 if QuickLookController.isShowing { QLPreviewPanel.shared().orderOut(nil); return nil }
                 self.model.pinnedOpen = false; self.model.expanded = false
@@ -375,6 +382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Damla’yı aç", action: #selector(showPanel), keyEquivalent: "")
         menu.addItem(withTitle: "Ayarlar", action: #selector(showSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: "Temizlik modu · 60 sn", action: #selector(startCleaning), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Damla’dan çık", action: #selector(quit), keyEquivalent: "q")
         for item in menu.items { item.target = self }
@@ -401,6 +409,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "tab-files": model.select(.files)
         case "tab-clipboard": model.select(.clipboard)
         case "tab-focus": model.select(.focus)
+        case "tab-agents": model.select(.agents)
+        case "share": model.select(.files); model.shareFile()
         case "settings": model.settingsVisible = true
         case "display-notch": model.displayMode = .notch
         case "display-mouse": model.displayMode = .followMouse
@@ -437,6 +447,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func showPanel() { manager.show() }
     @objc func showSettings() { model.settingsVisible = true; manager.show() }
+    @objc func startCleaning() { manager.show(); model.startCleaning() }
     @objc func quit() { NSApp.terminate(nil) }
     private func registerShortcut() {
         var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -451,6 +462,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if status != noErr { model.showNotice("Kısayol kullanılıyor. Menüdeki damladan açabilirsin.") }
     }
     func applicationWillTerminate(_ notification: Notification) {
+        model.cleaning.onEnd = nil
+        model.cleaning.stop()
+        model.keys.stop()
+        model.agents.stop()
         model.saveSession()
         model.media.bridge.stop()
         if let hotKey { UnregisterEventHotKey(hotKey) }
