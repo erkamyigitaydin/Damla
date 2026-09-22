@@ -24,10 +24,16 @@ final class MediaService: ObservableObject {
     private let queue = DispatchQueue(label: "app.damla.media", qos: .utility)
     private var lastArtworkKey = ""
     private var generation = 0
+    private var lastRefresh = Date.distantPast
+    /// Set while the panel is open: refresh every 2 s. Otherwise 2 s while playing, 6 s when idle.
+    var wantsFrequentUpdates = false
 
     func start() {
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refresh() }
+        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            if self.playing || self.wantsFrequentUpdates || Date().timeIntervalSince(self.lastRefresh) >= 6 { self.refresh() }
+        }
     }
     func connect(_ selected: MusicSource) {
         source = selected; connected = true; generation += 1
@@ -55,7 +61,7 @@ final class MediaService: ObservableObject {
         guard isRunning else {
             playing = false; hasTrack = false; status = "\(source.rawValue) açık değil."; return
         }
-        busy = true
+        busy = true; lastRefresh = Date()
         let selected = source, currentGeneration = generation
         let read = "return {name of current track, artist of current track, duration of current track, player position, player state as string}"
         queue.async {

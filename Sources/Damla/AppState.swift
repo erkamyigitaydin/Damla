@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ServiceManagement
 import UniformTypeIdentifiers
 
 enum PanelTab: String, CaseIterable, Identifiable {
@@ -29,6 +30,7 @@ final class AppState: ObservableObject {
     @Published var displayMode = DisplayMode(rawValue: UserDefaults.standard.string(forKey: "displayMode") ?? "") ?? .followMouse
     @Published var externalStyle = ExternalStyle(rawValue: UserDefaults.standard.string(forKey: "externalStyle") ?? "") ?? .menuBar
     @Published var hideSystemHUD = UserDefaults.standard.bool(forKey: "hideSystemHUD")
+    @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
     @Published var noticeAction: (() -> Void)?
     @Published var battery = BatterySnapshot()
     @Published var volume: Float?
@@ -51,6 +53,7 @@ final class AppState: ObservableObject {
     private var clipboardTimer: Timer?
     private var pasteboardCount = NSPasteboard.general.changeCount
     private var hudClear: DispatchWorkItem?
+    private var cancellables = Set<AnyCancellable>()
     private var noticeClear: DispatchWorkItem?
     var requestKeyFocus: (() -> Void)?
     var setDialogMode: ((Bool) -> Void)?
@@ -71,10 +74,17 @@ final class AppState: ObservableObject {
             self?.showNotice("Erişilebilirlik izni gerekli · ayarları açmak için dokun", duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
         }
         if hideSystemHUD { keys.start(prompt: false) }
+        $expanded.removeDuplicates().sink { [weak self] expanded in
+            guard let self else { return }
+            self.media.wantsFrequentUpdates = expanded
+            if expanded { self.now = Date(); self.media.refresh() }
+        }.store(in: &cancellables)
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
-            self.now = Date()
-            if self.session.finishIfNeeded(at: self.now) {
+            let date = Date()
+            // Only republish the clock when something on screen depends on it; keeps the closed notch idle.
+            if self.expanded || self.session.running { self.now = date }
+            if self.session.finishIfNeeded(at: date) {
                 if self.session.phase == .focus {
                     self.completedSessions += 1
                     UserDefaults.standard.set(self.completedSessions, forKey: "completedSessions")
@@ -99,6 +109,18 @@ final class AppState: ObservableObject {
         noticeClear?.cancel(); notice = message; noticeAction = action
         let work = DispatchWorkItem { [weak self] in self?.notice = nil; self?.noticeAction = nil }
         noticeClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+            if enabled && SMAppService.mainApp.status == .requiresApproval {
+                showNotice("Giriş öğesi onay bekliyor · Sistem Ayarları'nı aç", duration: 8) { SMAppService.openSystemSettingsLoginItems() }
+            }
+        } catch {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+            showNotice("Girişte başlatma ayarlanamadı: \(error.localizedDescription)", duration: 6)
+        }
     }
     func setHideSystemHUD(_ enabled: Bool) {
         hideSystemHUD = enabled

@@ -92,6 +92,7 @@ struct DamlaView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
     @State private var dropping = false
+    @State private var glassVisible = false
     init(model: AppState) { self.model = model; media = model.media }
 
     private struct Key: Equatable { var state: NotchState; var compact: Bool; var dropping: Bool; var metrics: Layout.Metrics }
@@ -117,6 +118,11 @@ struct DamlaView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(Theme.motion(open: open), value: Key(state: state, compact: model.compactContent, dropping: dropping, metrics: metrics))
+        .onChange(of: open, initial: true) { _, isOpen in
+            // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
+            if isOpen { glassVisible = true }
+            else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { if !model.expanded { glassVisible = false } } }
+        }
         .environment(\.colorScheme, .dark)
         .environment(\.controlActiveState, .active)
     }
@@ -124,7 +130,7 @@ struct DamlaView: View {
     /// Black glass: solid at the notch, gradually giving way to clear Liquid Glass towards the bottom.
     private var surface: some View {
         ZStack(alignment: .top) {
-            Color.clear.glassEffect(.clear, in: shape)
+            if glassVisible { Color.clear.glassEffect(.clear, in: shape) }
             shape.fill(LinearGradient(stops: [
                 .init(color: .black, location: 0),
                 .init(color: .black.opacity(open ? 0.94 : 1), location: 0.3),
@@ -734,8 +740,9 @@ struct SettingsView: View {
     @ObservedObject var keys: MediaKeyInterceptor
     init(model: AppState) { self.model = model; keys = model.keys }
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 8) {
             Toggle("Üzerine gelince aç", isOn: $model.automaticOpen).onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
+            Toggle("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
             Toggle("Pano geçmişi", isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) }))
             Toggle("Sistem ses/parlaklık baloncuğunu gizle", isOn: Binding(get: { model.hideSystemHUD }, set: { model.setHideSystemHUD($0) }))
                 .help("Ses, sessiz ve parlaklık tuşlarını Damla uygular; macOS kendi göstergesini çizmez. Erişilebilirlik izni ister.")

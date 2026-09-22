@@ -18,6 +18,9 @@ final class SystemMonitor {
     private var oldMuted: Bool?
     private var oldPlugged: Bool?
     private var tickCount = 0
+    private var listenerDevice: AudioDeviceID?
+    private var listenerBlock: AudioObjectPropertyListenerBlock?
+    private var deviceListenerBlock: AudioObjectPropertyListenerBlock?
     private var brightnessHandle: UnsafeMutableRawPointer?
     private var brightnessGetter: (@convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32)?
     private var brightnessSetter: (@convention(c) (UInt32, Float) -> Int32)?
@@ -39,8 +42,36 @@ final class SystemMonitor {
     }
     func start() {
         poll()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in self?.poll() }
+        installAudioListeners()
+        // Volume and mute arrive through CoreAudio listeners; the timer only covers brightness and battery.
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in self?.poll() }
         if let timer { RunLoop.main.add(timer, forMode: .common) }
+    }
+    private static let volumeAddresses: [AudioObjectPropertyAddress] = [
+        AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar, mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain),
+        AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar, mScope: kAudioDevicePropertyScopeOutput, mElement: 1),
+        AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute, mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+    ]
+    private func installAudioListeners() {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.attachVolumeListener(); self?.poll() }
+        deviceListenerBlock = block
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, DispatchQueue.main, block)
+        attachVolumeListener()
+    }
+    private func attachVolumeListener() {
+        if let old = listenerDevice, let block = listenerBlock {
+            for address in Self.volumeAddresses { var a = address; AudioObjectRemovePropertyListenerBlock(old, &a, DispatchQueue.main, block) }
+        }
+        listenerDevice = nil
+        guard let device = Self.defaultOutputDevice() else { return }
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.poll() }
+        listenerBlock = block; listenerDevice = device
+        for address in Self.volumeAddresses {
+            var a = address
+            if AudioObjectHasProperty(device, &a) { AudioObjectAddPropertyListenerBlock(device, &a, DispatchQueue.main, block) }
+        }
     }
     func poll() {
         let (volume, muted) = Self.audio()

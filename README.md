@@ -13,7 +13,7 @@ Panel varsayılan olarak farenin bulunduğu ekranı izler. Çentiksiz bir ekrand
 - **Dosyalar:** Dosya/klasörleri çentiğe bırak veya + düğmesini kullan. Raf yatay kutucuklardan oluşur; çift tık açar, üzerine gelince × kaldırır, sağ tık Finder'da gösterir. Raftan başka uygulamaya sürükle. Raftan kaldırmak orijinal dosyayı silmez. Damla dosyayı taşımaz veya kopyalamaz; kalıcı bir referans tutar.
 - **Pano:** Varsayılan olarak kapalıdır. Açıldıktan sonra kopyalanan metin/görselleri yatay kartlar halinde kaydeder; bağlantı, renk (#hex önizlemeli), metin ve görsel türlerini ayırt eder. Arama, sabitleme, yeniden kopyalama ve tek tek kaldırma vardır. Bir karta tıklayıp hedef uygulamada ⌘V ile yapıştır. En fazla 60 öğe / toplam 24 MB; metin başına 200 KB, görsel başına 4 MB. Sınır aşılınca sabitlenenler öncelikli tutulur. Görsellerde OCR araması yoktur.
 - **Odak:** 25/45/50 dakikalık çalışma, 5 dakikalık mola, duraklatma/devam ve sıfırlama. Çalışırken halka ve düğme nane yeşiline döner; kapalı çentikte kalan süre görünür. Bitişte yerel ses ve çentik bildirimi. Uyku sonrası gerçek saat üzerinden devam eder; uygulama kapalıyken bildirim vermez.
-- **Ayarlar:** Üzerine gelince açılma, pano kaydı, sistem baloncuğunu gizleme, ekran seçimi (Fareyi izle / Çentikli ekran) ve çentiksiz ekran biçimi (Menü çubuğu / Ada).
+- **Ayarlar:** Üzerine gelince açılma, girişte başlatma (`SMAppService`; uygulama taşınırsa yeniden açıp kapat), pano kaydı, sistem baloncuğunu gizleme, ekran seçimi (Fareyi izle / Çentikli ekran) ve çentiksiz ekran biçimi (Menü çubuğu / Ada).
 
 ## 0.3 görünüm ve hareket
 
@@ -33,10 +33,11 @@ Spotify seçildiğinde albüm kapakları Spotify'ın sağladığı HTTPS adresin
 
 - SwiftUI + AppKit, **glassEffect(.clear)** ile yerel Liquid Glass. macOS 26+.
 - `Layout.swift` tek gerçek kaynak: şekil boyutları, pencere boyutu ve fare takibi için görünür dikdörtgen buradan hesaplanır.
-- Pil: IOKit; ses: CoreAudio. Ekran kaydı istemez. Erişilebilirlik izni yalnızca "sistem baloncuğunu gizle" seçeneği için gerekir (`CGEvent` tap ile NX_SYSDEFINED medya tuşları yutulur, ses CoreAudio ile, parlaklık `DisplayServicesSetBrightness` ile uygulanır). Ad-hoc imza her derlemede değiştiği için izin yeniden derleme sonrası tekrar verilmelidir.
+- Pil: IOKit; ses: CoreAudio dinleyicileri (ses/sessiz değişimi anında gelir), parlaklık ve pil 1 s'de bir yoklanır. Ekran kaydı istemez. Erişilebilirlik izni yalnızca "sistem baloncuğunu gizle" seçeneği için gerekir (`CGEvent` tap ile NX_SYSDEFINED medya tuşları yutulur, ses CoreAudio ile, parlaklık `DisplayServicesSetBrightness` ile uygulanır).
+- Enerji: kapalı çentik saat tıkını yayınlamaz, cam katmanı yalnızca panel açıkken çizilir, müzik yenilemesi boşta 6 s'ye düşer. Boşta CPU yaklaşık %1 (önceki sürümde %2,5).
 - Parlaklık okuma, desteklenen yerleşik ekranlarda isteğe bağlı `DisplayServicesGetBrightness` sembolünü kullanır. Harici monitör parlaklığı hedeflenmez.
 - Müzik: Apple Events ile Apple Music / Spotify. Konum, 2 saniyelik yenilemeler arasında yerel olarak ilerletilir.
-- Yerel ad-hoc imza; App Store/Developer ID dağıtımı ve noter onayı yapılmadı.
+- İmza: `build.sh`, Keychain'deki ilk "Apple Development" sertifikasıyla imzalar (`DAMLA_SIGN_IDENTITY` ile değiştirilebilir, yoksa ad-hoc). Tasarlanmış gereksinim takım sertifikasına bağlı olduğu için Erişilebilirlik/Otomasyon izinleri yeniden derlemede korunur. App Store/Developer ID dağıtımı ve noter onayı yapılmadı.
 
 ## Derleme
 
@@ -62,4 +63,5 @@ Kaynak dizininin yanına `Damla.app` üretir. Derleme önbelleğini başka yerde
 - Harici 5K monitörde (çentiksiz, ana ekran): menü çubuğundaki sahte çentik (müzik, sayaç), HUD ve açık panel; ayrıca yüzen ada biçimi kontrol edildi. "Fareyi izle" modunda panel fareyle ekran değiştiriyor.
 - Pencere seviyesi piksel ölçümüyle doğrulandı; bağlam menüsünün panelin üstünde açıldığı görüldü.
 - Ses ve parlaklık uygulayıcıları debug komutlarıyla doğrulandı (1/16 adım, gerçek CoreAudio ve DisplayServices üzerinden okunup geri alındı). Tuş yakalama akışı Erişilebilirlik izni gerektirdiği için kullanıcı tarafından denenmeli.
-- Denenmeyenler: gerçek sürükle-bırak akışı, Spotify, tam ekran uygulama geçişleri, uzun süreli enerji kullanımı.
+- Tam ekran: yerleşik ekranda tam ekran bir pencere üzerinde kapalı çentik, hover ile açılış ve açık panel ekran görüntüsüyle doğrulandı.
+- Denenmeyenler: gerçek sürükle-bırak akışı, Spotify, uzun süreli enerji kullanımı.

@@ -12,7 +12,15 @@ cp "$PROJECT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 if [[ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]]; then
   cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
-codesign --force --sign - "$APP_DIR"
+# Sign with a stable identity so TCC permissions (Accessibility, Automation) survive rebuilds.
+# Override with DAMLA_SIGN_IDENTITY; falls back to the first Apple Development certificate, then ad-hoc.
+IDENTITY="${DAMLA_SIGN_IDENTITY:-}"
+if [[ -z "$IDENTITY" ]]; then
+  IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"')"
+fi
+[[ -z "$IDENTITY" ]] && IDENTITY="-"
+codesign --force --sign "$IDENTITY" --timestamp=none "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
+printf 'Signed with: %s\n' "$IDENTITY"
 "$APP_DIR/Contents/MacOS/Damla" --self-test
 printf 'Built: %s\n' "$APP_DIR"
