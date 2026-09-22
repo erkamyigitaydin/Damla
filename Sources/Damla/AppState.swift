@@ -56,6 +56,7 @@ final class AppState: ObservableObject {
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
     @Published private(set) var agentBadge: AgentSession?
+    @Published var agentAttention = false   // brief pulse of the mascot when an agent starts waiting
     lazy var keys = MediaKeyInterceptor(monitor: monitor)
     private var timer: Timer?
     private var clipboardTimer: Timer?
@@ -98,6 +99,12 @@ final class AppState: ObservableObject {
         agents.onChange = { [weak self] record in
             guard let self, !self.cleaning.active else { return }
             self.showAgentHUD(record)
+            if record.phase == .waiting {
+                // The HUD owns the notch for 3 s; the mascot pulses right after it hands the island back.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.05) { [weak self] in self?.agentAttention = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.6) { [weak self] in self?.agentAttention = false }
+                if self.agents.soundEnabled { NSSound(named: "Tink")?.play() }
+            }
         }
         agents.start()
         keys.onDenied = { [weak self] in

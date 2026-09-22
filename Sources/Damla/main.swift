@@ -9,7 +9,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--agent-event") {
             data.append(chunk)
             if data.count > 2 * 1024 * 1024 { exit(0) }
         }
-        try? AgentEventStore.receive(provider: provider, input: data)
+        try? AgentEventStore.receive(provider: provider, input: data, host: ProcessAncestry.hostBundleID())
     }
     exit(0)
 }

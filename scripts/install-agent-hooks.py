@@ -30,7 +30,7 @@ def merge(original, provider, binary):
             if copy["hooks"] or not handlers:
                 kept.append(copy)
         hooks[event] = kept
-    events = COMMON + (["Notification", "PostToolUseFailure", "StopFailure"] if provider == "claude" else ["Interrupt"])
+    events = COMMON + (["Notification", "PostToolUseFailure", "StopFailure", "PermissionDenied"] if provider == "claude" else ["Interrupt"])
     for event in events:
         group = {"hooks": [{"type": "command", "command": shlex.quote(str(binary)) + " --agent-event " + provider,
                             "timeout": 3, "statusMessage": MARKER}]}

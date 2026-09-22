@@ -293,7 +293,9 @@ struct CompactRow: View {
             Text(model.timeLabel).font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
                 .contentTransition(.numericText())
         case .agent(let agent):
-            AgentMascot(session: agent, size: 22)
+            AgentMascot(session: agent, size: 22, pulse: model.agentAttention)
+                .onTapGesture { model.agents.activate(agent) }
+                .help("\(agent.provider.title) · \(agent.project) · tıkla: \(agent.hostName ?? agent.provider.title)")
         case .media:
             if let art = media.artwork {
                 Image(nsImage: art).resizable().scaledToFill().frame(width: 20, height: 20)
@@ -309,7 +311,7 @@ struct CompactRow: View {
         case .timer:
             Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim)
         case .agent(let agent):
-            AgentStatusMark(phase: agent.phase)
+            AgentStatusMark(session: agent)
         case .media:
             Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55)
         }
@@ -339,13 +341,18 @@ struct Equalizer: View {
 
 // MARK: - Agent mascot
 
-/// The agent app's icon, alive while it works: a slow breath and a soft ring in the status colour,
-/// plus a small badge for waiting / done / failed.
+/// The agent app's icon, alive while it works: a slow breath and a soft ring in the status colour
+/// (amber and slower while it waits for you), a small badge for waiting / done / failed, and optionally
+/// the host app (Terminal, VS Code, Claude…) in the lower-left corner.
 struct AgentMascot: View {
     let session: AgentSession
     var size: CGFloat = 22
+    var pulse = false
+    var showHost = false
     private var tint: Color { session.phase == .waiting || session.phase == .failed ? Theme.amber : Theme.accent }
     private var working: Bool { session.phase == .working }
+    private var waiting: Bool { session.phase == .waiting }
+    private var live: Bool { working || waiting }
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Group {
@@ -357,11 +364,25 @@ struct AgentMascot: View {
             }
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).strokeBorder(tint.opacity(working ? 0.9 : 0.55), lineWidth: 1))
-            .phaseAnimator([false, true], trigger: working) { view, breathe in
+            .overlay(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).strokeBorder(tint.opacity(live ? 0.9 : 0.55), lineWidth: 1))
+            .phaseAnimator([false, true], trigger: live) { view, breathe in
                 view.scaleEffect(working && breathe ? 1.06 : 1)
-                    .shadow(color: tint.opacity(working && breathe ? 0.65 : 0.2), radius: working && breathe ? 6 : 2)
-            } animation: { _ in Theme.reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 1.1).repeatForever(autoreverses: true) }
+                    .shadow(color: tint.opacity(live && breathe ? (waiting ? 0.9 : 0.65) : 0.2), radius: live && breathe ? (waiting ? 8 : 6) : 2)
+            } animation: { _ in
+                Theme.reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: waiting ? 0.8 : 1.1).repeatForever(autoreverses: true)
+            }
+            .scaleEffect(pulse ? 1.3 : 1)
+            .shadow(color: tint.opacity(pulse ? 0.9 : 0), radius: pulse ? 10 : 0)
+            .animation(Theme.reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.45, bounce: 0.55), value: pulse)
+            .overlay(alignment: .bottomLeading) {
+                if showHost, let host = session.hostIcon {
+                    Image(nsImage: host).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+                        .frame(width: size * 0.5, height: size * 0.5)
+                        .clipShape(RoundedRectangle(cornerRadius: size * 0.12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: size * 0.12, style: .continuous).strokeBorder(.black, lineWidth: 1))
+                        .offset(x: -size * 0.16, y: size * 0.16)
+                }
+            }
             if session.phase != .working {
                 Image(systemName: session.phase.icon).font(.system(size: size * 0.32, weight: .bold)).foregroundStyle(.black)
                     .frame(width: size * 0.5, height: size * 0.5).background(tint, in: Circle())
@@ -375,9 +396,13 @@ struct AgentMascot: View {
     }
 }
 
-/// Right-hand status beside the mascot: three thinking dots while working, a symbol otherwise.
+/// Right-hand status beside the mascot: three thinking dots while working, the waiting time in amber
+/// while an approval is pending, a symbol otherwise.
 struct AgentStatusMark: View {
     let phase: AgentPhase
+    var waitingSince: Date? = nil
+    init(phase: AgentPhase) { self.phase = phase }
+    init(session: AgentSession) { phase = session.phase; waitingSince = session.waitingSince }
     private var tint: Color { phase == .waiting || phase == .failed ? Theme.amber : Theme.accent }
     var body: some View {
         if phase == .working {
@@ -389,6 +414,12 @@ struct AgentStatusMark: View {
                             .opacity(0.35 + 0.65 * max(0, sin(t * 2.6 - Double(i) * 0.9)))
                     }
                 }
+            }
+        } else if phase == .waiting, let since = waitingSince {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(AgentText.duration(context.date.timeIntervalSince(since)))
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(tint)
+                    .contentTransition(.numericText())
             }
         } else {
             Image(systemName: phase.icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(tint)
