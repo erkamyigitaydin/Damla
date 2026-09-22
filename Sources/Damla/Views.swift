@@ -102,7 +102,7 @@ struct DamlaView: View {
     private var open: Bool { state == .expanded }
     private var size: CGSize { Layout.shapeSize(state, metrics, compactContent: model.compactContent) }
     private var shape: NotchShape {
-        let bottom: CGFloat = open ? 26 : state == .drop ? 20 : 13
+        let bottom: CGFloat = open ? 26 : state == .drop ? 24 : 13
         return metrics.hasNotch
             ? NotchShape(topEar: Layout.ear(metrics, open: open), topRadius: 0, bottomRadius: bottom)
             : NotchShape(topEar: 0, topRadius: open ? 24 : bottom, bottomRadius: open ? 24 : bottom)
@@ -296,7 +296,8 @@ struct HUDRow: View {
 
 // MARK: - Basket
 
-/// The notch while a file is being dragged: a wider target with a "drop here" band under the notch.
+/// The notch while a file is being dragged: a deep tray under the notch so the drop never has to
+/// touch the screen edge (where macOS would spring Mission Control).
 struct DropRow: View {
     let metrics: Layout.Metrics
     let targeted: Bool
@@ -304,22 +305,28 @@ struct DropRow: View {
     var body: some View {
         VStack(spacing: 0) {
             Color.clear.frame(height: Layout.closedHeight(metrics))
-            HStack(spacing: 8) {
+            VStack(spacing: 8) {
                 Image(systemName: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
-                    .font(.system(size: 13, weight: .semibold)).contentTransition(.symbolEffect(.replace))
-                Text(targeted ? "Bırak" : "Buraya bırak").font(.system(size: 11.5, weight: .semibold))
-                if count > 0 && !targeted {
-                    Text("\(count)").font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit()
-                        .padding(.horizontal, 6).padding(.vertical, 2).background(Theme.fillStrong, in: Capsule())
+                    .font(.system(size: 24, weight: .regular)).contentTransition(.symbolEffect(.replace))
+                HStack(spacing: 6) {
+                    Text(targeted ? "Bırak" : "Buraya bırak").font(.system(size: 12.5, weight: .semibold))
+                    if count > 0 && !targeted {
+                        Text("\(count)").font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit()
+                            .padding(.horizontal, 6).padding(.vertical, 2).background(Theme.fillStrong, in: Capsule())
+                    }
                 }
             }
             .foregroundStyle(targeted ? Theme.accent : Color.white)
-            .padding(.horizontal, 14).padding(.vertical, 7)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
-                Capsule().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(targeted ? Theme.accent.opacity(0.12) : .white.opacity(0.04))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [6, 5]))
                     .foregroundStyle(targeted ? Theme.accent.opacity(0.9) : .white.opacity(0.35))
             }
-            .scaleEffect(targeted ? 1.06 : 1)
+            .scaleEffect(targeted ? 1.02 : 1)
+            .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 14)
             .frame(height: Layout.dropBandHeight)
             .animation(Theme.quick, value: targeted)
         }
