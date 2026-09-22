@@ -55,6 +55,7 @@ final class AppState: ObservableObject {
     let monitor = SystemMonitor()
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
+    let updater = UpdateService()
     @Published private(set) var agentBadge: AgentSession?
     @Published var agentAttention = false   // brief pulse of the mascot when an agent starts waiting
     lazy var keys = MediaKeyInterceptor(monitor: monitor)
@@ -107,6 +108,12 @@ final class AppState: ObservableObject {
             }
         }
         agents.start()
+        updater.onUpdateFound = { [weak self] version in
+            guard let self else { return }
+            self.showNotice("Damla \(version) hazır · yüklemek için dokun", duration: 12) { [weak self] in self?.updater.checkForUpdates() }
+            self.showHUD("arrow.down.circle.fill", "Damla \(version) hazır", 1)
+        }
+        updater.start()
         keys.onDenied = { [weak self] in
             self?.showNotice("Erişilebilirlik izni gerekli · ayarları açmak için dokun", duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
         }

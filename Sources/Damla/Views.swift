@@ -1060,7 +1060,8 @@ struct FocusView: View {
 struct SettingsView: View {
     @ObservedObject var model: AppState
     @ObservedObject var keys: MediaKeyInterceptor
-    init(model: AppState) { self.model = model; keys = model.keys }
+    @ObservedObject var updater: UpdateService
+    init(model: AppState) { self.model = model; keys = model.keys; updater = model.updater }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1096,6 +1097,20 @@ struct SettingsView: View {
                 Button("Klavyeyi kilitle · 60 sn") { model.startCleaning() }.buttonStyle(PillStyle())
                     .help("Tüm klavyeler 60 saniye kilitlenir. Fare çalışır. Esc’yi 2 saniye tutarak çıkabilirsin.")
             }
+            if updater.isConfigured {
+                divider
+                HStack {
+                    Text("Güncellemeler").foregroundStyle(.white.opacity(0.92))
+                    Spacer(minLength: 8)
+                    HStack(spacing: 8) {
+                        Toggle("", isOn: $updater.automaticChecks).labelsHidden().toggleStyle(GlassSwitchStyle())
+                            .help("Günde bir kez GitHub'daki sürüm listesine bakar; sunucu yok, veri gönderilmez.")
+                        Button(updater.availableVersion.map { "\($0) yükle" } ?? "Şimdi denetle") { updater.checkForUpdates() }
+                            .buttonStyle(PillStyle(accent: updater.availableVersion != nil)).font(.system(size: 10.5, weight: .medium))
+                    }
+                }
+                .frame(height: 30)
+            }
             Spacer(minLength: 0)
             HStack(spacing: 8) {
                 if model.hideSystemHUD && !keys.active {
@@ -1104,7 +1119,7 @@ struct SettingsView: View {
                             .font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.amber).lineLimit(1)
                     }.buttonStyle(.plain)
                 } else {
-                    Text("Damla 0.3 · ⌃⌥Space").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
+                    Text("Damla \(updater.currentVersion) · ⌃⌥Space").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
                 }
                 Spacer()
                 Button("Çıkış") { NSApp.terminate(nil) }.font(.system(size: 10.5, weight: .medium)).buttonStyle(.plain).foregroundStyle(Theme.dim)

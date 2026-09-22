@@ -6,12 +6,16 @@
 <key>CFBundleName</key><string>Damla</string>
 <key>CFBundleDisplayName</key><string>Damla</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.3.0</string>
-<key>CFBundleVersion</key><string>3</string>
+<key>CFBundleShortVersionString</key><string>0.4.0</string>
+<key>CFBundleVersion</key><string>4</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSMinimumSystemVersion</key><string>26.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSAppleEventsUsageDescription</key><string>Damla, seçtiğin müzik uygulamasındaki parçayı göstermek ve oynatmayı kontrol etmek için erişim ister.</string>
+<key>SUFeedURL</key><string>https://raw.githubusercontent.com/erkamyigitaydin/Damla/main/appcast.xml</string>
+<key>SUPublicEDKey</key><string>nRc3hMJ/a/RG0yzMlksdv3LxhUXMcXLw18TRFIFHaU0=</string>
+<key>SUEnableAutomaticChecks</key><true/>
+<key>SUScheduledCheckInterval</key><integer>86400</integer>
 <key>NSHumanReadableCopyright</key><string>Personal build · 2026</string>
 </dict></plist>

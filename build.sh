@@ -12,6 +12,11 @@ cp "$PROJECT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 if [[ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]]; then
   cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
+# Sparkle (auto-updates): SwiftPM fetches the framework; it has to be embedded by hand.
+SPARKLE="$(find "$BUILD_DIR/artifacts" -type d -name "Sparkle.framework" -path "*macos-arm64_x86_64*" | head -1)"
+if [[ -z "$SPARKLE" ]]; then echo "Sparkle.framework bulunamadı (swift build artifacts)"; exit 1; fi
+rm -rf "$APP_DIR/Contents/Frameworks"; mkdir -p "$APP_DIR/Contents/Frameworks"
+cp -R "$SPARKLE" "$APP_DIR/Contents/Frameworks/"
 # Now Playing adapter (perl-hosted MediaRemote bridge); bundled, never linked.
 ADAPTER_SRC="$PROJECT_DIR/Vendor/MediaRemoteAdapter"
 ADAPTER_DST="$APP_DIR/Contents/Resources/MediaRemoteAdapter"
@@ -25,6 +30,10 @@ if [[ -z "$IDENTITY" ]]; then
   IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"')"
 fi
 [[ -z "$IDENTITY" ]] && IDENTITY="-"
+FW="$APP_DIR/Contents/Frameworks/Sparkle.framework/Versions/B"
+for item in "$FW/XPCServices/"*.xpc "$FW/Autoupdate" "$FW/Updater.app" "$APP_DIR/Contents/Frameworks/Sparkle.framework"; do
+  [[ -e "$item" ]] && codesign --force --sign "$IDENTITY" --timestamp=none "$item"
+done
 codesign --force --sign "$IDENTITY" --timestamp=none "$ADAPTER_DST/MediaRemoteAdapter.framework"
 codesign --force --sign "$IDENTITY" --timestamp=none "$ADAPTER_DST/MediaRemoteAdapterTestClient"
 codesign --force --sign "$IDENTITY" --timestamp=none "$APP_DIR"

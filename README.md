@@ -65,6 +65,10 @@ Müzik bilgisi ve kapak macOS'un kendi "Şu An Çalıyor" kaydından yerel olara
 - Müzik: `Vendor/MediaRemoteAdapter` (ungive/mediaremote-adapter, BSD-3) uygulamaya paketlenir; `NowPlayingBridge`, `/usr/bin/perl` içinde çalışan adaptörün `stream` çıktısını (JSON satırları, fark tabanlı) okur, `send`/`seek` ile kumanda eder. Apple 15.4'ten beri MediaRemote'u üçüncü taraf süreçlere kapattığı için yalnızca Apple imzalı perl üzerinden çalışır; macOS 27.0 (26A428) üzerinde doğrulandı. Başlangıçta `test` komutu koşulur, 0 dönmezse Apple Events yoluna düşülür. Konum, `elapsedTime` + `timestamp` üzerinden yerel olarak ilerletilir.
 - İmza: `build.sh`, Keychain'deki ilk "Apple Development" sertifikasıyla imzalar (`DAMLA_SIGN_IDENTITY` ile değiştirilebilir, yoksa ad-hoc). Tasarlanmış gereksinim takım sertifikasına bağlı olduğu için Erişilebilirlik/Otomasyon izinleri yeniden derlemede korunur. App Store/Developer ID dağıtımı ve noter onayı yapılmadı.
 
+## Güncellemeler (Sparkle)
+
+Damla, [Sparkle](https://sparkle-project.org) ile günde bir kez `appcast.xml` dosyasına (bu depoda, `raw.githubusercontent.com` üzerinden) bakar; yeni sürüm varsa çentikte "Damla X hazır" bildirimi çıkar, tıklayınca Sparkle'ın kendi penceresi indirir ve yeniden başlatır. Ayarlar → Güncellemeler anahtarı otomatik denetimi kapatır; "Şimdi denetle" ve menü çubuğundaki "Güncellemeleri denetle…" elle bakar. Sunucu yoktur: dmg'ler GitHub Release'te, appcast depoda durur; indirilen dosya hem Apple noter onayı hem de `Info.plist`'teki EdDSA açık anahtarıyla doğrulanır (gizli anahtar yalnızca yayıncının Keychain'inde). Damla hiçbir veri göndermez; Sparkle'ın sistem profili paylaşımı kapalıdır.
+
 ## Paylaşım (Developer ID + noter onayı)
 
 Bir kez: Xcode → Settings → Accounts → Manage Certificates → **Developer ID Application** sertifikası; ardından `xcrun notarytool store-credentials damla-notary --team-id <TAKIM>` ile uygulamaya özel parolayı Keychain'e kaydet. Sonra her sürümde:
@@ -73,7 +77,7 @@ Bir kez: Xcode → Settings → Accounts → Manage Certificates → **Developer
 zsh release.sh
 ```
 
-Evrensel ikili (arm64 + x86_64) derler, hardened runtime ve zaman damgasıyla Developer ID imzalar (adaptör çerçevesi ve test istemcisi dahil), `dist/Damla-<sürüm>.dmg` üretir, Apple'a noter onayına gönderip damgalar. `--no-notarize` yalnızca imzalar. Alıcı `.dmg`'yi açıp uygulamayı Applications'a sürükler; Gatekeeper uyarısı çıkmaz. Erişilebilirlik ve Otomasyon izinlerini herkes kendi Mac'inde verir. Not: paketlenmiş Now Playing adaptörü arm64; Intel Mac'te Apple Events yedeği devreye girer, evrensel adaptör için `zsh Vendor/MediaRemoteAdapter/build-adapter.sh --universal`.
+Evrensel ikili (arm64 + x86_64) derler, hardened runtime ve zaman damgasıyla Developer ID imzalar (Sparkle çerçevesi, XPC servisleri, adaptör çerçevesi ve test istemcisi dahil), `dist/Damla-<sürüm>.dmg` üretir, Apple'a noter onayına gönderip damgalar; ardından dmg'yi Keychain'deki Sparkle anahtarıyla imzalar, `appcast.xml`'e girdi ekleyip commit'ler ve `gh release create` ile GitHub Release'e yükler. Sürüm notu için `dist/notes-<sürüm>.md` varsa onu, yoksa son commit mesajını kullanır. `--no-publish` appcast ve Release adımını atlar; `--no-notarize` yalnızca imzalar. Çalışma ağacı temiz olmalı ve `Info.plist`'teki sürüm daha önce yayınlanmamış olmalı. Bir kez: Sparkle anahtarı için `.build/artifacts/sparkle/Sparkle/bin/generate_keys` (açık anahtar `SUPublicEDKey`). Alıcı `.dmg`'yi açıp uygulamayı Applications'a sürükler; Gatekeeper uyarısı çıkmaz. Erişilebilirlik ve Otomasyon izinlerini herkes kendi Mac'inde verir. Not: paketlenmiş Now Playing adaptörü arm64; Intel Mac'te Apple Events yedeği devreye girer, evrensel adaptör için `zsh Vendor/MediaRemoteAdapter/build-adapter.sh --universal`.
 
 ## Derleme
 

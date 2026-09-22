@@ -383,6 +383,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Damla’yı aç", action: #selector(showPanel), keyEquivalent: "")
         menu.addItem(withTitle: "Ayarlar", action: #selector(showSettings), keyEquivalent: ",")
         menu.addItem(withTitle: "Temizlik modu · 60 sn", action: #selector(startCleaning), keyEquivalent: "")
+        menu.addItem(withTitle: "Güncellemeleri denetle…", action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Damla’dan çık", action: #selector(quit), keyEquivalent: "q")
         for item in menu.items { item.target = self }
@@ -448,6 +449,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showPanel() { manager.show() }
     @objc func showSettings() { model.settingsVisible = true; manager.show() }
     @objc func startCleaning() { manager.show(); model.startCleaning() }
+    @objc func checkForUpdates() { model.updater.checkForUpdates() }
     @objc func quit() { NSApp.terminate(nil) }
     private func registerShortcut() {
         var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
