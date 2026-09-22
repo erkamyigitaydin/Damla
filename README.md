@@ -65,6 +65,16 @@ Müzik bilgisi ve kapak macOS'un kendi "Şu An Çalıyor" kaydından yerel olara
 - Müzik: `Vendor/MediaRemoteAdapter` (ungive/mediaremote-adapter, BSD-3) uygulamaya paketlenir; `NowPlayingBridge`, `/usr/bin/perl` içinde çalışan adaptörün `stream` çıktısını (JSON satırları, fark tabanlı) okur, `send`/`seek` ile kumanda eder. Apple 15.4'ten beri MediaRemote'u üçüncü taraf süreçlere kapattığı için yalnızca Apple imzalı perl üzerinden çalışır; macOS 27.0 (26A428) üzerinde doğrulandı. Başlangıçta `test` komutu koşulur, 0 dönmezse Apple Events yoluna düşülür. Konum, `elapsedTime` + `timestamp` üzerinden yerel olarak ilerletilir.
 - İmza: `build.sh`, Keychain'deki ilk "Apple Development" sertifikasıyla imzalar (`DAMLA_SIGN_IDENTITY` ile değiştirilebilir, yoksa ad-hoc). Tasarlanmış gereksinim takım sertifikasına bağlı olduğu için Erişilebilirlik/Otomasyon izinleri yeniden derlemede korunur. App Store/Developer ID dağıtımı ve noter onayı yapılmadı.
 
+## Paylaşım (Developer ID + noter onayı)
+
+Bir kez: Xcode → Settings → Accounts → Manage Certificates → **Developer ID Application** sertifikası; ardından `xcrun notarytool store-credentials damla-notary --team-id <TAKIM>` ile uygulamaya özel parolayı Keychain'e kaydet. Sonra her sürümde:
+
+```sh
+zsh release.sh
+```
+
+Evrensel ikili (arm64 + x86_64) derler, hardened runtime ve zaman damgasıyla Developer ID imzalar (adaptör çerçevesi ve test istemcisi dahil), `dist/Damla-<sürüm>.dmg` üretir, Apple'a noter onayına gönderip damgalar. `--no-notarize` yalnızca imzalar. Alıcı `.dmg`'yi açıp uygulamayı Applications'a sürükler; Gatekeeper uyarısı çıkmaz. Erişilebilirlik ve Otomasyon izinlerini herkes kendi Mac'inde verir. Not: paketlenmiş Now Playing adaptörü arm64; Intel Mac'te Apple Events yedeği devreye girer, evrensel adaptör için `zsh Vendor/MediaRemoteAdapter/build-adapter.sh --universal`.
+
 ## Derleme
 
 Xcode Command Line Tools / Swift 6+ kurulu bir Mac'te:
