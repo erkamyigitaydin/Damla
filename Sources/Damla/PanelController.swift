@@ -171,7 +171,7 @@ final class PanelController {
 
     func visibleRect() -> NSRect {
         guard let screen else { return .zero }
-        return Layout.visibleRect(state, screenInfo.metrics, compactContent: model.compactContent, midX: screen.frame.midX, top: topY)
+        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY)
     }
 
     private func trackHover() {

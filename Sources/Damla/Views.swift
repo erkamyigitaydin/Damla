@@ -98,11 +98,11 @@ struct DamlaView: View {
     @State private var glassVisible = false
     init(model: AppState, screen: ScreenMetrics) { self.model = model; media = model.media; self.screen = screen }
 
-    private struct Key: Equatable { var state: NotchState; var compact: Bool; var dropping: Bool; var metrics: Layout.Metrics }
+    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics }
     private var state: NotchState { model.state(for: screen.id) }
     private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
-    private var size: CGSize { Layout.shapeSize(state, metrics, compactContent: model.compactContent) }
+    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots) }
     private var shape: NotchShape {
         let bottom: CGFloat = open ? 26 : state == .drop ? 24 : 13
         return metrics.hasNotch
@@ -121,7 +121,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactContent, dropping: dropping, metrics: metrics))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -224,42 +224,47 @@ struct DamlaView: View {
 
 // MARK: - Closed notch
 
+/// A live activity the closed notch can show. Each has a glyph (identity) and a status (motion).
+enum CompactActivity: Equatable {
+    case timer, agent(AgentSession), media
+    /// Left-to-right order when two share the island: the timer first, media next, the agent last.
+    var rank: Int { switch self { case .timer: return 0; case .media: return 1; case .agent: return 2 } }
+}
+
 struct CompactRow: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
     let metrics: Layout.Metrics
+
+    /// Up to two activities; when three compete the timer and the agent win because both need attention.
+    private var activities: [CompactActivity] {
+        var list: [CompactActivity] = []
+        if model.session.hasStarted { list.append(.timer) }
+        if let agent = model.agentBadge { list.append(.agent(agent)) }
+        if media.hasTrack { list.append(.media) }
+        return Array(list.prefix(2)).sorted { $0.rank < $1.rank }
+    }
+
     var body: some View {
         let m = metrics
         let ear = Layout.ear(m, open: false)
-        let side = Layout.compactSide - ear
-        if model.compactContent {
-            // Like the iPhone's island: the agent's mascot lives on the left while it works, its live status on the
-            // right. A running focus timer keeps the left; the mascot then moves right with its status badge.
-            let agent = model.agentBadge
-            let mascotLeft = agent != nil && !model.session.hasStarted
+        let list = activities
+        let side = Layout.compactSide(slots: list.count) - ear
+        if let first = list.first {
             HStack(spacing: 0) {
                 Group {
-                    if model.session.hasStarted {
-                        Text(model.timeLabel).font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
-                            .contentTransition(.numericText())
-                    } else if let agent {
-                        AgentMascot(session: agent, size: 22)
-                    } else if let art = media.artwork {
-                        Image(nsImage: art).resizable().scaledToFill().frame(width: 20, height: 20)
-                            .clipShape(RoundedRectangle(cornerRadius: 5.5, style: .continuous))
-                    } else {
-                        Image(systemName: "music.note").font(.system(size: 11, weight: .semibold))
-                    }
-                }.frame(width: side)
+                    if list.count == 1 { glyph(first) }
+                    else { HStack(spacing: 7) { glyph(first); status(first) } }
+                }
+                .frame(width: side)
                 Spacer(minLength: 0).frame(width: m.notchWidth)
                 Group {
-                    if let agent {
-                        if mascotLeft { AgentStatusMark(phase: agent.phase) } else { AgentMascot(session: agent, size: 22) }
-                    } else if media.hasTrack { Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55) }
-                    else { Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim) }
-                }.frame(width: side)
+                    if list.count == 1 { status(first) }
+                    else if let second = list.dropFirst().first { HStack(spacing: 7) { status(second); glyph(second) } }
+                }
+                .frame(width: side)
             }
-            .help(agent.map { "\($0.provider.title) · \($0.project) · \($0.phase.title)" } ?? "")
+            .help(helpText)
             .foregroundStyle(.white)
             .padding(.horizontal, ear)
             .frame(height: Layout.closedHeight(m))
@@ -269,6 +274,44 @@ struct CompactRow: View {
                 .frame(height: Layout.closedHeight(m))
         } else {
             Color.clear.frame(height: Layout.closedHeight(m))
+        }
+    }
+
+    private var helpText: String {
+        activities.map { activity -> String in
+            switch activity {
+            case .timer: return "Odak · \(model.timeLabel)"
+            case .agent(let agent): return "\(agent.provider.title) · \(agent.project) · \(agent.phase.title)"
+            case .media: return media.hasTrack ? "\(media.title) · \(media.artist)" : "Müzik"
+            }
+        }.joined(separator: "\n")
+    }
+
+    @ViewBuilder private func glyph(_ activity: CompactActivity) -> some View {
+        switch activity {
+        case .timer:
+            Text(model.timeLabel).font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
+                .contentTransition(.numericText())
+        case .agent(let agent):
+            AgentMascot(session: agent, size: 22)
+        case .media:
+            if let art = media.artwork {
+                Image(nsImage: art).resizable().scaledToFill().frame(width: 20, height: 20)
+                    .clipShape(RoundedRectangle(cornerRadius: 5.5, style: .continuous))
+            } else {
+                Image(systemName: "music.note").font(.system(size: 11, weight: .semibold))
+            }
+        }
+    }
+
+    @ViewBuilder private func status(_ activity: CompactActivity) -> some View {
+        switch activity {
+        case .timer:
+            Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim)
+        case .agent(let agent):
+            AgentStatusMark(phase: agent.phase)
+        case .media:
+            Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55)
         }
     }
 }

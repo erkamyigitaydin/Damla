@@ -30,7 +30,8 @@ enum Layout {
     static let pillGap: CGFloat = 8
     static let margin: CGFloat = 36           // transparent window margin that holds the shadow
     static let hudSide: CGFloat = 124         // HUD width on each side of the notch
-    static let compactSide: CGFloat = 54      // compact content width on each side of the notch
+    static let compactSide: CGFloat = 54      // one live activity: glyph on the left, status on the right
+    static let compactSideSplit: CGFloat = 80 // two live activities: each side holds one activity's glyph + status
     static let notchlessTopInset: CGFloat = 6 // gap under the menu bar on screens without a notch
     static let notchlessIdleWidth: CGFloat = 92
     static let dropBandHeight: CGFloat = 104   // tray under the notch while dragging; deep enough to hit without touching the screen edge
@@ -41,10 +42,13 @@ enum Layout {
     static func headerHeight(_ m: Metrics) -> CGFloat { m.hasNotch ? m.notchHeight : 12 }
     static func closedHeight(_ m: Metrics) -> CGFloat { m.notchHeight } // flush with the menu bar on every screen
 
-    static func shapeSize(_ state: NotchState, _ m: Metrics, compactContent: Bool) -> CGSize {
+    /// Width of one side of the closed notch for the given number of live activities (0, 1 or 2).
+    static func compactSide(slots: Int) -> CGFloat { slots >= 2 ? compactSideSplit : compactSide }
+
+    static func shapeSize(_ state: NotchState, _ m: Metrics, compactSlots: Int) -> CGSize {
         switch state {
         case .closed:
-            let extra: CGFloat = compactContent ? compactSide * 2 : (m.hasNotch ? 12 : notchlessIdleWidth)
+            let extra: CGFloat = compactSlots > 0 ? compactSide(slots: compactSlots) * 2 : (m.hasNotch ? 12 : notchlessIdleWidth)
             return CGSize(width: m.notchWidth + extra, height: closedHeight(m))
         case .hud:
             return CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m))
@@ -63,8 +67,8 @@ enum Layout {
     }
 
     /// Screen-space rect of everything currently drawn (shape plus the tab pill when open).
-    static func visibleRect(_ state: NotchState, _ m: Metrics, compactContent: Bool, midX: CGFloat, top: CGFloat) -> CGRect {
-        var size = shapeSize(state, m, compactContent: compactContent)
+    static func visibleRect(_ state: NotchState, _ m: Metrics, compactSlots: Int, midX: CGFloat, top: CGFloat) -> CGRect {
+        var size = shapeSize(state, m, compactSlots: compactSlots)
         if state == .expanded { size.height += pillGap + pillHeight }
         return CGRect(x: midX - size.width / 2, y: top - size.height, width: size.width, height: size.height)
     }

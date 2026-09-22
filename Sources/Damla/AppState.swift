@@ -72,8 +72,10 @@ final class AppState: ObservableObject {
     func state(for screenID: UInt32) -> NotchState {
         cleaning.active || (expanded && activeScreenID == screenID) ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
     }
+    /// Live activities the closed notch can show (focus timer, agent, media), at most two at once.
+    var compactSlots: Int { min(2, [session.hasStarted, agentBadge != nil, media.hasTrack].filter { $0 }.count) }
     /// True when the closed notch has something to show beside the physical notch.
-    var compactContent: Bool { session.hasStarted || media.hasTrack || agentBadge != nil }
+    var compactContent: Bool { compactSlots > 0 }
 
     func start() {
         monitor.onBattery = { [weak self] value in self?.battery = value }
