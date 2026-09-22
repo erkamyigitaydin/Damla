@@ -47,6 +47,10 @@ final class PanelController {
     private(set) var screen: NSScreen?
     var dialogShowing = false
     var pinnedBeforeQuickLook = false
+    /// The menu bar on this screen is out of sight (a full-screen app, or "hide the menu bar automatically").
+    /// The closed notch follows it away and comes back when the menu bar slides in.
+    var menuBarHidden = false { didSet { if menuBarHidden != oldValue { updateVisibility() } } }
+    private var concealed = false
 
     init(model: AppState, fixedScreen: NSScreen?) {
         self.model = model
@@ -83,6 +87,9 @@ final class PanelController {
             }
             self.lastExpandedHere = here
         }.store(in: &cancellables)
+        Publishers.Merge4(model.$expanded.map { _ in () }, model.$dragActive.map { _ in () }, model.$hud.map { _ in () },
+                          model.$pinnedOpen.map { _ in () })
+            .receive(on: RunLoop.main).sink { [weak self] in self?.updateVisibility() }.store(in: &cancellables)
         if fixedScreen == nil {
             model.$displayMode.dropFirst().receive(on: RunLoop.main)
                 .sink { [weak self] _ in self?.chooseScreen(); self?.layout() }.store(in: &cancellables)
@@ -121,6 +128,19 @@ final class PanelController {
         panel.level = target
         panel.orderFrontRegardless()
         layout()
+    }
+
+    /// Hidden only while closed: a HUD, the drop basket or an open panel still shows over a full-screen app.
+    func updateVisibility() {
+        let conceal = menuBarHidden && state == .closed && !model.pinnedOpen
+        guard conceal != concealed else { return }
+        concealed = conceal
+        if conceal { enteredAt = nil }
+        panel.ignoresMouseEvents = conceal
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = conceal ? 0.18 : 0.12
+            panel.animator().alphaValue = conceal ? 0 : 1
+        }
     }
 
     static func screenUnderMouse() -> NSScreen? {
@@ -175,7 +195,7 @@ final class PanelController {
     }
 
     private func trackHover() {
-        guard !model.cleaning.active else { return }
+        guard !model.cleaning.active, !concealed else { return }
         let now = Date()
         let location = NSEvent.mouseLocation
         if fixedScreen == nil, model.displayMode == .followMouse, state == .closed, !model.pinnedOpen,
@@ -241,6 +261,8 @@ final class PanelManager {
     private var localMonitor: Any?
     private var dragMonitors: [Any] = []
     private var dragTimer: Timer?
+    private var menuBarTimer: Timer?
+    private var revealedNotchBars = Set<UInt32>()
     private var lastDragCount = NSPasteboard(name: .drag).changeCount
     private weak var quickLookOwner: PanelController?
     var holdBasket = false // debug: keep the basket open without a real drag
@@ -300,6 +322,44 @@ final class PanelManager {
             else if self.model.dragActive && !self.holdBasket { self.endDrag() }
         }
         if let dragTimer { RunLoop.main.add(dragTimer, forMode: .common) }
+        menuBarTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.updateMenuBars() }
+        if let menuBarTimer { RunLoop.main.add(menuBarTimer, forMode: .common) }
+    }
+
+    /// The menu bar is one Window Server window per display at the main-menu level. It leaves the on-screen
+    /// window list while a full-screen app (or the auto-hide setting) keeps it away, and returns when the
+    /// pointer reveals it (measured on macOS 27). Owner name and layer need no screen-recording permission.
+    private func updateMenuBars() {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return }
+        let menuLevel = Int(CGWindowLevelForKey(.mainMenuWindow))
+        let bars: [CGRect] = list.compactMap { info in
+            guard info[kCGWindowLayer as String] as? Int == menuLevel, info[kCGWindowOwnerName as String] as? String == "Window Server",
+                  let bounds = info[kCGWindowBounds as String] as? NSDictionary else { return nil }
+            return CGRect(dictionaryRepresentation: bounds)
+        }
+        let fullScreen = controllers.contains { ($0.screen?.safeAreaInsets.top ?? 0) > 0 } ? FullScreenSpaces.current() : nil
+        let mouse = NSEvent.mouseLocation
+        for controller in controllers {
+            guard let screen = controller.screen else { continue }
+            if screen.safeAreaInsets.top > 0 {
+                // A notched display keeps its menu bar window in full screen (it paints the black band around
+                // the notch), so ask the Space instead. The menu bar drops in when the pointer touches the top
+                // edge and stays while the pointer is on it.
+                guard fullScreen?.contains(controller.id) == true else {
+                    revealedNotchBars.remove(controller.id); controller.menuBarHidden = false; continue
+                }
+                let onScreen = NSMouseInRect(mouse, screen.frame, false)
+                if onScreen && mouse.y >= screen.frame.maxY - 2 { revealedNotchBars.insert(controller.id) }
+                else if !onScreen || mouse.y < screen.frame.maxY - screen.safeAreaInsets.top - 6 { revealedNotchBars.remove(controller.id) }
+                controller.menuBarHidden = !revealedNotchBars.contains(controller.id)
+                continue
+            }
+            // With one Space across all displays only the main display has a menu bar; the rest follow it.
+            let visible = NSScreen.screensHaveSeparateSpaces
+                ? bars.contains { $0.intersects(CGDisplayBounds(controller.id)) }
+                : !bars.isEmpty
+            controller.menuBarHidden = !visible
+        }
     }
 
     /// The controller showing the panel, else the one under the mouse.
@@ -360,6 +420,7 @@ final class PanelManager {
 
     deinit {
         dragTimer?.invalidate()
+        menuBarTimer?.invalidate()
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }
         for monitor in dragMonitors { NSEvent.removeMonitor(monitor) }
     }
@@ -474,5 +535,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.media.bridge.stop()
         if let hotKey { UnregisterEventHotKey(hotKey) }
         if let eventHandler { RemoveEventHandler(eventHandler) }
+    }
+}
+
+
+/// Which displays currently show a full-screen Space. Private SkyLight call (loaded lazily, so a missing
+/// symbol only disables the check): `CGSCopyManagedDisplaySpaces` lists every display's current Space,
+/// and type 4 is a full-screen one (measured on macOS 27).
+enum FullScreenSpaces {
+    private typealias ConnectionFn = @convention(c) () -> Int32
+    private typealias SpacesFn = @convention(c) (Int32) -> Unmanaged<CFArray>?
+    private static let functions: (ConnectionFn, SpacesFn)? = {
+        guard let handle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY),
+              let connection = dlsym(handle, "CGSMainConnectionID"), let spaces = dlsym(handle, "CGSCopyManagedDisplaySpaces")
+        else { return nil }
+        return (unsafeBitCast(connection, to: ConnectionFn.self), unsafeBitCast(spaces, to: SpacesFn.self))
+    }()
+
+    static func current() -> Set<UInt32> {
+        guard let (connection, copySpaces) = functions,
+              let displays = copySpaces(connection())?.takeRetainedValue() as? [[String: Any]] else { return [] }
+        var result = Set<UInt32>()
+        for display in displays {
+            guard (display["Current Space"] as? [String: Any])?["type"] as? Int == 4 else { continue }
+            let identifier = display["Display Identifier"] as? String
+            for screen in NSScreen.screens {
+                // "Main" when all displays share one Space.
+                let uuid = CGDisplayCreateUUIDFromDisplayID(screen.displayID).map { CFUUIDCreateString(nil, $0.takeRetainedValue()) as String }
+                if identifier == "Main" || identifier == uuid { result.insert(screen.displayID) }
+            }
+        }
+        return result
     }
 }

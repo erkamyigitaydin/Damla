@@ -108,5 +108,5 @@ Kaynak dizininin yanına `Damla.app` üretir. Derleme önbelleğini başka yerde
 - Quick Look: raf küçük resimleri (metin ve ikon dosyaları), seçim halkası, Boşluk ile açılan sistem paneli, panel açıkken/kapanınca çentiğin yerinde kalması ve tepsi önizlemesi ekran görüntüsüyle doğrulandı.
 - Sepet zinciri canlı doğrulandı: fare basılıyken sürükleme panosuna dosya adresi yazılınca panel 499 seviyesine indi ve "Buraya bırak" bandı açıldı; bırakınca 1000'e döndü. Finder'dan gerçek bırakma kullanıcı tarafından denenmeli.
 - Ses ve parlaklık uygulayıcıları debug komutlarıyla doğrulandı (1/16 adım, gerçek CoreAudio ve DisplayServices üzerinden okunup geri alındı). Tuş yakalama akışı Erişilebilirlik izni gerektirdiği için kullanıcı tarafından denenmeli.
-- Tam ekran: yerleşik ekranda tam ekran bir pencere üzerinde kapalı çentik, hover ile açılış ve açık panel ekran görüntüsüyle doğrulandı.
+- Tam ekran: kapalı çentik menü çubuğuyla birlikte gizleniyor. Harici ekranda menü çubuğu penceresinin kaybolmasına, çentikli ekranda Space türüne (tam ekran) ve farenin üst kenara değmesine bakılıyor. İki ekranda da tam ekrana alınan bir pencereyle doğrulandı: gizlendi, fare üste gidince geri geldi, çıkınca normale döndü. HUD, sepet ve açık panel tam ekranda da görünüyor.
 - Denenmeyenler: gerçek sürükle-bırak akışı, Spotify, uzun süreli enerji kullanımı.
