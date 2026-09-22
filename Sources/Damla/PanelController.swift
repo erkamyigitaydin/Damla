@@ -24,6 +24,9 @@ final class PanelController {
     private var lastExpanded = false
     private(set) var screen: NSScreen?
     private var localMonitor: Any?
+    private var dragMonitors: [Any] = []
+    var holdBasket = false // debug: keep the basket open without a real drag
+    private var lastDragCount = NSPasteboard(name: .drag).changeCount
 
     init(model: AppState) {
         self.model = model
@@ -77,6 +80,10 @@ final class PanelController {
             }
             return event
         }
+        // Basket: watch for file drags anywhere. Mouse monitors need no permission; the drag pasteboard's
+        // change count ticks once per drag session, so the check is cheap.
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged, handler: { [weak self] _ in self?.checkDrag() }) { dragMonitors.append(monitor) }
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp, handler: { [weak self] _ in self?.endDrag() }) { dragMonitors.append(monitor) }
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.trackHover() }
         if let hoverTimer { RunLoop.main.add(hoverTimer, forMode: .common) }
         layout()
@@ -134,9 +141,27 @@ final class PanelController {
         return Layout.visibleRect(model.state, model.metrics, compactContent: model.compactContent, midX: screen.frame.midX, top: topY)
     }
 
+    private func checkDrag() {
+        guard !model.expanded else { return }
+        let board = NSPasteboard(name: .drag)
+        guard board.changeCount != lastDragCount else { return }
+        lastDragCount = board.changeCount
+        if board.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) {
+            model.dragActive = true
+        }
+    }
+    private func endDrag() {
+        // Give the drop a moment to land on our target before the basket folds away.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self, NSEvent.pressedMouseButtons == 0 else { return }
+            self.model.dragActive = false
+        }
+    }
     private func trackHover() {
         let now = Date()
         let location = NSEvent.mouseLocation
+        if NSEvent.pressedMouseButtons != 0 { checkDrag() }
+        else if model.dragActive && !holdBasket { endDrag() }
         if model.displayMode == .followMouse, model.state == .closed, !model.pinnedOpen,
            let under = Self.screenUnderMouse(), under != screen {
             chooseScreen(); layout()
@@ -145,7 +170,7 @@ final class PanelController {
         if inside {
             exitedAt = nil
             if enteredAt == nil { enteredAt = now }
-            if !model.expanded && model.automaticOpen && now >= suppressHoverUntil && now.timeIntervalSince(enteredAt!) > 0.12 {
+            if !model.expanded && !model.dragActive && model.automaticOpen && now >= suppressHoverUntil && now.timeIntervalSince(enteredAt!) > 0.12 {
                 model.expanded = true
             }
         } else {
@@ -169,7 +194,11 @@ final class PanelController {
         if model.displayMode == .followMouse { chooseScreen(); layout() }
         model.expanded = true; model.pinnedOpen = true; panel.orderFrontRegardless()
     }
-    deinit { hoverTimer?.invalidate(); if let localMonitor { NSEvent.removeMonitor(localMonitor) } }
+    deinit {
+        hoverTimer?.invalidate()
+        if let localMonitor { NSEvent.removeMonitor(localMonitor) }
+        for monitor in dragMonitors { NSEvent.removeMonitor(monitor) }
+    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -228,6 +257,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "bright-up": model.monitor.adjustBrightness(by: 1 / 16)
         case "bright-down": model.monitor.adjustBrightness(by: -1 / 16)
         case "keys-on": model.setHideSystemHUD(true)
+        case "drag-on": controller.holdBasket = true; model.dragActive = true
+        case "drag-off": controller.holdBasket = false; model.dragActive = false
         case "keys-off": model.setHideSystemHUD(false)
         case "focus-start": model.setFocus(minutes: 25); model.toggleFocus()
         case "focus-stop": model.setFocus(minutes: 25)

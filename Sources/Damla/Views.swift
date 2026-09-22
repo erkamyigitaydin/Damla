@@ -18,6 +18,7 @@ enum Theme {
         if reduceMotion { return .easeOut(duration: 0.15) }
         return open ? .spring(duration: 0.5, bounce: 0.24) : .spring(duration: 0.36, bounce: 0.02)
     }
+    static var basket: Animation { reduceMotion ? .easeOut(duration: 0.15) : .spring(duration: 0.42, bounce: 0.3) }
     static var quick: Animation { reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.3, bounce: 0.1) }
 }
 
@@ -101,9 +102,10 @@ struct DamlaView: View {
     private var open: Bool { state == .expanded }
     private var size: CGSize { Layout.shapeSize(state, metrics, compactContent: model.compactContent) }
     private var shape: NotchShape {
-        metrics.hasNotch
-            ? NotchShape(topEar: Layout.ear(metrics, open: open), topRadius: 0, bottomRadius: open ? 26 : 13)
-            : NotchShape(topEar: 0, topRadius: open ? 24 : 15, bottomRadius: open ? 24 : 15)
+        let bottom: CGFloat = open ? 26 : state == .drop ? 20 : 13
+        return metrics.hasNotch
+            ? NotchShape(topEar: Layout.ear(metrics, open: open), topRadius: 0, bottomRadius: bottom)
+            : NotchShape(topEar: 0, topRadius: open ? 24 : bottom, bottomRadius: open ? 24 : bottom)
     }
 
     var body: some View {
@@ -117,7 +119,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(Theme.motion(open: open), value: Key(state: state, compact: model.compactContent, dropping: dropping, metrics: metrics))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactContent, dropping: dropping, metrics: metrics))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -176,7 +178,8 @@ struct DamlaView: View {
             return !providers.isEmpty
         }
         .onChange(of: dropping) { _, value in
-            if value { model.selectedTab = .files; model.settingsVisible = false; model.expanded = true }
+            // Without the basket (drag started before we noticed), open the shelf so there is a target.
+            if value && !model.dragActive { model.selectedTab = .files; model.settingsVisible = false; model.expanded = true }
         }
     }
 
@@ -186,6 +189,8 @@ struct DamlaView: View {
             ExpandedView(model: model).transition(.blurReplace)
         case .hud:
             if let hud = model.hud { HUDRow(hud: hud, metrics: metrics).transition(.blurReplace) }
+        case .drop:
+            DropRow(metrics: metrics, targeted: dropping, count: model.files.count).transition(.blurReplace)
         case .closed:
             CompactRow(model: model, media: media).transition(.blurReplace)
         }
@@ -289,6 +294,39 @@ struct HUDRow: View {
     }
 }
 
+// MARK: - Basket
+
+/// The notch while a file is being dragged: a wider target with a "drop here" band under the notch.
+struct DropRow: View {
+    let metrics: Layout.Metrics
+    let targeted: Bool
+    let count: Int
+    var body: some View {
+        VStack(spacing: 0) {
+            Color.clear.frame(height: Layout.closedHeight(metrics))
+            HStack(spacing: 8) {
+                Image(systemName: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
+                    .font(.system(size: 13, weight: .semibold)).contentTransition(.symbolEffect(.replace))
+                Text(targeted ? "Bırak" : "Buraya bırak").font(.system(size: 11.5, weight: .semibold))
+                if count > 0 && !targeted {
+                    Text("\(count)").font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .padding(.horizontal, 6).padding(.vertical, 2).background(Theme.fillStrong, in: Capsule())
+                }
+            }
+            .foregroundStyle(targeted ? Theme.accent : Color.white)
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background {
+                Capsule().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    .foregroundStyle(targeted ? Theme.accent.opacity(0.9) : .white.opacity(0.35))
+            }
+            .scaleEffect(targeted ? 1.06 : 1)
+            .frame(height: Layout.dropBandHeight)
+            .animation(Theme.quick, value: targeted)
+        }
+        .padding(.horizontal, Layout.ear(metrics, open: false))
+    }
+}
+
 // MARK: - Expanded
 
 struct ExpandedView: View {
@@ -383,11 +421,17 @@ struct TabPill: View {
 struct HomeView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
+    @State private var appeared = false
     private var tint: Color { media.accent.map { Color(nsColor: $0) } ?? .white }
+    private func entrance(_ order: Double) -> Animation {
+        Theme.reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.55, bounce: 0.22).delay(0.04 + order * 0.05)
+    }
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
                 Artwork(image: media.artwork, placeholder: media.hasTrack ? "music.note" : "waveform", size: 88)
+                    .scaleEffect(appeared ? 1 : 0.72, anchor: .bottomLeading).opacity(appeared ? 1 : 0)
+                    .animation(entrance(0), value: appeared)
                 VStack(alignment: .leading, spacing: 3) {
                     if media.hasTrack {
                         HStack(alignment: .firstTextBaseline) {
@@ -410,6 +454,8 @@ struct HomeView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .offset(x: appeared ? 0 : 14).opacity(appeared ? 1 : 0)
+                .animation(entrance(1), value: appeared)
             }
             .frame(height: 88)
             Spacer(minLength: 10)
@@ -449,7 +495,10 @@ struct HomeView: View {
                 }
             }
             .frame(height: 36)
+            .offset(y: appeared ? 0 : 10).opacity(appeared ? 1 : 0)
+            .animation(entrance(2), value: appeared)
         }
+        .onAppear { appeared = true }
     }
     private func statusLabel(_ icon: String, _ text: String, tint: Color? = nil) -> some View {
         HStack(spacing: 4) {

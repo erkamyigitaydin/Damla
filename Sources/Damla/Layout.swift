@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-enum NotchState: Equatable { case closed, hud, expanded }
+enum NotchState: Equatable { case closed, hud, drop, expanded }
 
 enum DisplayMode: String, CaseIterable, Identifiable {
     case followMouse = "Fareyi izle", notch = "Çentikli ekran"
@@ -33,6 +33,7 @@ enum Layout {
     static let compactSide: CGFloat = 54      // compact content width on each side of the notch
     static let notchlessTopInset: CGFloat = 6 // gap under the menu bar on screens without a notch
     static let notchlessIdleWidth: CGFloat = 92
+    static let dropBandHeight: CGFloat = 30    // extra band under the notch that holds the "drop here" label
     static let fakeNotchWidth: CGFloat = 120   // middle section of the fake notch on notchless screens
     static let fakeNotchHeight: CGFloat = 30   // fallback when the menu bar height cannot be read
 
@@ -47,6 +48,9 @@ enum Layout {
             return CGSize(width: m.notchWidth + extra, height: closedHeight(m))
         case .hud:
             return CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m))
+        case .drop:
+            // Basket: a wider, slightly taller target that appears while a file is being dragged anywhere.
+            return CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m) + dropBandHeight)
         case .expanded:
             return CGSize(width: panelWidth, height: headerHeight(m) + contentHeight)
         }

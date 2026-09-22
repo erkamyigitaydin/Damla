@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
     @Published var notchHeight: CGFloat = 32
     @Published var notchWidth: CGFloat = 185
     @Published var hasNotch = true
+    @Published var dragActive = false   // a file drag is in progress somewhere on the system
     @Published var displayMode = DisplayMode(rawValue: UserDefaults.standard.string(forKey: "displayMode") ?? "") ?? .followMouse
     @Published var externalStyle = ExternalStyle(rawValue: UserDefaults.standard.string(forKey: "externalStyle") ?? "") ?? .menuBar
     @Published var hideSystemHUD = UserDefaults.standard.bool(forKey: "hideSystemHUD")
@@ -58,7 +59,7 @@ final class AppState: ObservableObject {
     var requestKeyFocus: (() -> Void)?
     var setDialogMode: ((Bool) -> Void)?
 
-    var state: NotchState { expanded ? .expanded : hud != nil ? .hud : .closed }
+    var state: NotchState { expanded ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed }
     var metrics: Layout.Metrics { Layout.Metrics(notchWidth: notchWidth, notchHeight: notchHeight, hasNotch: hasNotch) }
     /// True when the closed notch has something to show beside the physical notch.
     var compactContent: Bool { session.hasStarted || media.hasTrack }
