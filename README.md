@@ -17,7 +17,9 @@ Panel varsayılan olarak farenin bulunduğu ekranı izler. Çentiksiz bir ekrand
 
 ## 0.3 görünüm ve hareket
 
-- **Siyah cam:** Yüzey çentikte tam siyah başlar, aşağıya doğru saydamlaşarak `.clear` Liquid Glass'a açılır; alt kısımda duvar kağıdı kırılarak görünür. Metin her zaman beyaz; panel sistem temasından bağımsız koyu kalır.
+- **Siyah cam:** Yüzey çentikte tam siyah başlar, aşağıya doğru saydamlaşarak `.clear` Liquid Glass'a açılır. Karartma camın kendi `tint`'i olarak uygulanır; böylece camın kenar parlaması ve kırılması üstte kalır, arkadaki içerik buzlanmadan net görünür. Metin her zaman beyaz; panel sistem temasından bağımsız koyu kalır.
+- **Cam görünümlü kontroller:** Oynatma, ileri/geri, sıfırla, mola, + ve kapsül seçenekler cam gibi görünür ama gerçek `glassEffect` kullanmaz: panelin camının içine ikinci bir Liquid Glass koyunca (cam içinde cam) bileşik katman panelin siyah üstünden bile arkadaki pencereyi hayalet gibi geçiriyor (macOS 27'de gözlendi). Bu yüzden kontroller katmanlı çizilir: hafif beyaz dolgu, üstte parlama kenarı, gölge; seçili durum nane dolgulu.
+- **Kapak ambiyansı:** Albüm kapağının baskın rengi (`Palette.accent`, 24×24 örnekleme, en renkli ton kovası) Özet sekmesinde panelin alt yarısına yumuşak bir parıltı olarak yansır; ilerleme çubuğu ve kapalı çentikteki ekolayzer aynı renge boyanır. Parça değişince 0,9 s'de geçiş yapar; gri kapaklarda parıltı yoktur.
 - **Çentik şekli:** Üst köşelerde ekrana eriyen içbükey "kulaklar", altta 26 pt yuvarlak köşeler. Kapalıyken şekil fiziksel çentiğe yapışır; müzik veya sayaç varken iki yana açılıp kapak/ekolayzer ve süre gösterir. Boştayken görünmez.
 - **Hareket:** Pencere artık çerçeve animasyonu yapmıyor; sabit boyutlu saydam bir pencere içinde şeklin kendisi SwiftUI yayıyla büyüyor (açılış 0.5 s, hafif sıçrama; kapanış 0.36 s). İçerik bulanıklıktan netleşerek geliyor, sekme kapsülü panelle birlikte iniyor. Sistem "hareketi azalt" ayarı açıkken kısa geçişler kullanılır.
 - **Sekmeler:** Dört sekme, iğne ve ayarlar panelin altında ayrı bir cam kapsülde. Rafta öğe varsa nokta rozeti görünür.

@@ -35,8 +35,8 @@ final class MediaKeyInterceptor: ObservableObject {
             if prompt {
                 let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
                 _ = AXIsProcessTrustedWithOptions(options)
+                if !deniedShown { deniedShown = true; onDenied?() }
             }
-            if !deniedShown { deniedShown = true; onDenied?() }
             scheduleRetry()
             return
         }

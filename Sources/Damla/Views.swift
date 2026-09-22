@@ -127,20 +127,31 @@ struct DamlaView: View {
         .environment(\.controlActiveState, .active)
     }
 
-    /// Black glass: solid at the notch, gradually giving way to clear Liquid Glass towards the bottom.
+    private var ambientColor: Color { media.accent.map { Color(nsColor: $0) } ?? .clear }
+    private var ambientShown: Bool { open && model.selectedTab == .home && !model.settingsVisible && media.accent != nil }
+
+    /// Black glass: solid at the notch, melting into frosted Liquid Glass towards the bottom, with the
+    /// artwork's colour glowing through the lower half while music is showing.
     private var surface: some View {
         ZStack(alignment: .top) {
-            if glassVisible { Color.clear.glassEffect(.clear, in: shape) }
+            // Clear (not frosted) Liquid Glass with the darkness applied as the glass's own tint, so its
+            // specular rim and lensing stay on top and whatever is behind shows through sharp.
+            if glassVisible { Color.clear.glassEffect(.clear.tint(.black.opacity(0.48)), in: shape) }
             shape.fill(LinearGradient(stops: [
                 .init(color: .black, location: 0),
-                .init(color: .black.opacity(open ? 0.94 : 1), location: 0.3),
-                .init(color: .black.opacity(open ? 0.62 : 1), location: 1)
+                .init(color: .black.opacity(open ? 0.97 : 1), location: 0.24),
+                .init(color: .black.opacity(open ? 0.5 : 1), location: 0.58),
+                .init(color: .black.opacity(open ? 0.0 : 1), location: 1)
             ], startPoint: .top, endPoint: .bottom))
-            content
+            RadialGradient(colors: [ambientColor.opacity(0.62), ambientColor.opacity(0)],
+                           center: UnitPoint(x: 0.24, y: 0.66), startRadius: 0, endRadius: 250)
+                .animation(.easeInOut(duration: 0.9), value: media.accent)
+                .opacity(ambientShown ? 1 : 0)
+            content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
         }
         .clipShape(shape)
         .overlay {
-            shape.strokeBorder(.white.opacity(open ? 0.09 : 0), lineWidth: 0.5)
+            shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.02), .white.opacity(open ? 0.14 : 0)], startPoint: .top, endPoint: .bottom), lineWidth: 0.6)
             if dropping { shape.strokeBorder(Theme.accent.opacity(0.9), lineWidth: 1.5) }
         }
         .shadow(color: .black.opacity(open ? 0.45 : 0), radius: 24, y: 12)
@@ -196,7 +207,7 @@ struct CompactRow: View {
                 }.frame(width: side)
                 Spacer(minLength: 0).frame(width: m.notchWidth)
                 Group {
-                    if media.hasTrack { Equalizer(playing: media.playing).opacity(media.playing ? 1 : 0.55) }
+                    if media.hasTrack { Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55) }
                     else { Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim) }
                 }.frame(width: side)
             }
@@ -343,7 +354,7 @@ struct TabPill: View {
         }
         .padding(.horizontal, 5)
         .frame(height: Layout.pillHeight)
-        .glassEffect(.regular.tint(.black.opacity(0.55)).interactive(), in: Capsule())
+        .glassEffect(.clear.tint(.black.opacity(0.5)).interactive(), in: Capsule())
         .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
         .animation(Theme.quick, value: model.selectedTab)
         .animation(Theme.quick, value: model.settingsVisible)
@@ -363,6 +374,7 @@ struct TabPill: View {
 struct HomeView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
+    private var tint: Color { media.accent.map { Color(nsColor: $0) } ?? .white }
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
@@ -372,11 +384,11 @@ struct HomeView: View {
                         HStack(alignment: .firstTextBaseline) {
                             Text(media.title).font(.system(size: 15, weight: .semibold)).tracking(-0.2).lineLimit(1)
                             Spacer(minLength: 6)
-                            Equalizer(playing: media.playing, color: Theme.accent).opacity(media.playing ? 1 : 0)
+                            Equalizer(playing: media.playing, color: tint).opacity(media.playing ? 1 : 0)
                         }
                         Text(media.artist).font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
                         Spacer(minLength: 4)
-                        ScrubBar(position: media.livePosition(at: model.now), duration: media.duration) { media.seek($0) }
+                        ScrubBar(position: media.livePosition(at: model.now), duration: media.duration, tint: tint) { media.seek($0) }
                     } else {
                         Text("Müzik").font(.system(size: 15, weight: .semibold))
                         Text(media.status ?? "Apple Music veya Spotify’ı bağla.").font(.system(size: 11)).foregroundStyle(Theme.dim).lineLimit(2)
@@ -406,9 +418,10 @@ struct HomeView: View {
                             ForEach(MusicSource.allCases) { source in Button(source.rawValue) { media.connect(source) } }
                             Divider(); Button("Bağlantıyı kes") { media.disconnect() }
                         } label: {
-                            Image(systemName: media.source == .spotify ? "circle.hexagongrid.fill" : "music.note").font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Theme.dim).frame(width: 22, height: 22)
-                        }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 22).help(media.source.rawValue)
+                            Image(systemName: media.source == .spotify ? "circle.hexagongrid.fill" : "music.note").font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.white).frame(width: 26, height: 26).contentShape(Circle())
+                        }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 26)
+                            .glassLook(AnyShape(Circle())).help(media.source.rawValue)
                     }
                     Button { model.select(.focus) } label: {
                         statusLabel(model.session.running ? "timer" : "timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
@@ -421,7 +434,7 @@ struct HomeView: View {
                             Image(systemName: media.playing ? "pause.fill" : "play.fill").font(.system(size: 15, weight: .bold))
                                 .frame(width: 36, height: 36).contentShape(Circle())
                                 .contentTransition(.symbolEffect(.replace))
-                        }.buttonStyle(.glass).clipShape(Circle()).help(media.playing ? "Duraklat" : "Oynat")
+                        }.buttonStyle(GlassCircleStyle()).help(media.playing ? "Duraklat" : "Oynat")
                         transport("forward.fill", "Sonraki", size: 13) { media.command("next track") }
                     }
                 }
@@ -437,8 +450,9 @@ struct HomeView: View {
     }
     private func transport(_ icon: String, _ label: String, size: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).font(.system(size: size, weight: .semibold)).frame(width: 30, height: 30).contentShape(Rectangle())
-        }.buttonStyle(.plain).foregroundStyle(.white.opacity(0.85)).help(label)
+            Image(systemName: icon).font(.system(size: size, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: 32, height: 32).contentShape(Circle())
+        }.buttonStyle(GlassCircleStyle()).help(label)
     }
 }
 
@@ -466,6 +480,7 @@ struct Artwork: View {
 struct ScrubBar: View {
     var position: Double
     var duration: Double
+    var tint: Color = .white
     var onSeek: (Double) -> Void
     @State private var dragging = false
     @State private var dragValue = 0.0
@@ -477,7 +492,8 @@ struct ScrubBar: View {
                 let fraction = duration > 0 ? min(1, max(0, shown / duration)) : 0
                 ZStack(alignment: .leading) {
                     Capsule().fill(.white.opacity(0.18))
-                    Capsule().fill(.white).frame(width: max(0, g.size.width * fraction))
+                    Capsule().fill(tint).frame(width: max(0, g.size.width * fraction))
+                        .shadow(color: tint.opacity(0.6), radius: 4)
                 }
                 .frame(height: hovering || dragging ? 6 : 3.5)
                 .frame(maxHeight: .infinity)
@@ -518,7 +534,7 @@ struct ShelfView: View {
                     Text("Dosyaları buraya bırak").font(.system(size: 11)).foregroundStyle(Theme.faint)
                     Button { model.chooseFiles() } label: {
                         Image(systemName: "plus").font(.system(size: 12, weight: .semibold)).frame(width: 28, height: 28).contentShape(Circle())
-                    }.buttonStyle(.glass).clipShape(Circle()).help("Dosya ekle").accessibilityLabel("Dosya ekle")
+                    }.buttonStyle(GlassCircleStyle()).help("Dosya ekle").accessibilityLabel("Dosya ekle")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background {
@@ -717,13 +733,13 @@ struct FocusView: View {
                     }
                 }
                 HStack(spacing: 14) {
-                    IconButton(icon: "arrow.counterclockwise", label: "Sıfırla", size: 30) { model.resetFocus() }
+                    IconButton(icon: "arrow.counterclockwise", label: "Sıfırla", size: 32) { model.resetFocus() }
                     Button { model.toggleFocus() } label: {
                         Image(systemName: running ? "pause.fill" : "play.fill").font(.system(size: 16, weight: .bold))
                             .frame(width: 44, height: 44).contentShape(Circle()).contentTransition(.symbolEffect(.replace))
-                    }.buttonStyle(.glass).clipShape(Circle()).tint(running ? Theme.accent : nil)
+                    }.buttonStyle(GlassCircleStyle(prominent: running))
                         .help(running ? "Duraklat" : "Başlat").accessibilityLabel(running ? "Duraklat" : "Başlat")
-                    IconButton(icon: "cup.and.saucer", label: "5 dakika mola", size: 30) { model.setFocus(minutes: 5, phase: .rest); model.toggleFocus() }.disabled(running)
+                    IconButton(icon: "cup.and.saucer", label: "5 dakika mola", size: 32) { model.setFocus(minutes: 5, phase: .rest); model.toggleFocus() }.disabled(running)
                 }
                 if model.completedSessions > 0 {
                     Text("Bugün \(model.completedSessions) tur").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
@@ -794,31 +810,69 @@ extension View {
     }
 }
 
+/// Small round Liquid Glass button used for secondary actions.
 struct IconButton: View {
     let icon: String
     let label: String
-    var tint: Color = Theme.dim
-    var size: CGFloat = 24
+    var tint: Color = .white
+    var size: CGFloat = 26
     let action: () -> Void
-    @State private var hovering = false
     var body: some View {
         Button(action: action) {
-            Image(systemName: icon).font(.system(size: size * 0.42, weight: .semibold)).frame(width: size, height: size)
-                .foregroundStyle(hovering ? Color.white : tint)
-                .background(hovering ? Theme.fillStrong : .clear, in: Circle())
-                .contentShape(Circle())
+            Image(systemName: icon).font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(tint)
+                .frame(width: size, height: size).contentShape(Circle())
         }
-        .buttonStyle(.plain).help(label).accessibilityLabel(label)
-        .onHover { hovering = $0 }
+        .buttonStyle(GlassCircleStyle())
+        .help(label).accessibilityLabel(label)
     }
 }
 
+/// Glass-looking chrome drawn with plain layers. A real `glassEffect` inside the panel's glass would be
+/// glass-in-glass, which makes the compositor pull the backdrop through the panel's black top.
+struct GlassLook: ViewModifier {
+    var shape: AnyShape
+    var prominent = false
+    var pressed = false
+    func body(content: Content) -> some View {
+        content
+            .background {
+                if prominent { shape.fill(Theme.accent) }
+                else {
+                    shape.fill(LinearGradient(colors: [.white.opacity(pressed ? 0.24 : 0.16), .white.opacity(pressed ? 0.14 : 0.06)],
+                                              startPoint: .top, endPoint: .bottom))
+                }
+            }
+            .overlay {
+                shape.stroke(LinearGradient(colors: [.white.opacity(prominent ? 0.6 : 0.38), .white.opacity(0.03)],
+                                            startPoint: .top, endPoint: .bottom), lineWidth: 0.8)
+            }
+            .shadow(color: .black.opacity(0.3), radius: 5, y: 2)
+            .opacity(pressed ? 0.85 : 1)
+            .scaleEffect(pressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: pressed)
+    }
+}
+
+extension View {
+    func glassLook(_ shape: AnyShape, prominent: Bool = false, pressed: Bool = false) -> some View {
+        modifier(GlassLook(shape: shape, prominent: prominent, pressed: pressed))
+    }
+}
+
+struct GlassCircleStyle: ButtonStyle {
+    var prominent = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.foregroundStyle(prominent ? Color.black : Color.white)
+            .glassLook(AnyShape(Circle()), prominent: prominent, pressed: configuration.isPressed)
+    }
+}
+
+/// Capsule glass-look button; `accent` switches to the mint-filled variant.
 struct PillStyle: ButtonStyle {
     var accent = false
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.padding(.horizontal, 10).padding(.vertical, 6)
+        configuration.label.padding(.horizontal, 11).padding(.vertical, 6)
             .foregroundStyle(accent ? Color.black : Color.white)
-            .background(accent ? Theme.accent : configuration.isPressed ? Theme.fillStrong : Theme.fill, in: Capsule())
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .glassLook(AnyShape(Capsule()), prominent: accent, pressed: configuration.isPressed)
     }
 }

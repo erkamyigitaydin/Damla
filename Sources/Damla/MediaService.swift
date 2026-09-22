@@ -17,6 +17,7 @@ final class MediaService: ObservableObject {
     @Published var position: Double = 0
     @Published var positionDate = Date()
     @Published var artwork: NSImage?
+    @Published var accent: NSColor?
     @Published var status: String?
     @Published var hasTrack = false
     private var timer: Timer?
@@ -25,19 +26,20 @@ final class MediaService: ObservableObject {
     private var lastArtworkKey = ""
     private var generation = 0
     private var lastRefresh = Date.distantPast
-    /// Set while the panel is open: refresh every 2 s. Otherwise 2 s while playing, 6 s when idle.
+    /// Set while the panel is open: refresh every second. Otherwise 2 s while playing, 6 s when idle.
     var wantsFrequentUpdates = false
 
     func start() {
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
-            if self.playing || self.wantsFrequentUpdates || Date().timeIntervalSince(self.lastRefresh) >= 6 { self.refresh() }
+            let age = Date().timeIntervalSince(self.lastRefresh)
+            if self.wantsFrequentUpdates || (self.playing && age >= 2) || age >= 6 { self.refresh() }
         }
     }
     func connect(_ selected: MusicSource) {
         source = selected; connected = true; generation += 1
-        artwork = nil; hasTrack = false; lastArtworkKey = ""
+        artwork = nil; accent = nil; hasTrack = false; lastArtworkKey = ""
         UserDefaults.standard.set(source.rawValue, forKey: "musicSource")
         UserDefaults.standard.set(true, forKey: "musicConnected")
         if !isRunning {
@@ -50,7 +52,7 @@ final class MediaService: ObservableObject {
         } else { refresh() }
     }
     func disconnect() {
-        generation += 1; connected = false; hasTrack = false; playing = false; artwork = nil
+        generation += 1; connected = false; hasTrack = false; playing = false; artwork = nil; accent = nil
         title = "Müziğine yer aç"; artist = "Apple Music veya Spotify’ı bağla."; status = nil
         UserDefaults.standard.set(false, forKey: "musicConnected")
     }
@@ -84,7 +86,7 @@ final class MediaService: ObservableObject {
                 self.playing = playing; self.hasTrack = !name.isEmpty; self.status = nil
                 let key = "\(selected.rawValue)|\(name)|\(artist)"
                 if self.lastArtworkKey != key {
-                    self.lastArtworkKey = key; self.artwork = nil
+                    self.lastArtworkKey = key; self.artwork = nil; self.accent = nil
                     self.loadArtwork(source: selected, key: key, generation: currentGeneration)
                 }
             }
@@ -96,14 +98,16 @@ final class MediaService: ObservableObject {
             let (value, _) = Self.run(command, source: source)
             if source == .music {
                 let image = value.flatMap { NSImage(data: $0.data) }
+                let accent = image.flatMap(Palette.accent(for:))
                 DispatchQueue.main.async {
-                    if self.generation == generation, self.lastArtworkKey == key { self.artwork = image }
+                    if self.generation == generation, self.lastArtworkKey == key { self.artwork = image; self.accent = accent }
                 }
             } else if let string = value?.stringValue, let url = URL(string: string), url.scheme == "https" {
                 URLSession.shared.dataTask(with: url) { data, _, _ in
                     guard let data, data.count < 8_000_000, let image = NSImage(data: data) else { return }
+                    let accent = Palette.accent(for: image)
                     DispatchQueue.main.async {
-                        if self.generation == generation, self.lastArtworkKey == key { self.artwork = image }
+                        if self.generation == generation, self.lastArtworkKey == key { self.artwork = image; self.accent = accent }
                     }
                 }.resume()
             }
