@@ -57,6 +57,14 @@ final class NowPlayingBridge {
 
     func start() {
         stopped = false
+        // A previous Damla that was force-quit leaves its perl stream orphaned; clear it before launching ours.
+        if let script = Self.scriptURL {
+            let cleanup = Process()
+            cleanup.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+            cleanup.arguments = ["-f", script.path]
+            cleanup.standardOutput = FileHandle.nullDevice; cleanup.standardError = FileHandle.nullDevice
+            try? cleanup.run(); cleanup.waitUntilExit()
+        }
         launchStream()
     }
 
