@@ -190,7 +190,7 @@ struct DamlaView: View {
         case .hud:
             if let hud = model.hud { HUDRow(hud: hud, metrics: metrics).transition(.blurReplace) }
         case .drop:
-            DropRow(metrics: metrics, targeted: dropping, count: model.files.count).transition(.blurReplace)
+            DropRow(metrics: metrics, targeted: dropping, count: model.files.count, dragged: model.dragURLs).transition(.blurReplace)
         case .closed:
             CompactRow(model: model, media: media).transition(.blurReplace)
         }
@@ -302,17 +302,39 @@ struct DropRow: View {
     let metrics: Layout.Metrics
     let targeted: Bool
     let count: Int
+    var dragged: [URL] = []
+    @ObservedObject private var store = ThumbnailStore.shared
     var body: some View {
         VStack(spacing: 0) {
             Color.clear.frame(height: Layout.closedHeight(metrics))
-            VStack(spacing: 8) {
-                Image(systemName: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
-                    .font(.system(size: 24, weight: .regular)).contentTransition(.symbolEffect(.replace))
-                HStack(spacing: 6) {
-                    Text(targeted ? "Bırak" : "Buraya bırak").font(.system(size: 12.5, weight: .semibold))
-                    if count > 0 && !targeted {
-                        Text("\(count)").font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit()
-                            .padding(.horizontal, 6).padding(.vertical, 2).background(Theme.fillStrong, in: Capsule())
+            HStack(spacing: 12) {
+                if let first = dragged.first {
+                    let thumb = store.thumbnail(for: first, size: CGSize(width: 44, height: 44))
+                    ZStack {
+                        if let thumb, thumb.isPreview {
+                            Image(nsImage: thumb.image).resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: first.path)).resizable().padding(4)
+                        }
+                    }
+                    .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(dragged.count > 1 ? "\(dragged.count) öğe" : first.lastPathComponent)
+                            .font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
+                        Text(targeted ? "Bırak" : "Buraya bırak").font(.system(size: 10.5, weight: .medium)).foregroundStyle(targeted ? Theme.accent : Theme.dim)
+                    }
+                    .frame(maxWidth: 220, alignment: .leading)
+                } else {
+                    Image(systemName: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
+                        .font(.system(size: 24, weight: .regular)).contentTransition(.symbolEffect(.replace))
+                    HStack(spacing: 6) {
+                        Text(targeted ? "Bırak" : "Buraya bırak").font(.system(size: 12.5, weight: .semibold))
+                        if count > 0 && !targeted {
+                            Text("\(count)").font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit()
+                                .padding(.horizontal, 6).padding(.vertical, 2).background(Theme.fillStrong, in: Capsule())
+                        }
                     }
                 }
             }
@@ -633,31 +655,52 @@ struct ShelfView: View {
 struct FileTile: View {
     let item: ShelfItem
     @ObservedObject var model: AppState
+    @ObservedObject private var store = ThumbnailStore.shared
     @State private var hovering = false
+    private var selected: Bool { model.selectedFile == item.id }
     var body: some View {
+        let thumb = store.thumbnail(for: item.url)
         VStack(spacing: 6) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 44, height: 44)
-                .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
+            ZStack {
+                if let thumb, thumb.isPreview {
+                    Image(nsImage: thumb.image).resizable().aspectRatio(contentMode: .fill)
+                        .frame(width: 74, height: 58).clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+                } else {
+                    Image(nsImage: thumb?.image ?? NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 46, height: 46)
+                }
+            }
+            .frame(width: 74, height: 58)
+            .shadow(color: .black.opacity(0.35), radius: 6, y: 3)
             Text(item.url.lastPathComponent).font(.system(size: 10, weight: .medium)).lineLimit(2).multilineTextAlignment(.center)
                 .frame(height: 26, alignment: .top)
         }
-        .padding(.horizontal, 6).padding(.top, 12).padding(.bottom, 8)
-        .frame(width: 88).frame(maxHeight: .infinity)
-        .background(hovering ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 6).padding(.top, 10).padding(.bottom, 8)
+        .frame(width: 92).frame(maxHeight: .infinity)
+        .background(hovering || selected ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selected ? Theme.accent.opacity(0.9) : .clear, lineWidth: 1.5))
         .overlay(alignment: .topTrailing) {
             if hovering {
-                Button { model.removeFile(item) } label: {
-                    Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).frame(width: 18, height: 18)
-                        .background(.black.opacity(0.6), in: Circle()).contentShape(Circle())
-                }.buttonStyle(.plain).padding(4).help("Raftan kaldır").transition(.opacity)
+                HStack(spacing: 2) {
+                    Button { model.quickLook(item) } label: {
+                        Image(systemName: "eye").font(.system(size: 8, weight: .bold)).frame(width: 18, height: 18)
+                            .background(.black.opacity(0.6), in: Circle()).contentShape(Circle())
+                    }.buttonStyle(.plain).help("Önizle (Boşluk)")
+                    Button { model.removeFile(item) } label: {
+                        Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).frame(width: 18, height: 18)
+                            .background(.black.opacity(0.6), in: Circle()).contentShape(Circle())
+                    }.buttonStyle(.plain).help("Raftan kaldır")
+                }.padding(4).transition(.opacity)
             }
         }
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
         .onTapGesture(count: 2) { model.openFile(item) }
+        .onTapGesture(count: 1) { model.selectedFile = item.id; model.requestKeyFocus?() }
         .onDrag { NSItemProvider(object: item.url as NSURL) }
         .contextMenu {
             Button("Aç") { model.openFile(item) }
+            Button("Önizle") { model.quickLook(item) }
             Button("Finder’da göster") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
             Divider()
             Button("Raftan kaldır") { model.removeFile(item) }

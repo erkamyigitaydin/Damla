@@ -28,6 +28,8 @@ final class AppState: ObservableObject {
     @Published var notchWidth: CGFloat = 185
     @Published var hasNotch = true
     @Published var dragActive = false   // a file drag is in progress somewhere on the system
+    @Published var dragURLs: [URL] = []  // what is being dragged, for the tray preview
+    @Published var selectedFile: UUID?
     @Published var displayMode = DisplayMode(rawValue: UserDefaults.standard.string(forKey: "displayMode") ?? "") ?? .followMouse
     @Published var externalStyle = ExternalStyle(rawValue: UserDefaults.standard.string(forKey: "externalStyle") ?? "") ?? .menuBar
     @Published var hideSystemHUD = UserDefaults.standard.bool(forKey: "hideSystemHUD")
@@ -58,6 +60,7 @@ final class AppState: ObservableObject {
     private var noticeClear: DispatchWorkItem?
     var requestKeyFocus: (() -> Void)?
     var setDialogMode: ((Bool) -> Void)?
+    var requestQuickLook: ((Int?) -> Void)?
 
     var state: NotchState { expanded ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed }
     var metrics: Layout.Metrics { Layout.Metrics(notchWidth: notchWidth, notchHeight: notchHeight, hasNotch: hasNotch) }
@@ -192,6 +195,15 @@ final class AppState: ObservableObject {
     }
     func removeFile(_ item: ShelfItem) {
         files.removeAll { $0.id == item.id }; DiskStore.save(files, name: "shelf.json")
+        if selectedFile == item.id { selectedFile = nil }
+    }
+    /// Opens (or closes) the system Quick Look panel on the given shelf item, else the selection, else the first item.
+    func quickLook(_ item: ShelfItem? = nil) {
+        guard !files.isEmpty else { return }
+        if let item { selectedFile = item.id }
+        let index = files.firstIndex { $0.id == selectedFile } ?? 0
+        selectedFile = files[index].id
+        requestQuickLook?(index)
     }
     func openFile(_ item: ShelfItem) {
         if !NSWorkspace.shared.open(item.url) { showNotice("Dosya bulunamadı. Rafa yeniden ekleyebilirsin.") }

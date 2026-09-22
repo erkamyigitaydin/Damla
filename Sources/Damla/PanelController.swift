@@ -2,10 +2,19 @@ import AppKit
 import SwiftUI
 import Combine
 import Carbon
+import Quartz
 
 final class NotchPanel: NSPanel {
+    var quickLook: QuickLookController?
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    // AppKit pushes windows below the menu bar when their level drops (Quick Look, file dialog); the notch
+    // must stay glued to the top edge regardless of level.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+    // Quick Look asks the key window's responder chain who feeds the preview panel.
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { quickLook != nil }
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) { panel.dataSource = quickLook; panel.delegate = quickLook }
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) { panel.dataSource = nil; panel.delegate = nil }
 }
 
 /// The window is a fixed-size transparent sheet pinned to the top of the chosen screen.
@@ -26,6 +35,7 @@ final class PanelController {
     private var localMonitor: Any?
     private var dragMonitors: [Any] = []
     private var dialogShowing = false
+    private var pinnedBeforeQuickLook = false
     var holdBasket = false // debug: keep the basket open without a real drag
     private var lastDragCount = NSPasteboard(name: .drag).changeCount
 
@@ -58,6 +68,12 @@ final class PanelController {
         }
         model.$dragActive.removeDuplicates().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateLevel() }.store(in: &cancellables)
+        panel.quickLook = QuickLookController(model: model)
+        model.requestQuickLook = { [weak self] index in self?.toggleQuickLook(index: index) }
+        NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)
+            .filter { QLPreviewPanel.sharedPreviewPanelExists() && ($0.object as? NSWindow) === QLPreviewPanel.shared() }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.quickLookDidClose() }.store(in: &cancellables)
         chooseScreen()
         model.$expanded.receive(on: RunLoop.main).sink { [weak self] expanded in
             guard let self else { return }
@@ -76,8 +92,15 @@ final class PanelController {
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [weak self] _ in self?.chooseScreen(); self?.layout() }.store(in: &cancellables)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {
-                self?.model.pinnedOpen = false; self?.model.expanded = false
+            guard let self else { return event }
+            if event.keyCode == 53 { // Esc: Quick Look first, then the notch
+                if QuickLookController.isShowing { QLPreviewPanel.shared().orderOut(nil); return nil }
+                self.model.pinnedOpen = false; self.model.expanded = false
+                return nil
+            }
+            if event.keyCode == 49, self.model.expanded, self.model.selectedTab == .files, !self.model.settingsVisible,
+               event.modifierFlags.intersection([.command, .option, .control]).isEmpty { // Space
+                self.model.quickLook()
                 return nil
             }
             return event
@@ -103,6 +126,26 @@ final class PanelController {
         guard panel.level != target else { return }
         panel.level = target
         panel.orderFrontRegardless()
+        layout()
+    }
+
+    private func toggleQuickLook(index: Int?) {
+        guard let preview = QLPreviewPanel.shared() else { return }
+        if preview.isVisible { preview.orderOut(nil); return }
+        pinnedBeforeQuickLook = model.pinnedOpen
+        model.pinnedOpen = true
+        dialogShowing = true; updateLevel()
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        preview.makeKeyAndOrderFront(nil)
+        if preview.dataSource == nil { preview.dataSource = panel.quickLook; preview.delegate = panel.quickLook }
+        preview.reloadData()
+        if let index { preview.currentPreviewItemIndex = index }
+    }
+    private func quickLookDidClose() {
+        dialogShowing = false; updateLevel()
+        model.pinnedOpen = pinnedBeforeQuickLook
+        panel.makeKeyAndOrderFront(nil)
     }
 
     private static func screenUnderMouse() -> NSScreen? {
@@ -162,14 +205,16 @@ final class PanelController {
         guard board.changeCount != lastDragCount else { return }
         lastDragCount = board.changeCount
         if board.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) {
+            model.dragURLs = (board.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
             model.dragActive = true
         }
     }
     private func endDrag() {
         // Give the drop a moment to land on our target before the basket folds away.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            guard let self, NSEvent.pressedMouseButtons == 0 else { return }
+            guard let self, !self.holdBasket, NSEvent.pressedMouseButtons == 0 else { return }
             self.model.dragActive = false
+            self.model.dragURLs = []
         }
     }
     private func trackHover() {
@@ -272,8 +317,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "bright-up": model.monitor.adjustBrightness(by: 1 / 16)
         case "bright-down": model.monitor.adjustBrightness(by: -1 / 16)
         case "keys-on": model.setHideSystemHUD(true)
-        case "drag-on": controller.holdBasket = true; model.dragActive = true
-        case "drag-off": controller.holdBasket = false; model.dragActive = false
+        case "drag-on": controller.holdBasket = true; model.dragURLs = [URL(fileURLWithPath: "/Users/erkamyigitaydin/Desktop/Projects/Damla/docs/damla-0.3-overview.png")]; model.dragActive = true
+        case "drag-off": controller.holdBasket = false; model.dragActive = false; model.dragURLs = []
+        case "quicklook": model.quickLook()
         case "keys-off": model.setHideSystemHUD(false)
         case "focus-start": model.setFocus(minutes: 25); model.toggleFocus()
         case "focus-stop": model.setFocus(minutes: 25)
