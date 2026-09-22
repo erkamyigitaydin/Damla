@@ -430,6 +430,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model.dragActive = true
         case "drag-off": manager.holdBasket = false; model.dragActive = false; model.dragURLs = []
         case "quicklook": model.quickLook()
+        case "check-updates": model.updater.checkForUpdates()
+        case "quit": NSApp.terminate(nil)
         case "focus-start": model.setFocus(minutes: 25); model.toggleFocus()
         case "focus-stop": model.setFocus(minutes: 25)
         case "files-demo":
