@@ -1030,57 +1030,84 @@ struct SettingsView: View {
     @ObservedObject var model: AppState
     @ObservedObject var keys: MediaKeyInterceptor
     init(model: AppState) { self.model = model; keys = model.keys }
+
     var body: some View {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 8) {
-            Toggle("Üzerine gelince aç", isOn: $model.automaticOpen).onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
-            Toggle("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-            Toggle("Pano geçmişi", isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) }))
-            HStack {
-                Text("Temizlik modu")
-                Spacer()
-                Button("Klavyeyi kilitle · 60 sn") { model.startCleaning() }
-                    .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+        VStack(spacing: 0) {
+            // Switches in a two-column grid, every switch flush right in its cell.
+            Grid(horizontalSpacing: 18, verticalSpacing: 0) {
+                GridRow {
+                    switchRow("Üzerine gelince aç", isOn: $model.automaticOpen)
+                    switchRow("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                }
+                GridRow {
+                    switchRow("Pano geçmişi", isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) }))
+                    switchRow("Sistem HUD’unu gizle", isOn: Binding(get: { model.hideSystemHUD }, set: { model.setHideSystemHUD($0) }))
+                        .help("Ses, sessiz ve parlaklık tuşlarını Damla uygular; macOS kendi göstergesini çizmez. Erişilebilirlik izni ister.")
+                }
+            }
+            .onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
+            divider
+            choiceRow("Ekran") {
+                ForEach(DisplayMode.allCases) { mode in
+                    Button(mode.rawValue) { model.displayMode = mode; model.savePreferences() }
+                        .buttonStyle(PillStyle(accent: model.displayMode == mode))
+                }
+            }
+            divider
+            choiceRow("Çentiksiz ekran") {
+                ForEach(ExternalStyle.allCases) { style in
+                    Button(style.rawValue) { model.externalStyle = style; model.savePreferences() }
+                        .buttonStyle(PillStyle(accent: model.externalStyle == style))
+                }
+            }
+            divider
+            choiceRow("Temizlik modu") {
+                Button("Klavyeyi kilitle · 60 sn") { model.startCleaning() }.buttonStyle(PillStyle())
                     .help("Tüm klavyeler 60 saniye kilitlenir. Fare çalışır. Esc’yi 2 saniye tutarak çıkabilirsin.")
             }
-            Toggle("Sistem ses/parlaklık baloncuğunu gizle", isOn: Binding(get: { model.hideSystemHUD }, set: { model.setHideSystemHUD($0) }))
-                .help("Ses, sessiz ve parlaklık tuşlarını Damla uygular; macOS kendi göstergesini çizmez. Erişilebilirlik izni ister.")
-            if model.hideSystemHUD && !keys.active {
-                Button { MediaKeyInterceptor.openAccessibilitySettings() } label: {
-                    Label("Erişilebilirlik izni bekleniyor · Sistem Ayarları'nı aç", systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.amber)
-                }.buttonStyle(.plain)
-            }
-            HStack {
-                Text("Ekran")
-                Spacer()
-                HStack(spacing: 4) {
-                    ForEach(DisplayMode.allCases) { mode in
-                        Button(mode.rawValue) { model.displayMode = mode; model.savePreferences() }
-                            .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle(accent: model.displayMode == mode))
-                    }
-                }
-            }
-            HStack {
-                Text("Çentiksiz ekran")
-                Spacer()
-                HStack(spacing: 4) {
-                    ForEach(ExternalStyle.allCases) { style in
-                        Button(style.rawValue) { model.externalStyle = style; model.savePreferences() }
-                            .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle(accent: model.externalStyle == style))
-                    }
-                }
-            }
             Spacer(minLength: 0)
-            HStack {
-                Text("Damla 0.3 · ⌃⌥Space").font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
+            HStack(spacing: 8) {
+                if model.hideSystemHUD && !keys.active {
+                    Button { MediaKeyInterceptor.openAccessibilitySettings() } label: {
+                        Label("Erişilebilirlik izni bekleniyor · Sistem Ayarları’nı aç", systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.amber).lineLimit(1)
+                    }.buttonStyle(.plain)
+                } else {
+                    Text("Damla 0.3 · ⌃⌥Space").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
+                }
                 Spacer()
-                Button("Çıkış") { NSApp.terminate(nil) }.font(.system(size: 11)).buttonStyle(.plain).foregroundStyle(Theme.dim)
+                Button("Çıkış") { NSApp.terminate(nil) }.font(.system(size: 10.5, weight: .medium)).buttonStyle(.plain).foregroundStyle(Theme.dim)
             }
-          }
-        }.scrollIndicators(.hidden)
-        .font(.system(size: 12)).toggleStyle(.switch).controlSize(.small).tint(Theme.accent)
-        .padding(.horizontal, 4).padding(.top, 2).frame(maxHeight: .infinity)
+            .frame(height: 16)
+        }
+        .font(.system(size: 11.5))
+        .tint(Theme.accent)
+        .padding(.top, 2)
+        .frame(maxHeight: .infinity)
+    }
+
+    private var divider: some View {
+        Rectangle().fill(.white.opacity(0.08)).frame(height: 0.5)
+    }
+
+    private func switchRow(_ title: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(title).foregroundStyle(.white.opacity(0.92)).lineLimit(1)
+            Spacer(minLength: 6)
+            Toggle("", isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
+                .tint(Theme.accent).environment(\.controlActiveState, .active)
+        }
+        .frame(height: 24)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func choiceRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(title).foregroundStyle(.white.opacity(0.92))
+            Spacer(minLength: 8)
+            HStack(spacing: 4, content: content).font(.system(size: 10.5, weight: .medium))
+        }
+        .frame(height: 30)
     }
 }
 
