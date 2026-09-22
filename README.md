@@ -69,6 +69,8 @@ Müzik bilgisi ve kapak macOS'un kendi "Şu An Çalıyor" kaydından yerel olara
 
 Damla, [Sparkle](https://sparkle-project.org) ile günde bir kez `appcast.xml` dosyasına (bu depoda, `raw.githubusercontent.com` üzerinden) bakar; yeni sürüm varsa çentikte "Damla X hazır" bildirimi çıkar, tıklayınca Sparkle'ın kendi penceresi indirir ve yeniden başlatır. Ayarlar → Güncellemeler anahtarı otomatik denetimi kapatır; "Şimdi denetle" ve menü çubuğundaki "Güncellemeleri denetle…" elle bakar. Sunucu yoktur: dmg'ler GitHub Release'te, appcast depoda durur; indirilen dosya hem Apple noter onayı hem de `Info.plist`'teki EdDSA açık anahtarıyla doğrulanır (gizli anahtar yalnızca yayıncının Keychain'inde). Damla hiçbir veri göndermez; Sparkle'ın sistem profili paylaşımı kapalıdır.
 
+Doğrulama (22 Eylül 2026): 0.4.0 olarak işaretli uygulama appcast'ten 0.4.1'i buldu, dmg'yi indirip açtı, Sparkle penceresi göründü; "çıkışta yükle" seçildikten sonra uygulama kapanınca paket 0.4.1'e (Developer ID imzalı, damgalı) dönüştü. Not: `/private/tmp` altına kopyalanmış bir sürüm kopyasında zamanlanmış denetim indirme başlatmadı; normal konumda (Applications veya proje klasörü) çalışıyor.
+
 ## Paylaşım (Developer ID + noter onayı)
 
 Bir kez: Xcode → Settings → Accounts → Manage Certificates → **Developer ID Application** sertifikası; ardından `xcrun notarytool store-credentials damla-notary --team-id <TAKIM>` ile uygulamaya özel parolayı Keychain'e kaydet. Sonra her sürümde:
