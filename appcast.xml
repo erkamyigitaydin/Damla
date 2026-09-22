@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.4.3</title>
+      <pubDate>Tue, 22 Sep 2026 19:42:47 +0000</pubDate>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>0.4.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Damla kapalıyken alttaki uygulamalara tıklamayı engelleyen görünmez pencere alanı düzeltildi.</p><p>- Çentiğin altındaki Safari ve diğer uygulamaların düğmeleri yeniden tıklanabilir.</p><p>- Fare olayları Damla&#x27;nın görünen alanıyla sınırlandırılır; panel, bildirim ve dosya bırakma tepsisi değiştiğinde alan güncellenir.</p><p>- Düzeltme iki ekranda canlı olarak doğrulandı; 63 otomatik kontrol geçti.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.3/Damla-0.4.3.dmg" length="3956295" type="application/octet-stream" sparkle:edSignature="5PQ6L8wp1EtMr4LslQ4oezC/o6jCLGWtCDqlwMVPVN6NWDJ6Rdwq7eXPpH1s1tZ7WDrRaDNTjfP91+zwlLrgAQ=="/>
+    </item>
+    <item>
       <title>Damla 0.4.2</title>
       <pubDate>Tue, 22 Sep 2026 17:55:12 +0000</pubDate>
       <sparkle:version>6</sparkle:version>
