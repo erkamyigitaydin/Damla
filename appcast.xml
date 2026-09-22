@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Damla</title>
+    <description>Damla güncellemeleri</description>
+    <language>tr</language>
+    <item>
+      <title>Damla 0.4.0</title>
+      <pubDate>Tue, 22 Sep 2026 16:19:25 +0000</pubDate>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Debug komutları: check-updates, quit</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.0/Damla-0.4.0.dmg" length="3927736" type="application/octet-stream" sparkle:edSignature="/jkQxx9u8hDh5va+gGCtVhBz7rZPjBJfOLIZWxP+KY2gU16Gkpt6a24ujkZripzVS0EkNVhB1Hx7iZoOo2L3Bg=="/>
+    </item>
+  </channel>
+</rss>
