@@ -1,0 +1,105 @@
+import AppKit
+import CoreAudio
+import IOKit.ps
+import Darwin
+
+struct BatterySnapshot {
+    var percentage = 0
+    var charging = false
+    var plugged = false
+    var available = false
+    var symbol: String { plugged ? "battery.100percent.bolt" : (percentage < 20 ? "battery.25percent" : "battery.75percent") }
+}
+
+final class SystemMonitor {
+    private var timer: Timer?
+    private var oldVolume: Float?
+    private var oldBrightness: Float?
+    private var oldMuted: Bool?
+    private var oldPlugged: Bool?
+    private var tickCount = 0
+    private var brightnessHandle: UnsafeMutableRawPointer?
+    private var brightnessGetter: (@convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32)?
+    var onBattery: ((BatterySnapshot) -> Void)?
+    var onLevels: ((Float?, Float?, Bool) -> Void)?
+    var onHUD: ((String, String, Double) -> Void)?
+
+    init() {
+        // Read-only fallback: Apple has no public brightness getter for all modern built-in displays.
+        // It is optional; audio/battery keep working when this symbol is unavailable.
+        brightnessHandle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY)
+        if let brightnessHandle, let symbol = dlsym(brightnessHandle, "DisplayServicesGetBrightness") {
+            brightnessGetter = unsafeBitCast(symbol, to: (@convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32).self)
+        }
+    }
+    func start() {
+        poll()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in self?.poll() }
+        if let timer { RunLoop.main.add(timer, forMode: .common) }
+    }
+    func poll() {
+        let (volume, muted) = Self.audio()
+        let brightness = brightnessValue()
+        onLevels?(volume, brightness, muted)
+        if let volume, let oldVolume, abs(volume - oldVolume) > 0.005 || muted != oldMuted {
+            onHUD?(muted ? "speaker.slash.fill" : "speaker.wave.2.fill", muted ? "Ses kapalı" : "Ses", muted ? 0 : Double(volume))
+        }
+        if let brightness, let oldBrightness, abs(brightness - oldBrightness) > 0.009 {
+            onHUD?("sun.max.fill", "Parlaklık", Double(brightness))
+        }
+        oldVolume = volume; oldBrightness = brightness; oldMuted = muted
+        if tickCount % 5 == 0 {
+            let battery = Self.battery()
+            onBattery?(battery)
+            if let oldPlugged, oldPlugged != battery.plugged {
+                onHUD?(battery.symbol, battery.plugged ? "Şarja bağlandı" : "Pil kullanılıyor", Double(battery.percentage) / 100)
+            }
+            oldPlugged = battery.plugged
+        }
+        tickCount += 1
+    }
+    func brightnessValue() -> Float? {
+        guard let getter = brightnessGetter else { return nil }
+        let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main
+        guard let id = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else { return nil }
+        var value: Float = 0
+        return getter(id, &value) == 0 ? min(1, max(0, value)) : nil
+    }
+    static func audio() -> (Float?, Bool) {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var device = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr else { return (nil, false) }
+        address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute,
+                                             mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+        var mute: UInt32 = 0; size = 4
+        _ = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &mute)
+        var levels: [Float] = []
+        for element in [UInt32(0), 1, 2] {
+            address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar,
+                                                 mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+            var value: Float = 0; size = 4
+            if AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr {
+                levels.append(value)
+                if element == 0 { break }
+            }
+        }
+        return (levels.isEmpty ? nil : levels.reduce(0, +) / Float(levels.count), mute != 0)
+    }
+    static func battery() -> BatterySnapshot {
+        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] else { return BatterySnapshot() }
+        for source in sources {
+            guard let d = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any],
+                  (d[kIOPSTypeKey] as? String) == kIOPSInternalBatteryType,
+                  let current = d[kIOPSCurrentCapacityKey] as? Int,
+                  let maximum = d[kIOPSMaxCapacityKey] as? Int, maximum > 0 else { continue }
+            return BatterySnapshot(percentage: min(100, max(0, current * 100 / maximum)),
+                                   charging: d[kIOPSIsChargingKey] as? Bool ?? false,
+                                   plugged: (d[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue, available: true)
+        }
+        return BatterySnapshot()
+    }
+    deinit { timer?.invalidate(); if let brightnessHandle { dlclose(brightnessHandle) } }
+}
