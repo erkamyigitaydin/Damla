@@ -451,11 +451,14 @@ struct HomeView: View {
                         ScrubBar(position: media.livePosition(at: model.now), duration: media.duration, tint: tint) { media.seek($0) }
                     } else {
                         Text("Müzik").font(.system(size: 15, weight: .semibold))
-                        Text(media.status ?? "Apple Music veya Spotify’ı bağla.").font(.system(size: 11)).foregroundStyle(Theme.dim).lineLimit(2)
+                        Text(media.status ?? (media.bridgeActive ? "Bir şey çal: Müzik, Spotify, Safari…" : "Apple Music veya Spotify’ı bağla."))
+                            .font(.system(size: 11)).foregroundStyle(Theme.dim).lineLimit(2)
                         Spacer(minLength: 4)
-                        HStack(spacing: 6) {
-                            ForEach(MusicSource.allCases) { source in
-                                Button(source.rawValue) { media.connect(source) }.font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+                        if !media.bridgeActive {
+                            HStack(spacing: 6) {
+                                ForEach(MusicSource.allCases) { source in
+                                    Button(source.rawValue) { media.connect(source) }.font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+                                }
                             }
                         }
                     }
@@ -475,7 +478,11 @@ struct HomeView: View {
                         statusLabel(model.muted ? "speaker.slash" : "speaker.wave.2", model.muted ? "0" : "\(Int(volume * 100))")
                     }
                     Spacer()
-                    if media.connected {
+                    if media.bridgeActive, let icon = media.sourceIcon {
+                        Button { media.activateSource() } label: {
+                            Image(nsImage: icon).resizable().frame(width: 20, height: 20).contentShape(Circle())
+                        }.buttonStyle(.plain).help(media.sourceBundleID ?? "")
+                    } else if media.connected {
                         Menu {
                             ForEach(MusicSource.allCases) { source in Button(source.rawValue) { media.connect(source) } }
                             Divider(); Button("Bağlantıyı kes") { media.disconnect() }

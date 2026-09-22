@@ -20,6 +20,11 @@ final class MediaService: ObservableObject {
     @Published var accent: NSColor?
     @Published var status: String?
     @Published var hasTrack = false
+    /// True when the system Now Playing bridge is running: every player (browsers included) is covered
+    /// and the manual source picker is unnecessary.
+    @Published var bridgeActive = false
+    @Published var sourceBundleID: String?
+    let bridge = NowPlayingBridge()
     private var timer: Timer?
     private var busy = false
     private let queue = DispatchQueue(label: "app.damla.media", qos: .utility)
@@ -30,12 +35,51 @@ final class MediaService: ObservableObject {
     var wantsFrequentUpdates = false
 
     func start() {
+        if NowPlayingBridge.isBundled {
+            bridge.test { [weak self] ok in
+                guard let self else { return }
+                if ok { self.startBridge() } else { self.startLegacy() }
+            }
+        } else {
+            startLegacy()
+        }
+    }
+    private func startLegacy() {
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             let age = Date().timeIntervalSince(self.lastRefresh)
             if self.wantsFrequentUpdates || (self.playing && age >= 2) || age >= 6 { self.refresh() }
         }
+    }
+    private func startBridge() {
+        bridgeActive = true; connected = true; status = nil
+        title = "Müzik"; artist = "Bir şey çal: Müzik, Spotify, Safari…"
+        bridge.onUpdate = { [weak self] item, image in
+            guard let self else { return }
+            guard let item else {
+                self.hasTrack = false; self.playing = false; self.artwork = nil; self.accent = nil; self.sourceBundleID = nil
+                self.title = "Müzik"; self.artist = "Bir şey çal: Müzik, Spotify, Safari…"
+                return
+            }
+            self.hasTrack = true
+            self.title = item.title
+            self.artist = item.artist.isEmpty ? item.album : item.artist
+            self.playing = item.playing
+            self.duration = max(0, item.duration)
+            self.position = max(0, item.elapsed); self.positionDate = item.timestamp
+            self.sourceBundleID = item.bundleID
+            if let image {
+                self.artwork = image
+                self.queue.async {
+                    let accent = Palette.accent(for: image)
+                    DispatchQueue.main.async { if self.artwork === image { self.accent = accent } }
+                }
+            } else if item.artworkKey.isEmpty {
+                self.artwork = nil; self.accent = nil
+            }
+        }
+        bridge.start()
     }
     func connect(_ selected: MusicSource) {
         source = selected; connected = true; generation += 1
@@ -114,6 +158,15 @@ final class MediaService: ObservableObject {
         }
     }
     func command(_ action: String) {
+        if bridgeActive {
+            switch action {
+            case "playpause": bridge.send(.togglePlayPause)
+            case "next track": bridge.send(.next)
+            case "previous track": bridge.send(.previous)
+            default: break
+            }
+            return
+        }
         guard connected, isRunning else { return }
         let selected = source
         queue.async {
@@ -124,7 +177,16 @@ final class MediaService: ObservableObject {
     func seek(_ seconds: Double) {
         let target = min(duration, max(0, seconds))
         position = target; positionDate = Date()
-        command("set player position to \(target)")
+        if bridgeActive { bridge.seek(to: target) } else { command("set player position to \(target)") }
+    }
+    /// Icon of the app that is playing (Music, Spotify, Safari, Chrome…), for the source button.
+    var sourceIcon: NSImage? {
+        guard let id = sourceBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
+    }
+    func activateSource() {
+        guard let id = sourceBundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
     /// Interpolates between 2-second refreshes so the scrub bar moves smoothly.
     func livePosition(at now: Date) -> Double {
@@ -137,5 +199,5 @@ final class MediaService: ObservableObject {
         let result = NSAppleScript(source: text)?.executeAndReturnError(&error)
         return (result, error?[NSAppleScript.errorNumber] as? Int)
     }
-    deinit { timer?.invalidate() }
+    deinit { timer?.invalidate(); bridge.stop() }
 }
