@@ -56,6 +56,20 @@ func runSelfTests() -> Int32 {
     let window = Layout.windowSize(notch)
     let visible = Layout.visibleRect(.expanded, notch, compactSlots: 2, midX: 0, top: 0)
     check(window.width >= visible.width && window.height >= visible.height, "Window always contains the drawn shape")
+    // Regression: the fixed-size host remains over the browser after collapse; only the visible rect may receive clicks.
+    for metrics in [notch, flat] {
+        let closed = Layout.visibleRect(.closed, metrics, compactSlots: 2, midX: -700, top: 900)
+        let expanded = Layout.visibleRect(.expanded, metrics, compactSlots: 2, midX: -700, top: 900)
+        let browserToolbar = CGPoint(x: -700, y: closed.minY - 1)
+        check(expanded.contains(browserToolbar) && !closed.contains(browserToolbar), "Collapse releases browser toolbar on either display style")
+        check(closed.contains(CGPoint(x: closed.minX + 10, y: closed.midY)), "Closed activity stays clickable on offset displays")
+        check(!expanded.contains(CGPoint(x: expanded.maxX + 1, y: expanded.midY)), "Transparent shadow margin stays outside input area")
+        let hud = Layout.visibleRect(.hud, metrics, compactSlots: 0, midX: -700, top: 900)
+        let drop = Layout.visibleRect(.drop, metrics, compactSlots: 0, midX: -700, top: 900)
+        let basketPoint = CGPoint(x: -700, y: hud.minY - Layout.dropBandHeight / 2)
+        check(drop.contains(basketPoint) && !hud.contains(basketPoint) && !closed.contains(basketPoint), "Drop target is interactive only while its basket is visible")
+        check(expanded.contains(CGPoint(x: -700, y: expanded.minY + Layout.pillHeight / 2)), "Expanded tab pill remains interactive")
+    }
     var cleaning = CleaningSession()
     cleaning.start(at: 100)
     check(cleaning.remaining(at: 159) == 1 && !cleaning.shouldUnlock(at: 159), "Cleaning lock lasts at most 60 seconds")

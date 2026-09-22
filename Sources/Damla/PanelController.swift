@@ -29,8 +29,8 @@ extension NSScreen {
 }
 
 /// One notch window on one screen. The window is a fixed-size transparent sheet pinned to the top of
-/// its screen; it never animates its frame. Fully transparent pixels pass clicks through, and hover
-/// tracking uses the drawn shape, not the window. With "all screens" every display gets its own
+/// its screen; it never animates its frame. Mouse passthrough is explicitly gated by the visible area;
+/// transparent hosting/glass layers must not intercept other apps. With "all screens" every display gets its own
 /// controller; the panel expands only on the screen that asked for it (`AppState.activeScreenID`).
 final class PanelController {
     let model: AppState
@@ -40,6 +40,7 @@ final class PanelController {
     let fixedScreen: NSScreen?
     private var cancellables = Set<AnyCancellable>()
     private var hoverTimer: Timer?
+    private var mouseMonitors: [Any] = []
     private var enteredAt: Date?
     private var exitedAt: Date?
     private var suppressHoverUntil = Date.distantPast
@@ -68,6 +69,8 @@ final class PanelController {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.isMovable = false
+        panel.acceptsMouseMovedEvents = true
+        panel.ignoresMouseEvents = true
         panel.animationBehavior = .none
         panel.isReleasedWhenClosed = false
         panel.appearance = NSAppearance(named: .darkAqua)
@@ -87,8 +90,8 @@ final class PanelController {
             }
             self.lastExpandedHere = here
         }.store(in: &cancellables)
-        Publishers.Merge4(model.$expanded.map { _ in () }, model.$dragActive.map { _ in () }, model.$hud.map { _ in () },
-                          model.$pinnedOpen.map { _ in () })
+        // Read after @Published has committed, including screen ownership, compact activity and cleaning changes.
+        Publishers.Merge3(model.objectWillChange, model.media.objectWillChange, model.cleaning.objectWillChange)
             .receive(on: RunLoop.main).sink { [weak self] in self?.updateVisibility() }.store(in: &cancellables)
         if fixedScreen == nil {
             model.$displayMode.dropFirst().receive(on: RunLoop.main)
@@ -100,6 +103,17 @@ final class PanelController {
             .sink { [weak self] _ in self?.chooseScreen(); self?.layout() }.store(in: &cancellables)
         model.$dragActive.removeDuplicates().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateLevel() }.store(in: &cancellables)
+        let mouseEvents: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged,
+                                                  .leftMouseUp, .rightMouseUp, .otherMouseUp]
+        // Global events cover other apps; local events cover the pointer leaving our own surface.
+        // Keep this event-driven so a quick move followed by a click does not wait for the hover timer.
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents, handler: { [weak self] _ in
+            self?.updateMousePassthrough()
+        }) { mouseMonitors.append(monitor) }
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents, handler: { [weak self] event in
+            self?.updateMousePassthrough()
+            return event
+        }) { mouseMonitors.append(monitor) }
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.trackHover() }
         if let hoverTimer { RunLoop.main.add(hoverTimer, forMode: .common) }
         layout()
@@ -112,6 +126,7 @@ final class PanelController {
 
     func close() {
         hoverTimer?.invalidate(); hoverTimer = nil
+        mouseMonitors.forEach { NSEvent.removeMonitor($0) }; mouseMonitors.removeAll()
         cancellables.removeAll()
         panel.orderOut(nil)
     }
@@ -133,14 +148,21 @@ final class PanelController {
     /// Hidden only while closed: a HUD, the drop basket or an open panel still shows over a full-screen app.
     func updateVisibility() {
         let conceal = menuBarHidden && state == .closed && !model.pinnedOpen
-        guard conceal != concealed else { return }
+        let changed = conceal != concealed
         concealed = conceal
+        updateMousePassthrough()
+        guard changed else { return }
         if conceal { enteredAt = nil }
-        panel.ignoresMouseEvents = conceal
         NSAnimationContext.runAnimationGroup { context in
             context.duration = conceal ? 0.18 : 0.12
             panel.animator().alphaValue = conceal ? 0 : 1
         }
+    }
+
+    private func updateMousePassthrough() {
+        // No hover tolerance here: even the transparent strip below a closed notch belongs to the app behind it.
+        let ignores = concealed || !visibleRect().contains(NSEvent.mouseLocation)
+        if panel.ignoresMouseEvents != ignores { panel.ignoresMouseEvents = ignores }
     }
 
     static func screenUnderMouse() -> NSScreen? {
@@ -187,6 +209,7 @@ final class PanelController {
         let size = Layout.windowSize(screenInfo.metrics)
         let frame = NSRect(x: (screen.frame.midX - size.width / 2).rounded(), y: topY - size.height, width: size.width, height: size.height)
         if panel.frame != frame { panel.setFrame(frame, display: true) }
+        updateMousePassthrough()
     }
 
     func visibleRect() -> NSRect {
@@ -195,6 +218,8 @@ final class PanelController {
     }
 
     private func trackHover() {
+        // Also refresh with a stationary pointer when the HUD, activity width or panel state changes.
+        defer { updateMousePassthrough() }
         guard !model.cleaning.active, !concealed else { return }
         let now = Date()
         let location = NSEvent.mouseLocation
@@ -226,6 +251,7 @@ final class PanelController {
         if fixedScreen == nil && model.displayMode == .followMouse { chooseScreen(); layout() }
         model.activeScreenID = id
         model.expanded = true; model.pinnedOpen = true
+        updateVisibility()
         panel.orderFrontRegardless()
     }
 
@@ -248,7 +274,10 @@ final class PanelController {
         panel.makeKeyAndOrderFront(nil)
     }
 
-    deinit { hoverTimer?.invalidate() }
+    deinit {
+        hoverTimer?.invalidate()
+        mouseMonitors.forEach { NSEvent.removeMonitor($0) }
+    }
 }
 
 /// Owns one controller per screen (or a single roaming one), plus everything that must exist once:

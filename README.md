@@ -58,6 +58,7 @@ Müzik bilgisi ve kapak macOS'un kendi "Şu An Çalıyor" kaydından yerel olara
 
 - SwiftUI + AppKit, **glassEffect(.clear)** ile yerel Liquid Glass. macOS 26+.
 - `Layout.swift` tek gerçek kaynak: şekil boyutları, pencere boyutu ve fare takibi için görünür dikdörtgen buradan hesaplanır.
+- 0.4.3: Saydam pencerenin görünür panel dışında kalan kısmı fare olaylarını almaz. Panel kapanınca alttaki Safari ve diğer uygulamalar yeniden tıklama hedefi olur; bu yönlendirme iki ekranda canlı kontrol edildi. Fare hareketi ve panel/HUD/tepsi durumu değişiklikleri geçişi günceller. `--self-test` görünür alan kontrolleri dahil 63/63 geçti.
 - `PanelManager` ekran başına bir `PanelController` (pencere + `ScreenMetrics`) tutar; ekran değişince yeniden kurar. Genel durum `AppState`'te, hangi ekranın paneli açtığı `activeScreenID`'de; HUD ve tepsi her pencerede çizilir. Kısayol, sürükleme algılama ve Quick Look sahipliği tek yerde (yönetici) durur.
 - Pil: IOKit; ses: CoreAudio dinleyicileri (ses/sessiz değişimi anında gelir), parlaklık ve pil 1 s'de bir yoklanır. Ekran kaydı istemez. Erişilebilirlik izni yalnızca "sistem baloncuğunu gizle" seçeneği için gerekir (`CGEvent` tap ile NX_SYSDEFINED medya tuşları yutulur, ses CoreAudio ile, parlaklık `DisplayServicesSetBrightness` ile uygulanır).
 - Enerji: kapalı çentik saat tıkını yayınlamaz, cam katmanı yalnızca panel açıkken çizilir, müzik yenilemesi boşta 6 s'ye düşer. Boşta CPU yaklaşık %1 (önceki sürümde %2,5).
