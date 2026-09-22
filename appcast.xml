@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.4.2</title>
+      <pubDate>Tue, 22 Sep 2026 17:55:12 +0000</pubDate>
+      <sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>0.4.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Tam ekranda çentik menü çubuğuyla birlikte gizleniyor.</p><p>- Tam ekran bir uygulamada kapalı çentik ve canlı etkinlikler kaybolur; fareyi üst kenara götürüp menü çubuğunu açınca geri gelir.</p><p>- Harici ekranlarda ve çentikli MacBook ekranında çalışır; her ekran ayrı değerlendirilir.</p><p>- Ses/parlaklık göstergesi, dosya sepeti ve açık panel tam ekranda da görünmeye devam eder.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.2/Damla-0.4.2.dmg" length="3949356" type="application/octet-stream" sparkle:edSignature="E8gcZgtrP1vDAXBF12mnNfWTK4GBx9CimnSklR1sIqMCtSanx9Dws5d7sYqUP1RcPqIKynn/nvxfi7XV0CMVCg=="/>
+    </item>
+    <item>
       <title>Damla 0.4.1</title>
       <pubDate>Tue, 22 Sep 2026 16:21:35 +0000</pubDate>
       <sparkle:version>5</sparkle:version>
