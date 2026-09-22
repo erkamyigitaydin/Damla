@@ -65,7 +65,7 @@ Kaynak dizininin yanına `Damla.app` üretir. Derleme önbelleğini başka yerde
 - Gerçek Mac'te ekran görüntüsüyle kontrol edildi: kapalı çentik (kapak + ekolayzer, sayaç), hover ile açılış kareleri, Özet (Apple Music parçası, kapak, ilerleme), Dosyalar (5 öğe), Pano (bağlantı/metin/renk kartları), Odak (çalışan sayaç), Ayarlar, ses ve parlaklık HUD'ları.
 - Harici 5K monitörde (çentiksiz, ana ekran): menü çubuğundaki sahte çentik (müzik, sayaç), HUD ve açık panel; ayrıca yüzen ada biçimi kontrol edildi. "Fareyi izle" modunda panel fareyle ekran değiştiriyor.
 - Pencere seviyesi piksel ölçümüyle doğrulandı; bağlam menüsünün panelin üstünde açıldığı görüldü.
-- "Şu An Çalıyor" köprüsü canlı doğrulandı: adaptör testi 0 döndü, Apple Music'ten parça/kapak/ilerleme akışla geldi, kaynak simgesi göründü; kapalı çentikte kapak. Tarayıcı kaynağı (YouTube) kullanıcı tarafından denenmeli.
+- "Şu An Çalıyor" köprüsü canlı doğrulandı: adaptör testi 0 döndü, Apple Music'ten parça/kapak/ilerleme akışla geldi, kaynak simgesi göründü; kapalı çentikte kapak. Tarayıcı kaynağı kullanıcı tarafından doğrulandı: YouTube sekmesinde başlık, kapak ve oynat/duraklat çalışıyor.
 - Sepet zinciri canlı doğrulandı: fare basılıyken sürükleme panosuna dosya adresi yazılınca panel 499 seviyesine indi ve "Buraya bırak" bandı açıldı; bırakınca 1000'e döndü. Finder'dan gerçek bırakma kullanıcı tarafından denenmeli.
 - Ses ve parlaklık uygulayıcıları debug komutlarıyla doğrulandı (1/16 adım, gerçek CoreAudio ve DisplayServices üzerinden okunup geri alındı). Tuş yakalama akışı Erişilebilirlik izni gerektirdiği için kullanıcı tarafından denenmeli.
 - Tam ekran: yerleşik ekranda tam ekran bir pencere üzerinde kapalı çentik, hover ile açılış ve açık panel ekran görüntüsüyle doğrulandı.
