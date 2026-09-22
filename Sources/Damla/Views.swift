@@ -92,13 +92,14 @@ struct NotchShape: InsettableShape {
 struct DamlaView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
+    @ObservedObject var screen: ScreenMetrics
     @State private var dropping = false
     @State private var glassVisible = false
-    init(model: AppState) { self.model = model; media = model.media }
+    init(model: AppState, screen: ScreenMetrics) { self.model = model; media = model.media; self.screen = screen }
 
     private struct Key: Equatable { var state: NotchState; var compact: Bool; var dropping: Bool; var metrics: Layout.Metrics }
-    private var state: NotchState { model.state }
-    private var metrics: Layout.Metrics { model.metrics }
+    private var state: NotchState { model.state(for: screen.id) }
+    private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
     private var size: CGSize { Layout.shapeSize(state, metrics, compactContent: model.compactContent) }
     private var shape: NotchShape {
@@ -167,8 +168,9 @@ struct DamlaView: View {
         }
         .shadow(color: .black.opacity(open ? 0.45 : 0), radius: 24, y: 12)
         .contentShape(shape)
-        .onTapGesture { if !model.expanded { model.expanded = true } }
+        .onTapGesture { if state != .expanded { model.activeScreenID = screen.id; model.expanded = true } }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropping) { providers in
+            model.activeScreenID = screen.id
             for provider in providers {
                 _ = provider.loadObject(ofClass: URL.self) { url, _ in
                     guard let url else { return }
@@ -179,20 +181,20 @@ struct DamlaView: View {
         }
         .onChange(of: dropping) { _, value in
             // Without the basket (drag started before we noticed), open the shelf so there is a target.
-            if value && !model.dragActive { model.selectedTab = .files; model.settingsVisible = false; model.expanded = true }
+            if value && !model.dragActive { model.activeScreenID = screen.id; model.selectedTab = .files; model.settingsVisible = false; model.expanded = true }
         }
     }
 
     @ViewBuilder private var content: some View {
         switch state {
         case .expanded:
-            ExpandedView(model: model).transition(.blurReplace)
+            ExpandedView(model: model, metrics: metrics).transition(.blurReplace)
         case .hud:
             if let hud = model.hud { HUDRow(hud: hud, metrics: metrics).transition(.blurReplace) }
         case .drop:
             DropRow(metrics: metrics, targeted: dropping, count: model.files.count, dragged: model.dragURLs).transition(.blurReplace)
         case .closed:
-            CompactRow(model: model, media: media).transition(.blurReplace)
+            CompactRow(model: model, media: media, metrics: metrics).transition(.blurReplace)
         }
     }
 }
@@ -202,8 +204,9 @@ struct DamlaView: View {
 struct CompactRow: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
+    let metrics: Layout.Metrics
     var body: some View {
-        let m = model.metrics
+        let m = metrics
         let ear = Layout.ear(m, open: false)
         let side = Layout.compactSide - ear
         if model.compactContent {
@@ -360,8 +363,9 @@ struct DropRow: View {
 
 struct ExpandedView: View {
     @ObservedObject var model: AppState
+    let metrics: Layout.Metrics
     var body: some View {
-        let m = model.metrics
+        let m = metrics
         VStack(spacing: 0) {
             Color.clear.frame(height: Layout.headerHeight(m)).contentShape(Rectangle())
                 .onTapGesture { model.pinnedOpen = false; model.expanded = false }

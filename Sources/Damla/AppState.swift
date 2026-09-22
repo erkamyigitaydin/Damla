@@ -24,13 +24,12 @@ final class AppState: ObservableObject {
     @Published var expanded = false
     @Published var pinnedOpen = false
     @Published var selectedTab: PanelTab = .home
-    @Published var notchHeight: CGFloat = 32
-    @Published var notchWidth: CGFloat = 185
-    @Published var hasNotch = true
+    /// Screen whose window currently shows the expanded panel (HUD and basket show on every screen).
+    @Published var activeScreenID: UInt32?
     @Published var dragActive = false   // a file drag is in progress somewhere on the system
     @Published var dragURLs: [URL] = []  // what is being dragged, for the tray preview
     @Published var selectedFile: UUID?
-    @Published var displayMode = DisplayMode(rawValue: UserDefaults.standard.string(forKey: "displayMode") ?? "") ?? .followMouse
+    @Published var displayMode = DisplayMode(rawValue: UserDefaults.standard.string(forKey: "displayMode") ?? "") ?? .all
     @Published var externalStyle = ExternalStyle(rawValue: UserDefaults.standard.string(forKey: "externalStyle") ?? "") ?? .menuBar
     @Published var hideSystemHUD = UserDefaults.standard.bool(forKey: "hideSystemHUD")
     @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -62,8 +61,9 @@ final class AppState: ObservableObject {
     var setDialogMode: ((Bool) -> Void)?
     var requestQuickLook: ((Int?) -> Void)?
 
-    var state: NotchState { expanded ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed }
-    var metrics: Layout.Metrics { Layout.Metrics(notchWidth: notchWidth, notchHeight: notchHeight, hasNotch: hasNotch) }
+    func state(for screenID: UInt32) -> NotchState {
+        expanded && activeScreenID == screenID ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
+    }
     /// True when the closed notch has something to show beside the physical notch.
     var compactContent: Bool { session.hasStarted || media.hasTrack }
 

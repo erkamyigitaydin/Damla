@@ -4,7 +4,7 @@ import CoreGraphics
 enum NotchState: Equatable { case closed, hud, drop, expanded }
 
 enum DisplayMode: String, CaseIterable, Identifiable {
-    case followMouse = "Fareyi izle", notch = "Çentikli ekran"
+    case all = "Tümü", followMouse = "Fareyi izle", notch = "Çentikli"
     var id: String { rawValue }
 }
 
