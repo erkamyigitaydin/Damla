@@ -30,6 +30,7 @@ extension HUDItem {
         case .brightness: return Theme.amber
         case .battery: return Theme.green
         case .done: return Theme.accent
+        case .agent: return phase == .waiting || phase == .failed ? Theme.amber : Theme.accent
         }
     }
 }
@@ -232,30 +233,33 @@ struct CompactRow: View {
         let ear = Layout.ear(m, open: false)
         let side = Layout.compactSide - ear
         if model.compactContent {
+            // Like the iPhone's island: the agent's mascot lives on the left while it works, its live status on the
+            // right. A running focus timer keeps the left; the mascot then moves right with its status badge.
+            let agent = model.agentBadge
+            let mascotLeft = agent != nil && !model.session.hasStarted
             HStack(spacing: 0) {
                 Group {
                     if model.session.hasStarted {
                         Text(model.timeLabel).font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
                             .contentTransition(.numericText())
+                    } else if let agent {
+                        AgentMascot(session: agent, size: 22)
                     } else if let art = media.artwork {
                         Image(nsImage: art).resizable().scaledToFill().frame(width: 20, height: 20)
                             .clipShape(RoundedRectangle(cornerRadius: 5.5, style: .continuous))
-                    } else if model.agentBadge != nil {
-                        Image(systemName: "terminal").font(.system(size: 11, weight: .semibold))
                     } else {
                         Image(systemName: "music.note").font(.system(size: 11, weight: .semibold))
                     }
                 }.frame(width: side)
                 Spacer(minLength: 0).frame(width: m.notchWidth)
                 Group {
-                    if let agent = model.agentBadge {
-                        Image(systemName: agent.phase.icon).font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(agent.phase == .waiting || agent.phase == .failed ? Theme.amber : Theme.accent)
-                            .help("\(agent.provider.title) · \(agent.project) · \(agent.phase.title)")
+                    if let agent {
+                        if mascotLeft { AgentStatusMark(phase: agent.phase) } else { AgentMascot(session: agent, size: 22) }
                     } else if media.hasTrack { Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55) }
                     else { Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim) }
                 }.frame(width: side)
             }
+            .help(agent.map { "\($0.provider.title) · \($0.project) · \($0.phase.title)" } ?? "")
             .foregroundStyle(.white)
             .padding(.horizontal, ear)
             .frame(height: Layout.closedHeight(m))
@@ -290,6 +294,66 @@ struct Equalizer: View {
     }
 }
 
+// MARK: - Agent mascot
+
+/// The agent app's icon, alive while it works: a slow breath and a soft ring in the status colour,
+/// plus a small badge for waiting / done / failed.
+struct AgentMascot: View {
+    let session: AgentSession
+    var size: CGFloat = 22
+    private var tint: Color { session.phase == .waiting || session.phase == .failed ? Theme.amber : Theme.accent }
+    private var working: Bool { session.phase == .working }
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                if let icon = session.provider.icon {
+                    Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+                } else {
+                    Image(systemName: "terminal").font(.system(size: size * 0.5, weight: .semibold)).foregroundStyle(.white)
+                }
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).strokeBorder(tint.opacity(working ? 0.9 : 0.55), lineWidth: 1))
+            .phaseAnimator([false, true], trigger: working) { view, breathe in
+                view.scaleEffect(working && breathe ? 1.06 : 1)
+                    .shadow(color: tint.opacity(working && breathe ? 0.65 : 0.2), radius: working && breathe ? 6 : 2)
+            } animation: { _ in Theme.reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 1.1).repeatForever(autoreverses: true) }
+            if session.phase != .working {
+                Image(systemName: session.phase.icon).font(.system(size: size * 0.32, weight: .bold)).foregroundStyle(.black)
+                    .frame(width: size * 0.5, height: size * 0.5).background(tint, in: Circle())
+                    .overlay(Circle().strokeBorder(.black, lineWidth: 1))
+                    .offset(x: size * 0.16, y: size * 0.16)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .animation(Theme.quick, value: session.phase)
+        .accessibilityLabel("\(session.provider.title) · \(session.phase.title)")
+    }
+}
+
+/// Right-hand status beside the mascot: three thinking dots while working, a symbol otherwise.
+struct AgentStatusMark: View {
+    let phase: AgentPhase
+    private var tint: Color { phase == .waiting || phase == .failed ? Theme.amber : Theme.accent }
+    var body: some View {
+        if phase == .working {
+            TimelineView(.animation(minimumInterval: 1 / 12, paused: Theme.reduceMotion)) { context in
+                let t = context.date.timeIntervalSinceReferenceDate
+                HStack(spacing: 3) {
+                    ForEach(0..<3, id: \.self) { i in
+                        Circle().fill(tint).frame(width: 4.5, height: 4.5)
+                            .opacity(0.35 + 0.65 * max(0, sin(t * 2.6 - Double(i) * 0.9)))
+                    }
+                }
+            }
+        } else {
+            Image(systemName: phase.icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(tint)
+                .contentTransition(.symbolEffect(.replace))
+        }
+    }
+}
+
 // MARK: - HUD
 
 struct HUDRow: View {
@@ -300,21 +364,36 @@ struct HUDRow: View {
         let side = (metrics.hasNotch ? Layout.hudSide : 128) - ear
         HStack(spacing: 0) {
             HStack(spacing: 7) {
-                Image(systemName: hud.icon).font(.system(size: 12, weight: .semibold)).frame(width: 16)
-                    .contentTransition(.symbolEffect(.replace))
+                if let image = hud.image {
+                    Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fit).frame(width: 18, height: 18)
+                        .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
+                } else {
+                    Image(systemName: hud.icon).font(.system(size: 12, weight: .semibold)).frame(width: 16)
+                        .contentTransition(.symbolEffect(.replace))
+                }
                 Text(hud.title).font(.system(size: 11, weight: .semibold)).lineLimit(1)
             }
             .padding(.leading, 14).frame(width: side, alignment: .leading)
             Spacer(minLength: 0).frame(width: metrics.notchWidth)
-            HStack(spacing: 8) {
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.18))
-                        Capsule().fill(hud.tint).frame(width: max(4, g.size.width * hud.level))
+            Group {
+                if hud.kind == .agent {
+                    HStack(spacing: 6) {
+                        if let phase = hud.phase { AgentStatusMark(phase: phase) }
+                        Text(hud.detail).font(.system(size: 11, weight: .semibold)).lineLimit(1).foregroundStyle(hud.tint)
                     }
-                }.frame(height: 4)
-                Text("\(Int((hud.level * 100).rounded()))").font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
-                    .frame(width: 22, alignment: .trailing).contentTransition(.numericText())
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                } else {
+                    HStack(spacing: 8) {
+                        GeometryReader { g in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.18))
+                                Capsule().fill(hud.tint).frame(width: max(4, g.size.width * hud.level))
+                            }
+                        }.frame(height: 4)
+                        Text("\(Int((hud.level * 100).rounded()))").font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
+                            .frame(width: 22, alignment: .trailing).contentTransition(.numericText())
+                    }
+                }
             }
             .padding(.trailing, 14).frame(width: side)
         }

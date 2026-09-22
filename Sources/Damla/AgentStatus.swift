@@ -9,6 +9,17 @@ enum AgentProvider: String, Codable, CaseIterable {
     /// Apps that host the agent, in preference order (Codex also lives inside the ChatGPT app).
     var bundleIDs: [String] { self == .claude ? ["com.anthropic.claudefordesktop"] : ["com.openai.codex", "com.openai.chat"] }
     var appURL: URL? { bundleIDs.lazy.compactMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }.first }
+    /// The installed app's own icon (Claude's spark, the Codex/ChatGPT mark), read at runtime so no brand
+    /// asset ships with Damla. Nil when the app is not installed.
+    var icon: NSImage? {
+        if let cached = Self.iconCache[self] { return cached }
+        guard let url = appURL else { return nil }
+        let image = NSWorkspace.shared.icon(forFile: url.path)
+        image.size = NSSize(width: 64, height: 64)
+        Self.iconCache[self] = image
+        return image
+    }
+    nonisolated(unsafe) private static var iconCache: [AgentProvider: NSImage] = [:]
 }
 
 enum AgentPhase: String, Codable {
@@ -22,6 +33,18 @@ enum AgentPhase: String, Codable {
         case .failed: return "Hata oluştu"
         case .idle: return "Hazır"
         case .stale: return "Durum güncel değil"
+        }
+    }
+    /// Fits beside the notch in the HUD (about 90 pt).
+    var shortTitle: String {
+        switch self {
+        case .working: return "Çalışıyor"
+        case .waiting: return "Onay bekliyor"
+        case .done: return "Tamamlandı"
+        case .interrupted: return "Durduruldu"
+        case .failed: return "Hata"
+        case .idle: return "Hazır"
+        case .stale: return "Güncel değil"
         }
     }
     var icon: String {

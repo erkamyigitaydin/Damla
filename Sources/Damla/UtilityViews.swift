@@ -50,9 +50,7 @@ struct AgentPanelView: View {
                             ForEach(service.sessions.prefix(12)) { session in
                                 let phase = session.effectivePhase(at: context.date)
                                 HStack(spacing: 9) {
-                                    Image(systemName: phase.icon).font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(phase == .waiting || phase == .failed ? Theme.amber : Theme.accent)
-                                        .frame(width: 20)
+                                    AgentMascot(session: session, size: 24).frame(width: 28)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(session.project).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
                                         Text("\(session.provider.title) · \(phase == .waiting ? session.detail : phase.title)")

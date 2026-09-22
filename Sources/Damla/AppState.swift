@@ -12,12 +12,15 @@ enum PanelTab: String, CaseIterable, Identifiable {
 }
 
 struct HUDItem: Identifiable {
-    enum Kind { case volume, mute, brightness, battery, done }
+    enum Kind { case volume, mute, brightness, battery, done, agent }
     var id = UUID()
     var kind: Kind
     var icon: String
     var title: String
     var level: Double
+    var image: NSImage? = nil      // app icon instead of the symbol (agent HUDs)
+    var detail: String = ""        // right-hand text instead of the level bar (agent HUDs)
+    var phase: AgentPhase? = nil
 }
 
 final class AppState: ObservableObject {
@@ -92,7 +95,7 @@ final class AppState: ObservableObject {
         }
         agents.onChange = { [weak self] record in
             guard let self, !self.cleaning.active else { return }
-            self.showHUD(record.phase.icon, "\(record.provider.title) · \(record.phase.title)", 1)
+            self.showAgentHUD(record)
         }
         agents.start()
         keys.onDenied = { [weak self] in
@@ -129,6 +132,14 @@ final class AppState: ObservableObject {
         hud = HUDItem(kind: kind, icon: icon, title: title, level: min(1, max(0, level)))
         let work = DispatchWorkItem { [weak self] in self?.hud = nil }
         hudClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + 2.4, execute: work)
+    }
+    func showAgentHUD(_ record: AgentSession) {
+        hudClear?.cancel()
+        hud = HUDItem(kind: .agent, icon: record.phase.icon, title: record.provider.title, level: 1,
+                      image: record.provider.icon, detail: record.phase == .waiting && !record.detail.isEmpty ? record.detail : record.phase.shortTitle,
+                      phase: record.phase)
+        let work = DispatchWorkItem { [weak self] in self?.hud = nil }
+        hudClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
     }
     func showNotice(_ message: String, duration: TimeInterval = 3, action: (() -> Void)? = nil) {
         noticeClear?.cancel(); notice = message; noticeAction = action
