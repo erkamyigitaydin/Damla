@@ -20,6 +20,8 @@ final class SystemMonitor {
     private var tickCount = 0
     private var brightnessHandle: UnsafeMutableRawPointer?
     private var brightnessGetter: (@convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32)?
+    private var brightnessSetter: (@convention(c) (UInt32, Float) -> Int32)?
+    private static let feedbackSound = NSSound(contentsOfFile: "/System/Library/LoginPlugins/BezelServices.loginPlugin/Contents/Resources/volume.aiff", byReference: true)
     var onBattery: ((BatterySnapshot) -> Void)?
     var onLevels: ((Float?, Float?, Bool) -> Void)?
     var onHUD: ((String, String, Double) -> Void)?
@@ -30,6 +32,9 @@ final class SystemMonitor {
         brightnessHandle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY)
         if let brightnessHandle, let symbol = dlsym(brightnessHandle, "DisplayServicesGetBrightness") {
             brightnessGetter = unsafeBitCast(symbol, to: (@convention(c) (UInt32, UnsafeMutablePointer<Float>) -> Int32).self)
+        }
+        if let brightnessHandle, let symbol = dlsym(brightnessHandle, "DisplayServicesSetBrightness") {
+            brightnessSetter = unsafeBitCast(symbol, to: (@convention(c) (UInt32, Float) -> Int32).self)
         }
     }
     func start() {
@@ -58,12 +63,85 @@ final class SystemMonitor {
         }
         tickCount += 1
     }
-    func brightnessValue() -> Float? {
-        guard let getter = brightnessGetter else { return nil }
+    private var builtInDisplayID: UInt32? {
         let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main
-        guard let id = (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else { return nil }
+        return (screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+    func brightnessValue() -> Float? {
+        guard let getter = brightnessGetter, let id = builtInDisplayID else { return nil }
         var value: Float = 0
         return getter(id, &value) == 0 ? min(1, max(0, value)) : nil
+    }
+    var canSetBrightness: Bool { brightnessSetter != nil && brightnessValue() != nil }
+
+    // MARK: Applying changes ourselves (used when the system bezel is suppressed)
+
+    func adjustVolume(by delta: Float, feedback: Bool) {
+        let (current, muted) = Self.audio()
+        guard let current else { return }
+        let value = min(1, max(0, (current + delta * 1.0001).rounded(toStep: abs(delta))))
+        if muted && delta > 0 { Self.setMute(false) }
+        Self.setVolume(value)
+        let (applied, nowMuted) = Self.audio()
+        oldVolume = applied ?? value; oldMuted = nowMuted
+        onLevels?(applied ?? value, brightnessValue(), nowMuted)
+        onHUD?(nowMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", nowMuted ? "Ses kapalı" : "Ses", nowMuted ? 0 : Double(applied ?? value))
+        if feedback { Self.feedbackSound?.stop(); Self.feedbackSound?.play() }
+    }
+    func toggleMute() {
+        let (volume, muted) = Self.audio()
+        Self.setMute(!muted)
+        let (applied, nowMuted) = Self.audio()
+        oldVolume = applied ?? volume; oldMuted = nowMuted
+        onLevels?(applied ?? volume, brightnessValue(), nowMuted)
+        onHUD?(nowMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", nowMuted ? "Ses kapalı" : "Ses", nowMuted ? 0 : Double(applied ?? volume ?? 0))
+    }
+    func adjustBrightness(by delta: Float) {
+        guard let setter = brightnessSetter, let id = builtInDisplayID, let current = brightnessValue() else { return }
+        let value = min(1, max(0, (current + delta * 1.0001).rounded(toStep: abs(delta))))
+        _ = setter(id, value)
+        let applied = brightnessValue() ?? value
+        oldBrightness = applied
+        onLevels?(oldVolume, applied, oldMuted ?? false)
+        onHUD?("sun.max.fill", "Parlaklık", Double(applied))
+    }
+    private static func defaultOutputDevice() -> AudioDeviceID? {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var device = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr else { return nil }
+        return device
+    }
+    static func setVolume(_ value: Float) {
+        guard let device = defaultOutputDevice() else { return }
+        var value = value
+        let size = UInt32(MemoryLayout<Float>.size)
+        var applied = false
+        for element in [UInt32(0), 1, 2] {
+            var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar,
+                                                     mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+            var settable: DarwinBoolean = false
+            guard AudioObjectHasProperty(device, &address),
+                  AudioObjectIsPropertySettable(device, &address, &settable) == noErr, settable.boolValue else { continue }
+            if AudioObjectSetPropertyData(device, &address, 0, nil, size, &value) == noErr {
+                applied = true
+                if element == 0 { break }
+            }
+        }
+        if !applied {
+            // Devices without a direct scalar volume still expose the system-level "virtual main volume" ('vmvc').
+            var address = AudioObjectPropertyAddress(mSelector: AudioObjectPropertySelector(0x766D_7663),
+                                                     mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+            if AudioObjectHasProperty(device, &address) { AudioObjectSetPropertyData(device, &address, 0, nil, size, &value) }
+        }
+    }
+    static func setMute(_ muted: Bool) {
+        guard let device = defaultOutputDevice() else { return }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute,
+                                                 mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+        var value: UInt32 = muted ? 1 : 0
+        AudioObjectSetPropertyData(device, &address, 0, nil, 4, &value)
     }
     static func audio() -> (Float?, Bool) {
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -102,4 +180,9 @@ final class SystemMonitor {
         return BatterySnapshot()
     }
     deinit { timer?.invalidate(); if let brightnessHandle { dlclose(brightnessHandle) } }
+}
+
+private extension Float {
+    /// Snaps to macOS's 16 (or 64) volume/brightness steps so repeated presses land on the same grid.
+    func rounded(toStep step: Float) -> Float { step > 0 ? (self / step).rounded() * step : self }
 }

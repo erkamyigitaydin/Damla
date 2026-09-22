@@ -223,6 +223,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "display-mouse": model.displayMode = .followMouse
         case "external-menubar": model.externalStyle = .menuBar
         case "external-island": model.externalStyle = .island
+        case "vol-up": model.monitor.adjustVolume(by: 1 / 16, feedback: false)
+        case "vol-down": model.monitor.adjustVolume(by: -1 / 16, feedback: false)
+        case "bright-up": model.monitor.adjustBrightness(by: 1 / 16)
+        case "bright-down": model.monitor.adjustBrightness(by: -1 / 16)
+        case "keys-on": model.setHideSystemHUD(true)
+        case "keys-off": model.setHideSystemHUD(false)
         case "focus-start": model.setFocus(minutes: 25); model.toggleFocus()
         case "focus-stop": model.setFocus(minutes: 25)
         case "clip-demo":

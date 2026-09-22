@@ -286,9 +286,26 @@ struct ExpandedView: View {
             }
             .transition(.blurReplace)
             .id(model.settingsVisible ? "settings" : model.selectedTab.rawValue)
-            .padding(.horizontal, 18).padding(.top, m.hasNotch ? 6 : 2).padding(.bottom, 16)
+            .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
             .frame(width: Layout.panelWidth, height: Layout.contentHeight)
         }
+        .overlay(alignment: .bottom) {
+            if let notice = model.notice {
+                Button { model.noticeAction?(); model.notice = nil } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: model.noticeAction == nil ? "info.circle.fill" : "arrow.up.forward.circle.fill").font(.system(size: 10, weight: .semibold))
+                        Text(notice).font(.system(size: 10.5, weight: .medium)).lineLimit(1)
+                    }
+                    .foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain).padding(.bottom, 10)
+                .transition(.opacity.combined(with: .offset(y: 8)))
+            }
+        }
+        .animation(Theme.quick, value: model.notice)
         .foregroundStyle(.white)
         .animation(Theme.quick, value: model.selectedTab)
         .animation(Theme.quick, value: model.settingsVisible)
@@ -341,9 +358,9 @@ struct HomeView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
             HStack(spacing: 14) {
-                Artwork(image: media.artwork, placeholder: media.hasTrack ? "music.note" : "waveform", size: 82)
+                Artwork(image: media.artwork, placeholder: media.hasTrack ? "music.note" : "waveform", size: 88)
                 VStack(alignment: .leading, spacing: 3) {
                     if media.hasTrack {
                         HStack(alignment: .firstTextBaseline) {
@@ -367,7 +384,8 @@ struct HomeView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 82)
+            .frame(height: 88)
+            Spacer(minLength: 10)
             ZStack {
                 HStack(spacing: 14) {
                     if model.battery.available {
@@ -511,8 +529,8 @@ struct ShelfView: View {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 8) {
                         ForEach(model.files) { item in FileTile(item: item, model: model) }
-                    }.padding(.vertical, 2)
-                }.scrollIndicators(.hidden).edgeFade()
+                    }.padding(.vertical, 2).frame(maxHeight: .infinity)
+                }.scrollIndicators(.hidden).edgeFade().frame(maxHeight: .infinity)
             }
         }
     }
@@ -530,7 +548,7 @@ struct FileTile: View {
                 .frame(height: 26, alignment: .top)
         }
         .padding(.horizontal, 6).padding(.top, 12).padding(.bottom, 8)
-        .frame(width: 88)
+        .frame(width: 88).frame(maxHeight: .infinity)
         .background(hovering ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(alignment: .topTrailing) {
             if hovering {
@@ -642,7 +660,7 @@ struct ClipCard: View {
                 }
                 .foregroundStyle(Theme.dim).padding(.horizontal, 8).frame(height: 24).background(.black.opacity(0.25))
             }
-            .frame(width: 128, height: 132)
+            .frame(width: 128, height: 124)
             .background(hovering ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(entry.pinned ? 0.22 : 0.06), lineWidth: 0.5))
@@ -713,10 +731,20 @@ struct FocusView: View {
 
 struct SettingsView: View {
     @ObservedObject var model: AppState
+    @ObservedObject var keys: MediaKeyInterceptor
+    init(model: AppState) { self.model = model; keys = model.keys }
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 9) {
             Toggle("Üzerine gelince aç", isOn: $model.automaticOpen).onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
             Toggle("Pano geçmişi", isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) }))
+            Toggle("Sistem ses/parlaklık baloncuğunu gizle", isOn: Binding(get: { model.hideSystemHUD }, set: { model.setHideSystemHUD($0) }))
+                .help("Ses, sessiz ve parlaklık tuşlarını Damla uygular; macOS kendi göstergesini çizmez. Erişilebilirlik izni ister.")
+            if model.hideSystemHUD && !keys.active {
+                Button { MediaKeyInterceptor.openAccessibilitySettings() } label: {
+                    Label("Erişilebilirlik izni bekleniyor · Sistem Ayarları'nı aç", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.amber)
+                }.buttonStyle(.plain)
+            }
             HStack {
                 Text("Ekran")
                 Spacer()
@@ -745,7 +773,7 @@ struct SettingsView: View {
             }
         }
         .font(.system(size: 12)).toggleStyle(.switch).controlSize(.small).tint(Theme.accent)
-        .padding(.horizontal, 4).padding(.top, 6).frame(maxHeight: .infinity)
+        .padding(.horizontal, 4).padding(.top, 2).frame(maxHeight: .infinity)
     }
 }
 

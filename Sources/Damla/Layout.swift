@@ -24,8 +24,8 @@ enum Layout {
         var hasNotch: Bool
     }
 
-    static let panelWidth: CGFloat = 400
-    static let contentHeight: CGFloat = 196
+    static let panelWidth: CGFloat = 404
+    static let contentHeight: CGFloat = 188
     static let pillHeight: CGFloat = 36
     static let pillGap: CGFloat = 8
     static let margin: CGFloat = 36           // transparent window margin that holds the shadow

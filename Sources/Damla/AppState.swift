@@ -28,6 +28,8 @@ final class AppState: ObservableObject {
     @Published var hasNotch = true
     @Published var displayMode = DisplayMode(rawValue: UserDefaults.standard.string(forKey: "displayMode") ?? "") ?? .followMouse
     @Published var externalStyle = ExternalStyle(rawValue: UserDefaults.standard.string(forKey: "externalStyle") ?? "") ?? .menuBar
+    @Published var hideSystemHUD = UserDefaults.standard.bool(forKey: "hideSystemHUD")
+    @Published var noticeAction: (() -> Void)?
     @Published var battery = BatterySnapshot()
     @Published var volume: Float?
     @Published var brightness: Float?
@@ -44,6 +46,7 @@ final class AppState: ObservableObject {
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
     let media = MediaService()
     let monitor = SystemMonitor()
+    lazy var keys = MediaKeyInterceptor(monitor: monitor)
     private var timer: Timer?
     private var clipboardTimer: Timer?
     private var pasteboardCount = NSPasteboard.general.changeCount
@@ -64,6 +67,10 @@ final class AppState: ObservableObject {
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
         monitor.start(); media.start()
+        keys.onDenied = { [weak self] in
+            self?.showNotice("Erişilebilirlik izni gerekli · ayarları açmak için dokun", duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
+        }
+        if hideSystemHUD { keys.start(prompt: false) }
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.now = Date()
@@ -88,10 +95,15 @@ final class AppState: ObservableObject {
         let work = DispatchWorkItem { [weak self] in self?.hud = nil }
         hudClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + 2.4, execute: work)
     }
-    func showNotice(_ message: String) {
-        noticeClear?.cancel(); notice = message
-        let work = DispatchWorkItem { [weak self] in self?.notice = nil }
-        noticeClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
+    func showNotice(_ message: String, duration: TimeInterval = 3, action: (() -> Void)? = nil) {
+        noticeClear?.cancel(); notice = message; noticeAction = action
+        let work = DispatchWorkItem { [weak self] in self?.notice = nil; self?.noticeAction = nil }
+        noticeClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+    func setHideSystemHUD(_ enabled: Bool) {
+        hideSystemHUD = enabled
+        UserDefaults.standard.set(enabled, forKey: "hideSystemHUD")
+        if enabled { keys.start(prompt: true) } else { keys.stop() }
     }
     func select(_ tab: PanelTab) {
         settingsVisible = false
