@@ -128,25 +128,34 @@ struct DamlaView: View {
     }
 
     private var ambientColor: Color { media.accent.map { Color(nsColor: $0) } ?? .clear }
-    private var ambientShown: Bool { open && model.selectedTab == .home && !model.settingsVisible && media.accent != nil }
+    /// How strongly the artwork colour fills the panel: full on Özet, a hint on other tabs, none in settings.
+    private var ambientStrength: Double {
+        guard open, media.accent != nil, !model.settingsVisible else { return 0 }
+        return model.selectedTab == .home ? 1 : 0.45
+    }
 
-    /// Black glass: solid at the notch, melting into frosted Liquid Glass towards the bottom, with the
-    /// artwork's colour glowing through the lower half while music is showing.
+    /// Black glass: solid over the notch, then the artwork colour takes over as the black thins out,
+    /// so the notch never reads as a separate block. A dark scrim above the colour keeps text legible;
+    /// the clear glass shows through at the bottom.
     private var surface: some View {
-        ZStack(alignment: .top) {
-            // Clear (not frosted) Liquid Glass with the darkness applied as the glass's own tint, so its
-            // specular rim and lensing stay on top and whatever is behind shows through sharp.
+        let notchEdge = Layout.headerHeight(metrics) / size.height
+        return ZStack(alignment: .top) {
             if glassVisible { Color.clear.glassEffect(.clear.tint(.black.opacity(0.48)), in: shape) }
+            LinearGradient(stops: [
+                .init(color: ambientColor.opacity(0), location: max(0, notchEdge - 0.04)),
+                .init(color: ambientColor.opacity(0.75), location: notchEdge + 0.3),
+                .init(color: ambientColor.opacity(0.85), location: 0.72),
+                .init(color: ambientColor.opacity(0.7), location: 1)
+            ], startPoint: .top, endPoint: .bottom)
+                .animation(.easeInOut(duration: 0.9), value: media.accent)
+                .opacity(ambientStrength)
+            RadialGradient(colors: [.white.opacity(0.10 * ambientStrength), .clear], center: UnitPoint(x: 0.2, y: 0.5), startRadius: 0, endRadius: 200)
             shape.fill(LinearGradient(stops: [
                 .init(color: .black, location: 0),
-                .init(color: .black.opacity(open ? 0.97 : 1), location: 0.24),
-                .init(color: .black.opacity(open ? 0.5 : 1), location: 0.58),
-                .init(color: .black.opacity(open ? 0.0 : 1), location: 1)
+                .init(color: .black.opacity(open ? 0.98 : 1), location: notchEdge),
+                .init(color: .black.opacity(open ? 0.5 : 1), location: notchEdge + 0.36),
+                .init(color: .black.opacity(open ? 0.18 : 1), location: 1)
             ], startPoint: .top, endPoint: .bottom))
-            RadialGradient(colors: [ambientColor.opacity(0.62), ambientColor.opacity(0)],
-                           center: UnitPoint(x: 0.24, y: 0.66), startRadius: 0, endRadius: 250)
-                .animation(.easeInOut(duration: 0.9), value: media.accent)
-                .opacity(ambientShown ? 1 : 0)
             content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
         }
         .clipShape(shape)
