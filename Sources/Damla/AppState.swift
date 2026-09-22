@@ -78,7 +78,7 @@ final class AppState: ObservableObject {
         $expanded.removeDuplicates().sink { [weak self] expanded in
             guard let self else { return }
             self.media.wantsFrequentUpdates = expanded
-            if expanded { self.now = Date(); self.media.refresh() }
+            if expanded { self.now = Date(); if !self.media.bridgeActive { self.media.refresh() } }
         }.store(in: &cancellables)
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }

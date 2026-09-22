@@ -64,7 +64,8 @@ final class MediaService: ObservableObject {
             }
             self.hasTrack = true
             self.title = item.title
-            self.artist = item.artist.isEmpty ? item.album : item.artist
+            // Browsers often send no artist; fall back to the album, then to the player's name (Safari, Chrome…).
+            self.artist = !item.artist.isEmpty ? item.artist : !item.album.isEmpty ? item.album : Self.appName(for: item.bundleID)
             self.playing = item.playing
             self.duration = max(0, item.duration)
             self.position = max(0, item.elapsed); self.positionDate = item.timestamp
@@ -82,6 +83,7 @@ final class MediaService: ObservableObject {
         bridge.start()
     }
     func connect(_ selected: MusicSource) {
+        guard !bridgeActive else { return }
         source = selected; connected = true; generation += 1
         artwork = nil; accent = nil; hasTrack = false; lastArtworkKey = ""
         UserDefaults.standard.set(source.rawValue, forKey: "musicSource")
@@ -96,6 +98,7 @@ final class MediaService: ObservableObject {
         } else { refresh() }
     }
     func disconnect() {
+        guard !bridgeActive else { return }
         generation += 1; connected = false; hasTrack = false; playing = false; artwork = nil; accent = nil
         title = "Müziğine yer aç"; artist = "Apple Music veya Spotify’ı bağla."; status = nil
         UserDefaults.standard.set(false, forKey: "musicConnected")
@@ -103,7 +106,8 @@ final class MediaService: ObservableObject {
     var isRunning: Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: source.bundleID).isEmpty }
 
     func refresh() {
-        guard connected, !busy else { return }
+        // The bridge owns the state while it runs; the Apple Events path must not overwrite it.
+        guard !bridgeActive, connected, !busy else { return }
         guard isRunning else {
             playing = false; hasTrack = false; status = "\(source.rawValue) açık değil."; return
         }
@@ -178,6 +182,10 @@ final class MediaService: ObservableObject {
         let target = min(duration, max(0, seconds))
         position = target; positionDate = Date()
         if bridgeActive { bridge.seek(to: target) } else { command("set player position to \(target)") }
+    }
+    static func appName(for bundleID: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return bundleID }
+        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
     /// Icon of the app that is playing (Music, Spotify, Safari, Chrome…), for the source button.
     var sourceIcon: NSImage? {
