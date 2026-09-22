@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.4.1</title>
+      <pubDate>Tue, 22 Sep 2026 16:21:35 +0000</pubDate>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Ayarlar sayfasında satır aralıkları sıkılaştırıldı; Güncellemeler satırı eklendikten sonra alt bilgi rahat sığıyor.</p><p>Otomatik güncelleme akışının ilk gerçek testi.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.1/Damla-0.4.1.dmg" length="3927631" type="application/octet-stream" sparkle:edSignature="oQPuoqWvwWZGz09qzEcEo+6z95yfZLBk55Pb1WkD0d4esi00pop7+nr4HEb/ErBfytau5cSyWnGxmB8JiolIAw=="/>
+    </item>
+    <item>
       <title>Damla 0.4.0</title>
       <pubDate>Tue, 22 Sep 2026 16:19:25 +0000</pubDate>
       <sparkle:version>4</sparkle:version>
