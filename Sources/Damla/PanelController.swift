@@ -25,6 +25,7 @@ final class PanelController {
     private(set) var screen: NSScreen?
     private var localMonitor: Any?
     private var dragMonitors: [Any] = []
+    private var dialogShowing = false
     var holdBasket = false // debug: keep the basket open without a real drag
     private var lastDragCount = NSPasteboard(name: .drag).changeCount
 
@@ -52,10 +53,11 @@ final class PanelController {
         panel.contentView = host
         model.requestKeyFocus = { [weak self] in self?.panel.makeKeyAndOrderFront(nil) }
         model.setDialogMode = { [weak self] showingDialog in
-            guard let self else { return }
-            self.panel.level = showingDialog ? .floating : .screenSaver
-            if !showingDialog { self.panel.orderFrontRegardless() }
+            self?.dialogShowing = showingDialog
+            self?.updateLevel()
         }
+        model.$dragActive.removeDuplicates().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateLevel() }.store(in: &cancellables)
         chooseScreen()
         model.$expanded.receive(on: RunLoop.main).sink { [weak self] expanded in
             guard let self else { return }
@@ -87,6 +89,19 @@ final class PanelController {
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.trackHover() }
         if let hoverTimer { RunLoop.main.add(hoverTimer, forMode: .common) }
         layout()
+        panel.orderFrontRegardless()
+    }
+
+    /// Normally at the screen-saver level so the notch stays black over the menu bar. That is above the
+    /// drag layer (kCGDraggingWindowLevel = 500), where AppKit never looks for drop targets, so during a
+    /// file drag the panel steps just below the drag layer; the menu bar tint for that moment is acceptable.
+    private func updateLevel() {
+        let target: NSWindow.Level
+        if dialogShowing { target = .floating }
+        else if model.dragActive { target = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.draggingWindow)) - 1) }
+        else { target = .screenSaver }
+        guard panel.level != target else { return }
+        panel.level = target
         panel.orderFrontRegardless()
     }
 

@@ -33,7 +33,7 @@ enum Layout {
     static let compactSide: CGFloat = 54      // compact content width on each side of the notch
     static let notchlessTopInset: CGFloat = 6 // gap under the menu bar on screens without a notch
     static let notchlessIdleWidth: CGFloat = 92
-    static let dropBandHeight: CGFloat = 30    // extra band under the notch that holds the "drop here" label
+    static let dropBandHeight: CGFloat = 44    // band under the notch that holds the "drop here" label; tall enough to hit without touching the screen edge
     static let fakeNotchWidth: CGFloat = 120   // middle section of the fake notch on notchless screens
     static let fakeNotchHeight: CGFloat = 30   // fallback when the menu bar height cannot be read
 

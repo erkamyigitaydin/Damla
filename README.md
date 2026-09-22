@@ -24,7 +24,7 @@ Panel varsayılan olarak farenin bulunduğu ekranı izler. Çentiksiz bir ekrand
 - **Hareket:** Pencere artık çerçeve animasyonu yapmıyor; sabit boyutlu saydam bir pencere içinde şeklin kendisi SwiftUI yayıyla büyüyor (açılış 0.5 s, hafif sıçrama; kapanış 0.36 s). İçerik bulanıklıktan netleşerek geliyor, sekme kapsülü panelle birlikte iniyor. Sistem "hareketi azalt" ayarı açıkken kısa geçişler kullanılır.
 - **Sekmeler:** Dört sekme, iğne ve ayarlar panelin altında ayrı bir cam kapsülde. Rafta öğe varsa nokta rozeti görünür.
 - **Özet girişi:** Panel açılırken kapak sol alttan büyüyerek, başlık sağdan kayarak, kontroller alttan gelerek kademeli belirir (40 ms başlangıç, 50 ms aralık). "Hareketi azalt" açıkken atlanır.
-- **Pencere katmanı:** Çentikli ekranda macOS menü çubuğu malzemesini ekran koruyucu seviyesinin altındaki her pencerenin üstüne çiziyor (macOS 27'de ölçüldü: 999 boyanıyor, 1000 boyanmıyor). Panel bu yüzden `.screenSaver` seviyesinde; dosya seçici açıkken geçici olarak iner. Bağlam menüleri bu seviyede de panelin üstünde açılıyor.
+- **Pencere katmanı:** Çentikli ekranda macOS menü çubuğu malzemesini ekran koruyucu seviyesinin altındaki her pencerenin üstüne çiziyor (macOS 27'de ölçüldü: 999 boyanıyor, 1000 boyanmıyor). Panel bu yüzden `.screenSaver` seviyesinde; dosya seçici açıkken geçici olarak iner. Bağlam menüleri bu seviyede de panelin üstünde açılıyor. Bu seviye sürükleme katmanının (`kCGDraggingWindowLevel` = 500) üstünde kaldığı için AppKit paneli bırakma hedefi olarak görmez; dosya sürüklemesi algılandığı sürece panel 499'a iner (o anda menü çubuğu tonu hafifçe görünür) ve sürükleme bitince geri çıkar.
 
 ## Veriler ve bağlantılar
 
@@ -65,6 +65,7 @@ Kaynak dizininin yanına `Damla.app` üretir. Derleme önbelleğini başka yerde
 - Gerçek Mac'te ekran görüntüsüyle kontrol edildi: kapalı çentik (kapak + ekolayzer, sayaç), hover ile açılış kareleri, Özet (Apple Music parçası, kapak, ilerleme), Dosyalar (5 öğe), Pano (bağlantı/metin/renk kartları), Odak (çalışan sayaç), Ayarlar, ses ve parlaklık HUD'ları.
 - Harici 5K monitörde (çentiksiz, ana ekran): menü çubuğundaki sahte çentik (müzik, sayaç), HUD ve açık panel; ayrıca yüzen ada biçimi kontrol edildi. "Fareyi izle" modunda panel fareyle ekran değiştiriyor.
 - Pencere seviyesi piksel ölçümüyle doğrulandı; bağlam menüsünün panelin üstünde açıldığı görüldü.
+- Sepet zinciri canlı doğrulandı: fare basılıyken sürükleme panosuna dosya adresi yazılınca panel 499 seviyesine indi ve "Buraya bırak" bandı açıldı; bırakınca 1000'e döndü. Finder'dan gerçek bırakma kullanıcı tarafından denenmeli.
 - Ses ve parlaklık uygulayıcıları debug komutlarıyla doğrulandı (1/16 adım, gerçek CoreAudio ve DisplayServices üzerinden okunup geri alındı). Tuş yakalama akışı Erişilebilirlik izni gerektirdiği için kullanıcı tarafından denenmeli.
 - Tam ekran: yerleşik ekranda tam ekran bir pencere üzerinde kapalı çentik, hover ile açılış ve açık panel ekran görüntüsüyle doğrulandı.
 - Denenmeyenler: gerçek sürükle-bırak akışı, Spotify, uzun süreli enerji kullanımı.

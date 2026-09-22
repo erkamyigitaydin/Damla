@@ -314,7 +314,7 @@ struct DropRow: View {
                 }
             }
             .foregroundStyle(targeted ? Theme.accent : Color.white)
-            .padding(.horizontal, 12).padding(.vertical, 5)
+            .padding(.horizontal, 14).padding(.vertical, 7)
             .background {
                 Capsule().strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     .foregroundStyle(targeted ? Theme.accent.opacity(0.9) : .white.opacity(0.35))
