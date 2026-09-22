@@ -1094,8 +1094,7 @@ struct SettingsView: View {
         HStack {
             Text(title).foregroundStyle(.white.opacity(0.92)).lineLimit(1)
             Spacer(minLength: 6)
-            Toggle("", isOn: isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
-                .tint(Theme.accent).environment(\.controlActiveState, .active)
+            Toggle("", isOn: isOn).labelsHidden().toggleStyle(GlassSwitchStyle())
         }
         .frame(height: 24)
         .frame(maxWidth: .infinity)
@@ -1167,6 +1166,25 @@ struct GlassLook: ViewModifier {
 extension View {
     func glassLook(_ shape: AnyShape, prominent: Bool = false, pressed: Bool = false) -> some View {
         modifier(GlassLook(shape: shape, prominent: prominent, pressed: pressed))
+    }
+}
+
+/// Switch drawn in the panel's own glass language: mint track when on, white knob, no dependence on the
+/// system accent (NSSwitch ignores `tint` inside this non-key panel on macOS 27).
+struct GlassSwitchStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            ZStack(alignment: configuration.isOn ? .trailing : .leading) {
+                Capsule().fill(configuration.isOn ? Theme.accent : .white.opacity(0.14))
+                    .overlay(Capsule().strokeBorder(.white.opacity(configuration.isOn ? 0.35 : 0.12), lineWidth: 0.6))
+                Circle().fill(.white).padding(2).shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+            }
+            .frame(width: 34, height: 20)
+            .contentShape(Capsule())
+            .animation(Theme.quick, value: configuration.isOn)
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(configuration.isOn ? "açık" : "kapalı")
     }
 }
 
