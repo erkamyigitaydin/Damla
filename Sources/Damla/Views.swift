@@ -1109,7 +1109,7 @@ struct SettingsView: View {
                             .buttonStyle(PillStyle(accent: updater.availableVersion != nil)).font(.system(size: 10.5, weight: .medium))
                     }
                 }
-                .frame(height: 30)
+                .frame(height: 28)
             }
             Spacer(minLength: 0)
             HStack(spacing: 8) {
@@ -1142,7 +1142,7 @@ struct SettingsView: View {
             Spacer(minLength: 6)
             Toggle("", isOn: isOn).labelsHidden().toggleStyle(GlassSwitchStyle())
         }
-        .frame(height: 24)
+        .frame(height: 23)
         .frame(maxWidth: .infinity)
     }
 
@@ -1152,7 +1152,7 @@ struct SettingsView: View {
             Spacer(minLength: 8)
             HStack(spacing: 4, content: content).font(.system(size: 10.5, weight: .medium))
         }
-        .frame(height: 30)
+        .frame(height: 28)
     }
 }
 
