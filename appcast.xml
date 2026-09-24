@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.6.0</title>
+      <pubDate>Thu, 24 Sep 2026 18:22:01 +0000</pubDate>
+      <sparkle:version>10</sparkle:version>
+      <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Claude Code izinlerini çentikten onayla.</p><p>- Claude Code bir komut çalıştırmak, dosya düzenlemek veya web&#x27;e çıkmak için izin isteyince Damla çentikte açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin.</p><p>- Terminal (veya Claude uygulaması) öndeyse çentik sormaz; süre dolarsa ya da terminalde yanıtlarsan soru orada kalır.</p><p>- İsteğe bağlıdır: onay hook&#x27;u yalnızca `install-agent-hooks.py --approvals` ile kurulur, Ayarlar → Ajanlar&#x27;dan kapatılabilir.</p><p>- Bekleme süresi 30, 60 veya 120 saniye seçilebilir.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.6.0/Damla-0.6.0.dmg" length="4307966" type="application/octet-stream" sparkle:edSignature="fGRGFEhtH9pfzxE+3SBHwMH4zBspY5orUxFNqPhPSTSh1iAJc7lbXhLRAOToqWpHWUGYoGOQQVOoeLIp0v4pAA=="/>
+    </item>
+    <item>
       <title>Damla 0.5.1</title>
       <pubDate>Thu, 24 Sep 2026 18:05:46 +0000</pubDate>
       <sparkle:version>9</sparkle:version>
