@@ -104,5 +104,19 @@ if (( PUBLISH )); then
   git -C "$PROJECT_DIR" commit -q -m "appcast: $VERSION"
   git -C "$PROJECT_DIR" push -q origin main
   echo "→ yayında: https://github.com/$REPO/releases/tag/v$VERSION"
+  # Homebrew: refresh the cask in the tap repository, when there is one (brew install --cask erkamyigitaydin/tap/damla).
+  TAP="erkamyigitaydin/homebrew-tap"
+  if gh repo view "$TAP" >/dev/null 2>&1; then
+    TAP_DIR="$(mktemp -d)"
+    gh repo clone "$TAP" "$TAP_DIR" -- -q
+    python3 "$PROJECT_DIR/scripts/cask.py" "$DMG" --version "$VERSION" --out "$TAP_DIR/Casks/damla.rb"
+    git -C "$TAP_DIR" add Casks/damla.rb
+    git -C "$TAP_DIR" commit -q -m "damla $VERSION"
+    git -C "$TAP_DIR" push -q
+    rm -rf "$TAP_DIR"
+    echo "→ Homebrew: $TAP güncellendi"
+  else
+    echo "  not: $TAP yok; Homebrew tarifi atlandı (packaging/homebrew/damla.rb)"
+  fi
 fi
 printf '\nHazır: %s\n' "$DMG"
