@@ -170,7 +170,7 @@ struct LyricsFlow: View {
         return ScrollViewReader { reader in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 13) {
-                    Color.clear.frame(height: 24)
+                    Color.clear.frame(height: 24).id(-1)   // the top, for the moments before the first line
                     ForEach(lines.indices, id: \.self) { index in
                         LyricLineView(text: lines[index].text,
                                       role: index == current ? .current : (current.map { index < $0 } ?? false) ? .past : .upcoming,
@@ -191,17 +191,21 @@ struct LyricsFlow: View {
                 if phase == .interacting || phase == .decelerating { followPausedUntil = Date().addingTimeInterval(3) }
             }
             .onChange(of: current) { _, line in
-                guard let line, Date() >= followPausedUntil else { return }
-                withAnimation(.spring(duration: 0.65, bounce: 0.12)) { reader.scrollTo(line, anchor: UnitPoint(x: 0, y: 0.3)) }
+                guard Date() >= followPausedUntil else { return }
+                // Before the first line (a new song, a seek back to the start): back to the top.
+                withAnimation(.spring(duration: 0.65, bounce: 0.12)) {
+                    if let line { reader.scrollTo(line, anchor: UnitPoint(x: 0, y: 0.3)) } else { reader.scrollTo(-1, anchor: .top) }
+                }
             }
             .onChange(of: following) { _, resumed in
                 if resumed, let current { withAnimation(.spring(duration: 0.65, bounce: 0.12)) { reader.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) } }
             }
             .onAppear {
-                MediaService.trace("lyrics view: \(lines.count) lines, current=\(current.map(String.init) ?? "nil"), state=\(lyrics.state)")
                 if let current { reader.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) }
             }
         }
+        // Rows are keyed by index, so without this a new song would inherit the old one's scroll position.
+        .id("\(media.title)|\(media.artist)|\(lines.count)")
     }
 
     private var plain: some View {

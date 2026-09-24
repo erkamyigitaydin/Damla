@@ -153,7 +153,7 @@ final class AppState: ObservableObject {
                 guard let self else { return }
                 // A new track often reports its length a moment after its title: wait for it instead of
                 // briefly declaring "no lyrics".
-                if self.media.hasTrack && known && duration <= 0 { return }
+                if self.media.hasTrack && known && duration <= 0 { self.lyrics.expecting(title: title, artist: artist); return }
                 let song = self.media.hasTrack && known && duration >= 30 && duration <= 20 * 60
                 self.lyrics.show(title: song ? title : "", artist: song ? artist : "", album: self.media.album, duration: song ? duration : 0)
             }.store(in: &cancellables)

@@ -117,6 +117,13 @@ final class LyricsService: ObservableObject {
         load(track)
     }
 
+    /// A new song started but its length is not known yet: drop the old song's lyrics now rather than show them
+    /// over the new one while waiting.
+    func expecting(title: String, artist: String) {
+        guard enabled, current?.title != title || current?.artist != artist else { return }
+        task?.cancel(); current = nil; lyrics = Lyrics(); state = .loading
+    }
+
     private func load(_ track: LRCLib.Track) {
         current = track; task?.cancel(); lyrics = Lyrics()
         guard !track.title.isEmpty, !track.artist.isEmpty, track.duration > 30, track.duration.isFinite else { state = .missing; return }
