@@ -540,7 +540,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "tab-home": model.select(.home)
         case "mixer": model.select(.home); model.homePane = .levels
         case "outputs": model.select(.home); model.homePane = .outputs
-        case "lyrics": model.select(.home); model.homePane = .lyrics
+        case "lyrics": model.select(.home); model.homePane = .player; model.lyricsExpanded = true
         case "sources": model.select(.home); model.homePane = .sources
         case "lyrics-on": model.lyrics.enabled = true
         case "lyrics-off": model.lyrics.enabled = false

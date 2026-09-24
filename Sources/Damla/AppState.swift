@@ -74,10 +74,12 @@ final class AppState: ObservableObject {
     @Published var muted = false
     @Published var outputs: [AudioOutput] = []
     /// What Özet shows: the player, the output list, or the volume levels.
-    enum HomePane { case player, outputs, levels, lyrics, sources }
+    enum HomePane { case player, outputs, levels, sources }
     @Published var homePane: HomePane = .player
-    /// The lyrics stretch the open panel down to the tall height.
-    var tallPanel: Bool { selectedTab == .home && homePane == .lyrics }
+    /// Lyrics mode: the panel grows down with the lyrics flowing under the player, and stays open when the pointer
+    /// leaves. Left by the lyrics button or by closing the panel by hand; never restored on the next open.
+    @Published var lyricsExpanded = false
+    var tallPanel: Bool { selectedTab == .home && homePane == .player && lyricsExpanded && media.hasTrack }
     /// Scroll on the notch strip: vertical for volume, a horizontal swipe to skip tracks.
     @Published var notchGestures = UserDefaults.standard.object(forKey: "notchGestures") as? Bool ?? true {
         didSet { UserDefaults.standard.set(notchGestures, forKey: "notchGestures") }
@@ -149,6 +151,9 @@ final class AppState: ObservableObject {
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { [weak self] title, artist, duration, known in
                 guard let self else { return }
+                // A new track often reports its length a moment after its title: wait for it instead of
+                // briefly declaring "no lyrics".
+                if self.media.hasTrack && known && duration <= 0 { return }
                 let song = self.media.hasTrack && known && duration >= 30 && duration <= 20 * 60
                 self.lyrics.show(title: song ? title : "", artist: song ? artist : "", album: self.media.album, duration: song ? duration : 0)
             }.store(in: &cancellables)
@@ -208,7 +213,7 @@ final class AppState: ObservableObject {
         $expanded.removeDuplicates().sink { [weak self] expanded in
             guard let self else { return }
             self.media.wantsFrequentUpdates = expanded
-            if !expanded { self.homePane = .player }
+            if !expanded { self.homePane = .player; self.lyricsExpanded = false }
             if expanded { self.now = Date(); if !self.media.bridgeActive { self.media.refresh() } }
         }.store(in: &cancellables)
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in

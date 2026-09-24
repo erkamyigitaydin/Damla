@@ -583,7 +583,6 @@ struct ExpandedView: View {
                     case .player: HomeView(model: model, media: model.media, lyrics: model.lyrics)
                     case .outputs: OutputsView(model: model)
                     case .levels: MixerView(model: model, media: model.media, apps: model.appVolumes)
-                    case .lyrics: LyricsView(model: model, media: model.media, lyrics: model.lyrics)
                     case .sources: SourcesView(model: model, media: model.media)
                     }
                 case .files: ShelfView(model: model)
@@ -697,15 +696,15 @@ struct HomeView: View {
                             sourceControl
                             Text(media.artist).font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
                         }
-                        if lyrics.state == .found {
+                        if lyrics.state == .found && !model.tallPanel {
                             // The line being sung, in the artwork's colour; a tap opens the whole text.
-                            Button { withAnimation(Theme.quick) { model.homePane = .lyrics } } label: {
+                            Button { withAnimation(Theme.motion(open: true)) { model.lyricsExpanded = true } } label: {
                                 Text(currentLyric.isEmpty ? "♪" : currentLyric)
                                     .font(.system(size: 11, weight: .medium)).foregroundStyle(tint.opacity(0.95)).lineLimit(1)
                                     .contentTransition(.opacity).animation(.easeInOut(duration: 0.25), value: currentLyric)
                                     .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                             }.buttonStyle(.plain).help("Sözlerin tamamı")
-                        } else if lyrics.state == .loading || (lyrics.state == .missing && isSong) {
+                        } else if !model.tallPanel && (lyrics.state == .loading || (lyrics.state == .missing && isSong)) {
                             Text(lyrics.state == .loading ? "Sözler aranıyor…" : "Bu şarkının sözü bulunamadı")
                                 .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.faint).lineLimit(1)
                         }
@@ -743,7 +742,7 @@ struct HomeView: View {
                 .animation(entrance(1), value: appeared)
             }
             .frame(height: 88)
-            Spacer(minLength: 10)
+            if model.tallPanel { Color.clear.frame(height: 12) } else { Spacer(minLength: 10) }
             // Two columns matching the row above: under the artwork the sound controls (output, level); under
             // the text the transport, centred on the progress line, with a running timer at its right end.
             HStack(spacing: 14) {
@@ -798,18 +797,20 @@ struct HomeView: View {
                         Spacer()
                         if media.hasTrack {
                             Button {
-                                lyrics.enabled.toggle()
-                                if lyrics.enabled && !UserDefaults.standard.bool(forKey: "lyricsNoticeShown") {
+                                // Lyrics mode on/off; turning it on also allows the lookup if it was off.
+                                withAnimation(Theme.motion(open: !model.lyricsExpanded)) { model.lyricsExpanded.toggle() }
+                                if model.lyricsExpanded && !lyrics.enabled { lyrics.enabled = true }
+                                if model.lyricsExpanded && !UserDefaults.standard.bool(forKey: "lyricsNoticeShown") {
                                     UserDefaults.standard.set(true, forKey: "lyricsNoticeShown")
                                     model.showNotice(String(localized: "Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir"), duration: 5)
                                 }
                             } label: {
-                                Image(systemName: lyrics.enabled ? "quote.bubble.fill" : "quote.bubble").font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(lyrics.enabled ? tint : .white).contentTransition(.symbolEffect(.replace))
+                                Image(systemName: model.lyricsExpanded ? "quote.bubble.fill" : "quote.bubble").font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(model.lyricsExpanded ? tint : .white).contentTransition(.symbolEffect(.replace))
                                     .frame(width: 28, height: 28).contentShape(Circle())
                             }
                             .buttonStyle(GlassCircleStyle())
-                            .help(lyrics.enabled ? "Şarkı sözlerini kapat" : "Şarkı sözlerini aç")
+                            .help(model.lyricsExpanded ? "Şarkı sözlerini kapat" : "Şarkı sözlerini aç")
                         }
                     }
                 }
@@ -818,6 +819,12 @@ struct HomeView: View {
             .frame(height: 36)
             .offset(y: appeared ? 0 : 10).opacity(appeared ? 1 : 0)
             .animation(entrance(2), value: appeared)
+            if model.tallPanel {
+                LyricsFlow(model: model, media: media, lyrics: lyrics)
+                    .padding(.top, 12)
+                    .frame(maxHeight: .infinity)
+                    .transition(.opacity.combined(with: .offset(y: -12)))
+            }
         }
         .onAppear { appeared = true }
     }
