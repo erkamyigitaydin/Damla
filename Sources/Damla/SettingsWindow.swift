@@ -4,6 +4,9 @@ import SwiftUI
 /// A regular macOS settings window: toolbar tabs, grouped forms, system controls. It lives outside the
 /// notch so the panel stays a glanceable surface and settings get room to explain themselves.
 final class SettingsWindowController: NSWindowController {
+    /// One size for every tab. Letting each tab report its own height made the window show the new page at the
+    /// old size and snap ~0.6 s later; a fixed size never resizes, and a longer page scrolls inside itself.
+    static let contentSize = NSSize(width: 500, height: 420)
     private let model: AppState
     private let tabs: NSTabViewController
 
@@ -13,8 +16,10 @@ final class SettingsWindowController: NSWindowController {
         tabs.tabStyle = .toolbar
         tabs.transitionOptions = [.allowUserInteraction, .crossfade]
         func tab<Content: View>(_ title: String, _ symbol: String, _ content: Content) -> NSTabViewItem {
-            let host = NSHostingController(rootView: content.formStyle(.grouped).frame(width: 500).fixedSize(horizontal: false, vertical: true))
-            host.sizingOptions = .preferredContentSize
+            let size = SettingsWindowController.contentSize
+            let host = NSHostingController(rootView: content.formStyle(.grouped).frame(width: size.width, height: size.height))
+            host.sizingOptions = []
+            host.preferredContentSize = size
             host.title = title   // the tab controller hands it to the window title
             let item = NSTabViewItem(viewController: host)
             item.label = title
@@ -22,6 +27,7 @@ final class SettingsWindowController: NSWindowController {
             return item
         }
         tabs.addTabViewItem(tab("Genel", "gearshape", GeneralSettings(model: model)))
+        tabs.addTabViewItem(tab("Panel", "rectangle.topthird.inset.filled", PanelSettings(model: model)))
         tabs.addTabViewItem(tab("Ekran", "display", DisplaySettings(model: model, keys: model.keys)))
         tabs.addTabViewItem(tab("Medya", "music.note", MediaSettings(media: model.media)))
         tabs.addTabViewItem(tab("Ajanlar", "sparkles", AgentSettings(agents: model.agents)))
@@ -74,6 +80,32 @@ private struct GeneralSettings: View {
                     Text("Temizlik modu")
                     Text("Tüm klavyeler 60 saniye kilitlenir, fare çalışır. Çıkmak için Esc’yi 2 saniye basılı tut.")
                 }
+            }
+        }
+    }
+}
+
+private struct PanelSettings: View {
+    @ObservedObject var model: AppState
+    var body: some View {
+        Form {
+            Section {
+                ForEach(PanelTab.allCases) { tab in
+                    let on = model.enabledTabs.contains(tab)
+                    Toggle(isOn: Binding(get: { on }, set: { model.setTab(tab, enabled: $0) })) {
+                        Label {
+                            Text(tab.rawValue)
+                            Text(tab.summary)
+                        } icon: {
+                            Image(systemName: tab.icon)
+                        }
+                    }
+                    .disabled(on && model.enabledTabs.count == 1)
+                }
+            } header: {
+                Text("Sayfalar")
+            } footer: {
+                Text("Kapattığın sayfa panelin alt kapsülünden kalkar. En az bir sayfa açık kalır.")
             }
         }
     }

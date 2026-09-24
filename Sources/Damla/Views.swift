@@ -183,6 +183,7 @@ struct DamlaView: View {
         }
         .onTapGesture { if state != .expanded { model.activeScreenID = screen.id; model.expanded = true } }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropping) { providers in
+            guard model.enabledTabs.contains(.files) else { return false }   // no shelf, no drop target
             model.activeScreenID = screen.id
             for provider in providers {
                 _ = provider.loadObject(ofClass: URL.self) { url, _ in
@@ -194,7 +195,7 @@ struct DamlaView: View {
         }
         .onChange(of: dropping) { _, value in
             // Without the basket (drag started before we noticed), open the shelf so there is a target.
-            if value && !model.dragActive { model.activeScreenID = screen.id; model.selectedTab = .files; model.expanded = true }
+            if value && !model.dragActive && model.enabledTabs.contains(.files) { model.activeScreenID = screen.id; model.selectedTab = .files; model.expanded = true }
         }
     }
 
@@ -606,7 +607,7 @@ struct TabPill: View {
     @ObservedObject var model: AppState
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(PanelTab.allCases) { tab in
+            ForEach(model.visibleTabs) { tab in
                 let selected = model.selectedTab == tab
                 Button { model.select(tab) } label: {
                     ZStack(alignment: .topTrailing) {

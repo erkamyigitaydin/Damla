@@ -120,7 +120,9 @@ final class NowPlayingBridge {
     }
 
     private func publish() {
-        guard let title = state["title"] as? String, let bundleID = state["bundleIdentifier"] as? String else {
+        // Web media is reported by WebKit's helper (com.apple.WebKit.GPU); the adapter names the app it serves.
+        guard let title = state["title"] as? String,
+              let bundleID = (state["parentApplicationBundleIdentifier"] as? String) ?? (state["bundleIdentifier"] as? String) else {
             lastArtworkKey = ""
             DispatchQueue.main.async { [weak self] in self?.onUpdate?(nil, nil) }
             return

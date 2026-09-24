@@ -429,7 +429,7 @@ final class PanelManager {
     func show() { controllerForMouse()?.show() }
 
     private func checkDrag() {
-        guard !model.expanded else { return }
+        guard !model.expanded, model.enabledTabs.contains(.files) else { return }
         let board = NSPasteboard(name: .drag)
         guard board.changeCount != lastDragCount else { return }
         lastDragCount = board.changeCount
@@ -508,6 +508,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "settings": model.openSettings()
         case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
         case "media-demo": model.media.injectDemoSessions()
+        case let list where list.hasPrefix("tabs:"):   // e.g. tabs:home,focus,agents
+            let wanted = Set(list.dropFirst(5).split(separator: ",").compactMap { name in PanelTab.allCases.first { "\($0)" == name } })
+            for tab in PanelTab.allCases { model.setTab(tab, enabled: true) }
+            for tab in PanelTab.allCases where !wanted.contains(tab) { model.setTab(tab, enabled: false) }
         case let body where body.hasPrefix("music:"): model.media.debugMusic(String(body.dropFirst(6)))
         case "render-media": MainActor.assumeIsolated { renderMedia() }
         case "approval-allow", "approval-deny":

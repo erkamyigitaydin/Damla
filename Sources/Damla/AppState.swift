@@ -9,6 +9,22 @@ enum PanelTab: String, CaseIterable, Identifiable {
     var icon: String {
         switch self { case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"; case .agents: return "terminal" }
     }
+    /// One line for the settings page that turns pages on and off.
+    var summary: String {
+        switch self {
+        case .home: return "Şimdi çalan, pil, ses ve odak sayacı"
+        case .files: return "Sürükleyip bıraktığın dosyalar; kapalıyken sürükleme tepsisi de açılmaz"
+        case .clipboard: return "Kopyaladıkların; geçmişi tutmayı Genel’den ayrıca kapatabilirsin"
+        case .focus: return "Pomodoro sayacı"
+        case .agents: return "Claude Code ve Codex oturumları; izin soruları kapalıyken de gelir"
+        }
+    }
+    /// Pages the user keeps in the panel, in the fixed order; never empty.
+    static func loadEnabled() -> Set<PanelTab> {
+        guard let saved = UserDefaults.standard.array(forKey: "enabledTabs") as? [String] else { return Set(allCases) }
+        let tabs = Set(saved.compactMap(PanelTab.init(rawValue:)))
+        return tabs.isEmpty ? Set(allCases) : tabs
+    }
 }
 
 struct HUDItem: Identifiable {
@@ -26,7 +42,15 @@ struct HUDItem: Identifiable {
 final class AppState: ObservableObject {
     @Published var expanded = false
     @Published var pinnedOpen = false
-    @Published var selectedTab: PanelTab = .home
+    @Published var selectedTab: PanelTab = PanelTab.allCases.first(where: PanelTab.loadEnabled().contains) ?? .home
+    /// Pages shown in the tab pill. Turning off the page on screen moves to the first one still on.
+    @Published private(set) var enabledTabs = PanelTab.loadEnabled() {
+        didSet {
+            UserDefaults.standard.set(PanelTab.allCases.filter(enabledTabs.contains).map(\.rawValue), forKey: "enabledTabs")
+            if !enabledTabs.contains(selectedTab), let first = visibleTabs.first { selectedTab = first }
+        }
+    }
+    var visibleTabs: [PanelTab] { PanelTab.allCases.filter(enabledTabs.contains) }
     /// Screen whose window currently shows the expanded panel (HUD and basket show on every screen).
     @Published var activeScreenID: UInt32?
     @Published var dragActive = false   // a file drag is in progress somewhere on the system
@@ -113,6 +137,8 @@ final class AppState: ObservableObject {
                 // Answered (here or in the terminal) or timed out: give the notch back.
                 self.openedForApproval = false
                 self.pinnedOpen = self.pinnedBeforeApproval
+                // The approval card lives on the agents page even when that page is off; leave it again.
+                if !self.enabledTabs.contains(self.selectedTab), let first = self.visibleTabs.first { self.selectedTab = first }
                 if !self.pinnedOpen { self.expanded = false }
             }
             let badge = self.agents.sessions.first { $0.visibleInNotch(at: Date()) }
@@ -215,6 +241,10 @@ final class AppState: ObservableObject {
     func openSettings() {
         pinnedOpen = false; expanded = false
         presentSettings?()
+    }
+    /// The last page cannot be turned off: the panel always has something to open to.
+    func setTab(_ tab: PanelTab, enabled: Bool) {
+        if enabled { enabledTabs.insert(tab) } else if enabledTabs.count > 1 { enabledTabs.remove(tab) }
     }
     func select(_ tab: PanelTab) {
         selectedTab = tab
