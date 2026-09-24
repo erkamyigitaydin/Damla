@@ -45,6 +45,10 @@ if CommandLine.arguments.contains("--diagnose") {
     print("Battery: \(battery.available ? String(battery.percentage) : "unavailable"); plugged: \(battery.plugged)")
     print("Volume: \(volume.map(String.init(describing:)) ?? "unavailable"); muted: \(muted)")
     print("Brightness: \(monitor.brightnessValue().map(String.init(describing:)) ?? "unavailable")")
+    let current = AudioOutputs.defaultID()
+    for output in AudioOutputs.list() {
+        print("Output: \(output.id == current ? "*" : " ") \(output.name) [\(output.icon)] transport=\(String(format: "%08x", output.transport))")
+    }
     exit(0)
 }
 let delegate = AppDelegate()

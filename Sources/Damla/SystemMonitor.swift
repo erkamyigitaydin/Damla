@@ -28,6 +28,10 @@ final class SystemMonitor {
     var onBattery: ((BatterySnapshot) -> Void)?
     var onLevels: ((Float?, Float?, Bool) -> Void)?
     var onHUD: ((String, String, Double) -> Void)?
+    /// Output devices and the default one; called at start and whenever either changes.
+    var onOutputs: (([AudioOutput], AudioDeviceID?) -> Void)?
+    private var devicesListenerBlock: AudioObjectPropertyListenerBlock?
+    private var lastOutput: AudioDeviceID?
 
     init() {
         // Read-only fallback: Apple has no public brightness getter for all modern built-in displays.
@@ -55,10 +59,17 @@ final class SystemMonitor {
     private func installAudioListeners() {
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
                                                  mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.attachVolumeListener(); self?.poll() }
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.attachVolumeListener(); self?.poll(); self?.publishOutputs() }
         deviceListenerBlock = block
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, DispatchQueue.main, block)
         attachVolumeListener()
+        // Devices coming and going (AirPods connecting, a display plugged in) change the output list.
+        var devices = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices,
+                                                 mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        let devicesBlock: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.publishOutputs() }
+        devicesListenerBlock = devicesBlock
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &devices, DispatchQueue.main, devicesBlock)
+        publishOutputs()
     }
     private func attachVolumeListener() {
         if let old = listenerDevice, let block = listenerBlock {
@@ -72,6 +83,16 @@ final class SystemMonitor {
             var a = address
             if AudioObjectHasProperty(device, &a) { AudioObjectAddPropertyListenerBlock(device, &a, DispatchQueue.main, block) }
         }
+    }
+    /// Publishes the output list; a new default device (picked here, in Control Center, or AirPods connecting)
+    /// shows its name in the HUD with the volume it plays at.
+    private func publishOutputs() {
+        let outputs = AudioOutputs.list(), current = AudioOutputs.defaultID()
+        onOutputs?(outputs, current)
+        defer { lastOutput = current }
+        guard let lastOutput, let current, current != lastOutput, let device = outputs.first(where: { $0.id == current }) else { return }
+        let (volume, muted) = Self.audio()
+        onHUD?(device.icon, device.name, muted ? 0 : Double(volume ?? 1))
     }
     func poll() {
         let (volume, muted) = Self.audio()

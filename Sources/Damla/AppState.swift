@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CoreAudio
 import ServiceManagement
 import UniformTypeIdentifiers
 
@@ -65,6 +66,8 @@ final class AppState: ObservableObject {
     @Published var volume: Float?
     @Published var brightness: Float?
     @Published var muted = false
+    @Published var outputs: [AudioOutput] = []
+    @Published var currentOutput: AudioDeviceID?
     @Published var hud: HUDItem?
     @Published var notice: String?
     @Published var files: [ShelfItem] = DiskStore.load([ShelfItem].self, name: "shelf.json") ?? []
@@ -112,6 +115,11 @@ final class AppState: ObservableObject {
             self?.volume = volume; self?.brightness = brightness; self?.muted = muted
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
+        monitor.onOutputs = { [weak self] outputs, current in
+            guard let self else { return }
+            if self.outputs != outputs { self.outputs = outputs }
+            if self.currentOutput != current { self.currentOutput = current }
+        }
         media.onNotice = { [weak self] text in
             self?.showNotice(text, duration: 8) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") { NSWorkspace.shared.open(url) }

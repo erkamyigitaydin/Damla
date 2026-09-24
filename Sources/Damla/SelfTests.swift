@@ -1,4 +1,5 @@
 import Foundation
+import CoreAudio
 
 func runSelfTests() -> Int32 {
     var failures: [String] = []
@@ -138,6 +139,9 @@ func runSelfTests() -> Int32 {
         AgentEventStore.remove(id: records[0].id, directory: isolated)
         check(AgentEventStore.read(directory: isolated).count == 1, "Removed session leaves the store")
     } catch { failures.append("Agent fixture: \(error)") }
+    check(AudioOutput.icon(name: "Erkam’s AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth) == "airpods.pro"
+          && AudioOutput.icon(name: "MacBook Pro Speakers", transport: kAudioDeviceTransportTypeBuiltIn) == "laptopcomputer"
+          && AudioOutput.icon(name: "DELL U2723QE", transport: kAudioDeviceTransportTypeDisplayPort) == "display", "Output icons follow the device")
     runMediaSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
     print("Damla self-test: \(count - failures.count)/\(count) passed")

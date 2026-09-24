@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreAudio
 import AppKit
 import UniformTypeIdentifiers
 
@@ -710,12 +711,23 @@ struct HomeView: View {
                         statusLabel(model.battery.symbol, "\(model.battery.percentage)%", tint: model.battery.plugged ? Theme.green : nil)
                     }
                     if let volume = model.volume {
-                        statusLabel(model.muted ? "speaker.slash" : "speaker.wave.2", model.muted ? "0" : "\(Int(volume * 100))")
+                        // Tap the level to pick where sound goes; away from the speakers it shows that device's icon.
+                        Menu {
+                            ForEach(model.outputs) { output in
+                                Button { AudioOutputs.setDefault(output.id) } label: {
+                                    Label(output.name, systemImage: output.id == model.currentOutput ? "checkmark" : output.icon)
+                                }
+                            }
+                        } label: {
+                            statusLabel(model.muted ? "speaker.slash" : outputIcon, model.muted ? "0" : "\(Int(volume * 100))")
+                        }
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                        .help("Ses çıkışı: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—")")
                     }
                     Spacer()
                     if media.bridgeActive, !media.sessions.isEmpty {
                         SourceStack(media: media)
-                    } else if media.connected {
+                    } else if !media.bridgeActive && media.connected {
                         Menu {
                             ForEach(MusicSource.allCases) { source in Button(source.rawValue) { media.connect(source) } }
                             Divider(); Button("Bağlantıyı kes") { media.disconnect() }
@@ -750,6 +762,10 @@ struct HomeView: View {
             .animation(entrance(2), value: appeared)
         }
         .onAppear { appeared = true }
+    }
+    private var outputIcon: String {
+        guard let output = model.outputs.first(where: { $0.id == model.currentOutput }), output.transport != kAudioDeviceTransportTypeBuiltIn else { return "speaker.wave.2" }
+        return output.icon
     }
     private func statusLabel(_ icon: String, _ text: String, tint: Color? = nil) -> some View {
         HStack(spacing: 4) {
