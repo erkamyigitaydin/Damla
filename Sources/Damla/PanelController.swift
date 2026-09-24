@@ -654,7 +654,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .frame(width: Layout.panelWidth, height: Layout.contentHeight)))
         ]
         for (name, view) in pairs {
-            let renderer = ImageRenderer(content: view.background(Color.black).environment(\.colorScheme, .dark))
+            let renderer = ImageRenderer(content: view.background(Color.black).environment(\.colorScheme, .dark).environment(\.mascotStill, true))
             renderer.scale = 2
             if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
                let png = rep.representation(using: .png, properties: [:]) {
