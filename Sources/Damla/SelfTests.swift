@@ -142,6 +142,18 @@ func runSelfTests() -> Int32 {
     check(AudioOutput.icon(name: "Erkam’s AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth) == "airpods.pro"
           && AudioOutput.icon(name: "MacBook Pro Speakers", transport: kAudioDeviceTransportTypeBuiltIn) == "laptopcomputer"
           && AudioOutput.icon(name: "DELL U2723QE", transport: kAudioDeviceTransportTypeDisplayPort) == "display", "Output icons follow the device")
+    var gesture = NotchScrollGesture()
+    check(gesture.feed(up: 1, right: 0, precise: false, began: false, ended: false, momentum: false) == [.volume(1)], "Wheel click is one volume step")
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
+    let travel = (0..<5).flatMap { _ in gesture.feed(up: 7, right: 1, precise: true, began: false, ended: false, momentum: false) }
+    check(travel == [.volume(1), .volume(1)], "Trackpad travel maps to volume steps")
+    check(gesture.feed(up: 50, right: 0, precise: true, began: false, ended: false, momentum: true).isEmpty, "Momentum never changes the volume")
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
+    let swipe = (0..<6).flatMap { _ in gesture.feed(up: 1, right: -20, precise: true, began: false, ended: false, momentum: false) }
+    check(swipe == [.next], "Left swipe skips forward exactly once")
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false)
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
+    check((0..<4).flatMap { _ in gesture.feed(up: 0, right: 20, precise: true, began: false, ended: false, momentum: false) } == [.previous], "Right swipe goes back")
     runMediaSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
     print("Damla self-test: \(count - failures.count)/\(count) passed")

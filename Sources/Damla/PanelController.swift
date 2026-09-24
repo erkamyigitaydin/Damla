@@ -41,6 +41,7 @@ final class PanelController {
     private var cancellables = Set<AnyCancellable>()
     private var hoverTimer: Timer?
     private var mouseMonitors: [Any] = []
+    private var scrollGesture = NotchScrollGesture()
     private var enteredAt: Date?
     private var exitedAt: Date?
     private var suppressHoverUntil = Date.distantPast
@@ -113,6 +114,12 @@ final class PanelController {
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents, handler: { [weak self] event in
             self?.updateMousePassthrough()
             return event
+        }) { mouseMonitors.append(monitor) }
+        // Scrolling on the notch strip itself (not the panel content below it) changes volume or skips a track.
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] event in
+            guard let self, event.window === self.panel, self.model.notchGestures, self.inNotchStrip(NSEvent.mouseLocation) else { return event }
+            self.handleScroll(event)
+            return nil
         }) { mouseMonitors.append(monitor) }
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.trackHover() }
         if let hoverTimer { RunLoop.main.add(hoverTimer, forMode: .common) }
@@ -210,6 +217,28 @@ final class PanelController {
         let frame = NSRect(x: (screen.frame.midX - size.width / 2).rounded(), y: topY - size.height, width: size.width, height: size.height)
         if panel.frame != frame { panel.setFrame(frame, display: true) }
         updateMousePassthrough()
+    }
+
+    /// The top band of the visible shape, as tall as the menu bar / physical notch.
+    private func inNotchStrip(_ point: NSPoint) -> Bool {
+        let visible = visibleRect()
+        let height = Layout.closedHeight(screenInfo.metrics)
+        return NSRect(x: visible.minX, y: visible.maxY - height, width: visible.width, height: height).contains(point)
+    }
+
+    private func handleScroll(_ event: NSEvent) {
+        let finger = NotchScrollGesture.finger(event)
+        let actions = scrollGesture.feed(up: finger.up, right: finger.right, precise: event.hasPreciseScrollingDeltas,
+                                         began: event.phase.contains(.began) || event.phase.contains(.mayBegin),
+                                         ended: event.phase.contains(.ended) || event.phase.contains(.cancelled),
+                                         momentum: !event.momentumPhase.isEmpty)
+        for action in actions {
+            switch action {
+            case .volume(let steps): model.monitor.adjustVolume(by: Float(steps) / 16, feedback: false)
+            case .next: model.media.command("next track"); model.showHUD("forward.fill", "Sonraki parça", 1)
+            case .previous: model.media.command("previous track"); model.showHUD("backward.fill", "Önceki parça", 1)
+            }
+        }
     }
 
     func visibleRect() -> NSRect {

@@ -107,6 +107,14 @@ private struct PanelSettings: View {
             } footer: {
                 Text("Kapattığın sayfa panelin alt kapsülünden kalkar. En az bir sayfa açık kalır.")
             }
+            Section {
+                Toggle(isOn: $model.notchGestures) {
+                    Text("Çentikte kaydırma")
+                    Text("Çentiğin üzerinde yukarı/aşağı kaydırınca ses değişir; trackpad’de sola kaydırmak sonraki, sağa kaydırmak önceki parçaya geçer.")
+                }
+            } header: {
+                Text("Hareketler")
+            }
         }
     }
 }

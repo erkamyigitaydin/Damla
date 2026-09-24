@@ -67,6 +67,10 @@ final class AppState: ObservableObject {
     @Published var brightness: Float?
     @Published var muted = false
     @Published var outputs: [AudioOutput] = []
+    /// Scroll on the notch strip: vertical for volume, a horizontal swipe to skip tracks.
+    @Published var notchGestures = UserDefaults.standard.object(forKey: "notchGestures") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(notchGestures, forKey: "notchGestures") }
+    }
     @Published var currentOutput: AudioDeviceID?
     @Published var hud: HUDItem?
     @Published var notice: String?
