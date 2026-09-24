@@ -93,7 +93,7 @@ struct HeroAgentCard: View {
     var body: some View {
         let phase = session.effectivePhase(at: now)
         let activity = AgentText.activity(session, at: now)
-        let tint = phase == .waiting ? Theme.amber : phase == .failed ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.accent
+        let tint = phase == .waiting ? Theme.amber : phase == .failed ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.agent
         Button { service.activate(session) } label: {
             HStack(spacing: 14) {
                 AgentMascot(session: session, size: 56, showHost: true).frame(width: 64, height: 64)

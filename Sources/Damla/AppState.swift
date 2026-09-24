@@ -146,6 +146,11 @@ final class AppState: ObservableObject {
         }
         monitor.onDeviceBattery = { [weak self] icon, title, detail in self?.showDeviceHUD(icon, title, detail: detail) }
         appVolumes.start()
+        // The accent follows the cover; every view reads it, so a new colour redraws the panel.
+        media.$accent.removeDuplicates().sink { [weak self] cover in
+            Accent.update(from: cover)
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
         // Lyrics follow the shown track; only songs a player named an artist for, 30 s – 20 min long.
         Publishers.CombineLatest4(media.$title, media.$artist, media.$duration, media.$artistKnown)
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)

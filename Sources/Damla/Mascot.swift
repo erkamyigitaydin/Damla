@@ -21,11 +21,11 @@ struct DropletMascot: View {
 
     private var color: Color {
         switch phase {
-        case .working, .done: return Theme.accent
+        case .working, .done: return Theme.agent
         case .waiting: return Theme.amber
         case .failed: return Color(red: 1, green: 0.47, blue: 0.47)
         case .interrupted: return Color(red: 0.62, green: 0.72, blue: 0.9)
-        case .idle: return Theme.accent.opacity(0.75)
+        case .idle: return Theme.agent.opacity(0.75)
         case .stale: return Color(white: 0.62)
         }
     }

@@ -5,8 +5,22 @@ import UniformTypeIdentifiers
 
 // MARK: - Theme
 
+/// The accent follows the music: the album cover's colour, lifted bright enough to carry black text, or plain
+/// white when nothing (or something grey) is playing. AppState refreshes the views when it changes.
+enum Accent {
+    nonisolated(unsafe) static var current: NSColor = .white
+    static func update(from cover: NSColor?) {
+        guard let rgb = cover?.usingColorSpace(.sRGB) else { current = .white; return }
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        rgb.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        current = s < 0.15 ? .white : NSColor(hue: h, saturation: min(s, 0.62), brightness: max(b, 0.92), alpha: 1)
+    }
+}
+
 enum Theme {
-    static let accent = Color(red: 0.62, green: 0.93, blue: 0.82)
+    static var accent: Color { Color(nsColor: Accent.current) }
+    /// Agents keep their own colour, a pale water blue, whatever the music is.
+    static let agent = Color(red: 0.8, green: 0.89, blue: 1.0)
     static let amber = Color(red: 1.0, green: 0.80, blue: 0.36)
     static let green = Color(red: 0.45, green: 0.87, blue: 0.55)
     static let dim = Color.white.opacity(0.55)
@@ -31,7 +45,7 @@ extension HUDItem {
         case .brightness: return Theme.amber
         case .battery: return Theme.green
         case .done: return Theme.accent
-        case .agent: return phase == .waiting || phase == .failed ? Theme.amber : Theme.accent
+        case .agent: return phase == .waiting || phase == .failed ? Theme.amber : Theme.agent
         case .device: return Theme.green
         }
     }
@@ -171,8 +185,9 @@ struct DamlaView: View {
                 .init(color: .black.opacity(open ? 0 : 1), location: notchEdge + bodyHeight * 0.97),
                 .init(color: .black.opacity(open ? 0 : 1), location: 1)
             ], startPoint: .top, endPoint: .bottom))
-            // Lyrics are long white text over the glass: darken the whole body so what is behind never reads through.
-            shape.fill(Color.black.opacity(open && model.tallPanel ? 0.55 : 0))
+            // The glass alone loses its text over a white window behind it. The open panel always carries a dark
+            // veil so every page reads on any background; lyrics (long white text, tall panel) go a little deeper.
+            shape.fill(Color.black.opacity(open ? (model.tallPanel ? 0.55 : 0.45) : 0))
                 .animation(.easeInOut(duration: 0.35), value: model.tallPanel)
             content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
         }
@@ -369,7 +384,7 @@ struct AgentMascot: View {
     var size: CGFloat = 22
     var pulse = false
     var showHost = false
-    private var tint: Color { session.phase == .waiting || session.phase == .failed ? Theme.amber : Theme.accent }
+    private var tint: Color { session.phase == .waiting || session.phase == .failed ? Theme.amber : Theme.agent }
     var body: some View {
         // Damla's drop acts out the phase; the agent's own app icon rides the corner as a badge.
         DropletMascot(phase: session.phase, size: size)
@@ -407,7 +422,7 @@ struct AgentStatusMark: View {
     var waitingSince: Date? = nil
     init(phase: AgentPhase) { self.phase = phase }
     init(session: AgentSession) { phase = session.phase; waitingSince = session.waitingSince }
-    private var tint: Color { phase == .waiting || phase == .failed ? Theme.amber : Theme.accent }
+    private var tint: Color { phase == .waiting || phase == .failed ? Theme.amber : Theme.agent }
     var body: some View {
         if phase == .working {
             TimelineView(.animation(minimumInterval: 1 / 12, paused: Theme.reduceMotion)) { context in
@@ -615,7 +630,7 @@ struct TabPill: View {
                             Circle().fill(Theme.accent).frame(width: 5, height: 5).offset(x: -6, y: 5)
                         }
                         if tab == .agents, let badge = model.agentBadge {
-                            Circle().fill(badge.phase == .waiting ? Theme.amber : Theme.accent).frame(width: 5, height: 5).offset(x: -6, y: 5)
+                            Circle().fill(badge.phase == .waiting ? Theme.amber : Theme.agent).frame(width: 5, height: 5).offset(x: -6, y: 5)
                         }
                     }
                     .foregroundStyle(selected ? Color.white : Theme.dim)
@@ -629,7 +644,7 @@ struct TabPill: View {
         }
         .padding(.horizontal, 5)
         .frame(height: Layout.pillHeight)
-        .glassEffect(.clear.tint(.black.opacity(0.5)).interactive(), in: Capsule())
+        .glassEffect(.clear.tint(.black.opacity(0.62)).interactive(), in: Capsule())
         .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
         .animation(Theme.quick, value: model.selectedTab)
     }
