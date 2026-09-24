@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.5.1</title>
+      <pubDate>Thu, 24 Sep 2026 18:05:46 +0000</pubDate>
+      <sparkle:version>9</sparkle:version>
+      <sparkle:shortVersionString>0.5.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Daha sağlam medya takibi ve Intel desteği.</p><p>- Müzik videodan hemen önce duraklatıldığında bile video bitince müzik geri gelir.</p><p>- Canlı yayınların süresi doğru temizlenir; önceki parçanın süresi ekranda kalmaz.</p><p>- Şimdi Çalıyor köprüsü artık Intel Mac&#x27;lerde de çalışır (önceden yalnızca Apple Silicon).</p><p>- Güncellemeden sonra Erişilebilirlik izni korunur. Bu sürüme geçerken izni bir kez yeniden vermen gerekebilir.</p><p>- Medya kararları 30 yeni otomatik testle korunuyor.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.5.1/Damla-0.5.1.dmg" length="4173474" type="application/octet-stream" sparkle:edSignature="2Jz95C7YI6cD8kSFmjRTIAvUdeXK1CqQrh0UHfrQX/A3Gw3DSjva66XYK+U8j7YyfZiXPqLdLTaCuYVNh51PCg=="/>
+    </item>
+    <item>
       <title>Damla 0.5.0</title>
       <pubDate>Thu, 24 Sep 2026 16:33:36 +0000</pubDate>
       <sparkle:version>8</sparkle:version>
