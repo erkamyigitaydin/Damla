@@ -533,6 +533,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "mixer": model.select(.home); model.homePane = .levels
         case "outputs": model.select(.home); model.homePane = .outputs
         case "lyrics": model.select(.home); model.homePane = .lyrics
+        case "sources": model.select(.home); model.homePane = .sources
         case "lyrics-on": model.lyrics.enabled = true
         case "lyrics-off": model.lyrics.enabled = false
         case "lyrics-probe":   // fetch a known song through the real service, report what came back

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import CoreAudio
 
 /// How loud each source is: the system volume and one level per player Damla can reach. Opened from the level
@@ -178,6 +179,68 @@ struct LyricsView: View {
                 }
             }
             Text("lrclib.net").font(.system(size: 8.5, weight: .medium)).foregroundStyle(Theme.faint)
+        }
+    }
+}
+
+/// Every player Damla knows, to switch between: the shown one marked, playing ones with a moving equalizer.
+struct SourcesView: View {
+    @ObservedObject var model: AppState
+    @ObservedObject var media: MediaService
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PaneHeader(title: "Kaynaklar") { withAnimation(Theme.quick) { model.homePane = .player } }
+            ScrollView {
+                VStack(spacing: 4) {
+                    ForEach(media.sessions) { session in
+                        let shown = session.bundleID == media.sourceBundleID
+                        let live = media.isLive(session)
+                        HStack(spacing: 10) {
+                            Button {
+                                media.select(session.bundleID)
+                                withAnimation(Theme.quick) { model.homePane = .player }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    ZStack {
+                                        if let art = session.artwork {
+                                            Image(nsImage: art).resizable().scaledToFill().frame(width: 30, height: 30)
+                                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                        } else {
+                                            RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Theme.fill).frame(width: 30, height: 30)
+                                        }
+                                        if let icon = MediaService.icon(for: session.bundleID) {
+                                            Image(nsImage: icon).resizable().frame(width: 14, height: 14).offset(x: 12, y: 12)
+                                        }
+                                    }
+                                    .frame(width: 34, height: 34)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(session.title.isEmpty ? MediaService.appName(for: session.bundleID) : session.title)
+                                            .font(.system(size: 11.5, weight: shown ? .semibold : .medium)).lineLimit(1)
+                                        Text(live ? session.artist : "\(MediaService.appName(for: session.bundleID)) · arka planda")
+                                            .font(.system(size: 10)).foregroundStyle(Theme.dim).lineLimit(1)
+                                    }
+                                    Spacer(minLength: 6)
+                                    if session.playing && live {
+                                        Equalizer(playing: true, color: Theme.accent)
+                                    } else if shown {
+                                        Image(systemName: "checkmark").font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.accent)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            IconButton(icon: "arrow.up.forward.app", label: "\(MediaService.appName(for: session.bundleID)) uygulamasını aç", size: 24) {
+                                NSWorkspace.shared.urlForApplication(withBundleIdentifier: session.bundleID).map {
+                                    NSWorkspace.shared.openApplication(at: $0, configuration: NSWorkspace.OpenConfiguration())
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 8).frame(height: 44)
+                        .background(shown ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
         }
     }
 }

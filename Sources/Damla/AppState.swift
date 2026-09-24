@@ -68,7 +68,7 @@ final class AppState: ObservableObject {
     @Published var muted = false
     @Published var outputs: [AudioOutput] = []
     /// What Özet shows: the player, the output list, or the volume levels.
-    enum HomePane { case player, outputs, levels, lyrics }
+    enum HomePane { case player, outputs, levels, lyrics, sources }
     @Published var homePane: HomePane = .player
     /// Scroll on the notch strip: vertical for volume, a horizontal swipe to skip tracks.
     @Published var notchGestures = UserDefaults.standard.object(forKey: "notchGestures") as? Bool ?? true {

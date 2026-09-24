@@ -581,6 +581,7 @@ struct ExpandedView: View {
                     case .outputs: OutputsView(model: model)
                     case .levels: MixerView(model: model, media: model.media, apps: model.appVolumes)
                     case .lyrics: LyricsView(model: model, media: model.media, lyrics: model.lyrics)
+                    case .sources: SourcesView(model: model, media: model.media)
                     }
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
@@ -686,18 +687,6 @@ struct HomeView: View {
                                         .frame(width: 18, height: 18).contentShape(Rectangle())
                                 }.buttonStyle(.plain).help(favorited ? "Favorilerden çıkar" : "Favorilere ekle")
                             }
-                            // Lyrics on/off right where they show; the first switch-on says where they come from.
-                            Button {
-                                lyrics.enabled.toggle()
-                                if lyrics.enabled && !UserDefaults.standard.bool(forKey: "lyricsNoticeShown") {
-                                    UserDefaults.standard.set(true, forKey: "lyricsNoticeShown")
-                                    model.showNotice("Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir", duration: 5)
-                                }
-                            } label: {
-                                Image(systemName: lyrics.enabled ? "quote.bubble.fill" : "quote.bubble").font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(lyrics.enabled ? tint : Theme.dim).contentTransition(.symbolEffect(.replace))
-                                    .frame(width: 18, height: 18).contentShape(Rectangle())
-                            }.buttonStyle(.plain).help(lyrics.enabled ? "Şarkı sözlerini kapat" : "Şarkı sözlerini aç")
                             Equalizer(playing: media.playing, color: tint).opacity(media.playing ? 1 : 0)
                         }
                         // Which app is playing sits with the name it belongs to.
@@ -796,12 +785,28 @@ struct HomeView: View {
                             transport("forward.fill", "Sonraki", size: 13) { media.command("next track") }
                         }
                     }
-                    if model.session.hasStarted {   // only a running or paused timer takes room here
-                        HStack {
-                            Spacer()
+                    // Either end of the transport zone: a running timer on the left, lyrics on/off on the right.
+                    HStack {
+                        if model.session.hasStarted {
                             Button { model.select(.focus) } label: {
                                 statusLabel("timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
                             }.buttonStyle(.plain).help("Odak")
+                        }
+                        Spacer()
+                        if media.hasTrack {
+                            Button {
+                                lyrics.enabled.toggle()
+                                if lyrics.enabled && !UserDefaults.standard.bool(forKey: "lyricsNoticeShown") {
+                                    UserDefaults.standard.set(true, forKey: "lyricsNoticeShown")
+                                    model.showNotice("Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir", duration: 5)
+                                }
+                            } label: {
+                                Image(systemName: lyrics.enabled ? "quote.bubble.fill" : "quote.bubble").font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(lyrics.enabled ? tint : .white).contentTransition(.symbolEffect(.replace))
+                                    .frame(width: 28, height: 28).contentShape(Circle())
+                            }
+                            .buttonStyle(GlassCircleStyle())
+                            .help(lyrics.enabled ? "Şarkı sözlerini kapat" : "Şarkı sözlerini aç")
                         }
                     }
                 }
@@ -817,7 +822,7 @@ struct HomeView: View {
     /// fallback, the picker between Apple Music and Spotify.
     @ViewBuilder private var sourceControl: some View {
         if media.bridgeActive, !media.sessions.isEmpty {
-            SourceStack(media: media, size: 14)
+            SourceChip(model: model, media: media)
         } else if !media.bridgeActive && media.connected {
             Menu {
                 ForEach(MusicSource.allCases) { source in Button(source.rawValue) { media.connect(source) } }
@@ -855,43 +860,40 @@ struct HomeView: View {
     }
 }
 
-/// App icons of every player Damla has seen, overlapped like avatars; they fan out on hover. Tapping another
-/// icon shows that player; tapping the shown one brings its app forward.
-struct SourceStack: View {
+/// The playing app beside the artist. With one player a tap brings it forward; with several a count shows and a
+/// tap opens the Kaynaklar list to switch between them.
+struct SourceChip: View {
+    @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
-    var size: CGFloat = 20
-    @State private var hovering = false
     var body: some View {
-        let sessions = Array(media.sessions.suffix(3))
-        HStack(spacing: hovering || sessions.count == 1 ? size / 4 : -size * 0.4) {
-            ForEach(sessions) { session in
-                let shown = session.bundleID == media.sourceBundleID
-                Button {
-                    if shown { media.activateSource() } else { withAnimation(Theme.quick) { media.select(session.bundleID) } }
-                } label: {
-                    ZStack(alignment: .bottomTrailing) {
-                        if let icon = MediaService.icon(for: session.bundleID) {
-                            Image(nsImage: icon).resizable().frame(width: size, height: size)
-                        } else {
-                            Image(systemName: "music.note").font(.system(size: size / 2, weight: .semibold)).frame(width: size, height: size)
-                        }
-                        if session.playing && media.isLive(session) && sessions.count > 1 {
-                            Circle().fill(Theme.accent).frame(width: 5, height: 5)
-                                .overlay(Circle().stroke(.black.opacity(0.7), lineWidth: 1)).offset(x: 1, y: 1)
-                        }
-                    }
-                    .opacity(shown || hovering ? 1 : 0.55)
-                    .scaleEffect(shown ? 1 : 0.86)
-                    .contentShape(Circle())
+        let count = media.sessions.count
+        Button {
+            if count > 1 { withAnimation(Theme.quick) { model.homePane = .sources } } else { media.activateSource() }
+        } label: {
+            HStack(spacing: 4) {
+                if let icon = media.sourceIcon {
+                    Image(nsImage: icon).resizable().frame(width: 15, height: 15)
+                } else {
+                    Image(systemName: "music.note").font(.system(size: 9, weight: .semibold)).frame(width: 15, height: 15)
                 }
-                .buttonStyle(.plain)
-                .zIndex(shown ? 1 : 0)
-                .help(shown ? "\(MediaService.appName(for: session.bundleID)) · uygulamayı aç" : "\(session.title) · \(MediaService.appName(for: session.bundleID))")
+                if count > 1 {
+                    HStack(spacing: 2) {
+                        Text("\(count)").font(.system(size: 9.5, weight: .bold, design: .rounded)).monospacedDigit()
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 6.5, weight: .bold))
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 5).frame(height: 15)
+                    .background(Theme.fillStrong, in: Capsule())
+                    .overlay(alignment: .topTrailing) {
+                        // Another source is playing too: a mint dot on the count.
+                        if media.otherPlaying != nil { Circle().fill(Theme.accent).frame(width: 5, height: 5).offset(x: 2, y: -1) }
+                    }
+                }
             }
+            .contentShape(Rectangle())
         }
-        .onHover { hovering = $0 }
-        .animation(Theme.quick, value: hovering)
-        .animation(Theme.quick, value: media.sourceBundleID)
+        .buttonStyle(.plain)
+        .help(count > 1 ? "\(count) kaynak · geçiş yap" : "\(MediaService.appName(for: media.sourceBundleID ?? "")) · uygulamayı aç")
     }
 }
 
