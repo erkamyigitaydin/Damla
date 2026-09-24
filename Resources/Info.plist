@@ -1,21 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>Damla</string>
-<key>CFBundleIdentifier</key><string>app.local.damla</string>
-<key>CFBundleName</key><string>Damla</string>
-<key>CFBundleDisplayName</key><string>Damla</string>
-<key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.4.3</string>
-<key>CFBundleVersion</key><string>7</string>
-<key>CFBundleIconFile</key><string>AppIcon</string>
-<key>LSMinimumSystemVersion</key><string>26.0</string>
-<key>LSUIElement</key><true/>
-<key>NSHighResolutionCapable</key><true/>
-<key>NSAppleEventsUsageDescription</key><string>Damla, seçtiğin müzik uygulamasındaki parçayı göstermek ve oynatmayı kontrol etmek için erişim ister.</string>
-<key>SUFeedURL</key><string>https://raw.githubusercontent.com/erkamyigitaydin/Damla/main/appcast.xml</string>
-<key>SUPublicEDKey</key><string>nRc3hMJ/a/RG0yzMlksdv3LxhUXMcXLw18TRFIFHaU0=</string>
-<key>SUEnableAutomaticChecks</key><true/>
-<key>SUScheduledCheckInterval</key><integer>86400</integer>
-<key>NSHumanReadableCopyright</key><string>Personal build · 2026</string>
-</dict></plist>
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>Damla</string>
+	<key>CFBundleExecutable</key>
+	<string>Damla</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>app.local.damla</string>
+	<key>CFBundleName</key>
+	<string>Damla</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.5.0</string>
+	<key>CFBundleVersion</key>
+	<string>8</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Damla, seçtiğin müzik uygulamasındaki parçayı göstermek ve oynatmayı kontrol etmek için erişim ister.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Personal build · 2026</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/erkamyigitaydin/Damla/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>nRc3hMJ/a/RG0yzMlksdv3LxhUXMcXLw18TRFIFHaU0=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+</dict>
+</plist>

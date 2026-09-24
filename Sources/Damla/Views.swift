@@ -132,9 +132,9 @@ struct DamlaView: View {
     }
 
     private var ambientColor: Color { media.accent.map { Color(nsColor: $0) } ?? .clear }
-    /// How strongly the artwork colour fills the panel: full on Özet, a hint on other tabs, none in settings.
+    /// How strongly the artwork colour fills the panel: full on Özet, a hint on other tabs.
     private var ambientStrength: Double {
-        guard open, media.accent != nil, !model.settingsVisible, !model.cleaning.active else { return 0 }
+        guard open, media.accent != nil, !model.cleaning.active else { return 0 }
         return model.selectedTab == .home ? 1 : 0.45
     }
 
@@ -194,7 +194,7 @@ struct DamlaView: View {
         }
         .onChange(of: dropping) { _, value in
             // Without the basket (drag started before we noticed), open the shelf so there is a target.
-            if value && !model.dragActive { model.activeScreenID = screen.id; model.selectedTab = .files; model.settingsVisible = false; model.expanded = true }
+            if value && !model.dragActive { model.activeScreenID = screen.id; model.selectedTab = .files; model.expanded = true }
         }
     }
 
@@ -282,7 +282,10 @@ struct CompactRow: View {
             switch activity {
             case .timer: return "Odak · \(model.timeLabel)"
             case .agent(let agent): return "\(agent.provider.title) · \(agent.project) · \(agent.phase.title)"
-            case .media: return media.hasTrack ? "\(media.title) · \(media.artist)" : "Müzik"
+            case .media:
+                guard media.hasTrack else { return "Müzik" }
+                let other = media.otherPlaying.map { "\n\($0.title) · \(MediaService.appName(for: $0.bundleID))" } ?? ""
+                return "\(media.title) · \(media.artist)" + other
             }
         }.joined(separator: "\n")
     }
@@ -297,12 +300,24 @@ struct CompactRow: View {
                 .onTapGesture { model.agents.activate(agent) }
                 .help("\(agent.provider.title) · \(agent.project) · tıkla: \(agent.hostName ?? agent.provider.title)")
         case .media:
-            if let art = media.artwork {
-                Image(nsImage: art).resizable().scaledToFill().frame(width: 20, height: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 5.5, style: .continuous))
-            } else {
-                Image(systemName: "music.note").font(.system(size: 11, weight: .semibold))
+            Group {
+                if let art = media.artwork {
+                    Image(nsImage: art).resizable().scaledToFill().frame(width: 20, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 5.5, style: .continuous))
+                } else {
+                    Image(systemName: "music.note").font(.system(size: 11, weight: .semibold))
+                }
             }
+            // A second player is audible too (music left running under a video, two browsers…): its icon rides the corner.
+            .overlay(alignment: .bottomTrailing) {
+                if let other = media.otherPlaying, let icon = MediaService.icon(for: other.bundleID) {
+                    Image(nsImage: icon).resizable().frame(width: 11, height: 11)
+                        .shadow(color: .black.opacity(0.6), radius: 1.5)
+                        .offset(x: 4, y: 3)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(Theme.quick, value: media.otherPlaying?.bundleID)
         }
     }
 
@@ -552,19 +567,16 @@ struct ExpandedView: View {
                 .onTapGesture { model.pinnedOpen = false; model.expanded = false }
                 .help("Kapat")
             Group {
-                if model.settingsVisible { SettingsView(model: model) }
-                else {
-                    switch model.selectedTab {
-                    case .home: HomeView(model: model, media: model.media)
-                    case .files: ShelfView(model: model)
-                    case .clipboard: ClipboardView(model: model)
-                    case .focus: FocusView(model: model)
-                    case .agents: AgentPanelView(service: model.agents)
-                    }
+                switch model.selectedTab {
+                case .home: HomeView(model: model, media: model.media)
+                case .files: ShelfView(model: model)
+                case .clipboard: ClipboardView(model: model)
+                case .focus: FocusView(model: model)
+                case .agents: AgentPanelView(service: model.agents)
                 }
             }
             .transition(.blurReplace)
-            .id(model.settingsVisible ? "settings" : model.selectedTab.rawValue)
+            .id(model.selectedTab.rawValue)
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
             .frame(width: Layout.panelWidth, height: Layout.contentHeight)
         }
@@ -587,7 +599,6 @@ struct ExpandedView: View {
         .animation(Theme.quick, value: model.notice)
         .foregroundStyle(.white)
         .animation(Theme.quick, value: model.selectedTab)
-        .animation(Theme.quick, value: model.settingsVisible)
     }
 }
 
@@ -596,7 +607,7 @@ struct TabPill: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(PanelTab.allCases) { tab in
-                let selected = model.selectedTab == tab && !model.settingsVisible
+                let selected = model.selectedTab == tab
                 Button { model.select(tab) } label: {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: tab.icon).font(.system(size: 12.5, weight: selected ? .semibold : .medium))
@@ -615,14 +626,13 @@ struct TabPill: View {
             }
             Rectangle().fill(.white.opacity(0.14)).frame(width: 1, height: 14).padding(.horizontal, 4)
             pillButton(model.pinnedOpen ? "pin.fill" : "pin", "Açık tut", active: model.pinnedOpen) { model.pinnedOpen.toggle() }
-            pillButton("gearshape", "Ayarlar", active: model.settingsVisible) { model.settingsVisible.toggle() }
+            pillButton("gearshape", "Ayarlar", active: false) { model.openSettings() }
         }
         .padding(.horizontal, 5)
         .frame(height: Layout.pillHeight)
         .glassEffect(.clear.tint(.black.opacity(0.5)).interactive(), in: Capsule())
         .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
         .animation(Theme.quick, value: model.selectedTab)
-        .animation(Theme.quick, value: model.settingsVisible)
     }
     private func pillButton(_ icon: String, _ label: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -659,7 +669,20 @@ struct HomeView: View {
                         }
                         Text(media.artist).font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
                         Spacer(minLength: 4)
-                        ScrubBar(position: media.livePosition(at: model.now), duration: media.duration, tint: tint) { media.seek($0) }
+                        if media.controllable && media.duration <= 0 {
+                            // Live streams report no (or infinite) duration: nothing to scrub.
+                            HStack(spacing: 5) {
+                                Circle().fill(Color.red).frame(width: 6, height: 6)
+                                Text("CANLI").font(.system(size: 9.5, weight: .bold, design: .rounded)).tracking(0.6)
+                            }
+                            .foregroundStyle(Theme.dim).frame(height: 29, alignment: .bottomLeading)
+                        } else if media.controllable {
+                            ScrubBar(position: media.livePosition(at: model.now), duration: media.duration, tint: tint) { media.seek($0) }
+                        } else {
+                            Label("Arka planda · son bilinen durum", systemImage: "rectangle.stack")
+                                .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.faint).lineLimit(1)
+                                .frame(height: 29, alignment: .bottomLeading)
+                        }
                     } else {
                         Text("Müzik").font(.system(size: 15, weight: .semibold))
                         Text(media.status ?? (media.bridgeActive ? "Bir şey çal: Müzik, Spotify, Safari…" : "Apple Music veya Spotify’ı bağla."))
@@ -689,10 +712,8 @@ struct HomeView: View {
                         statusLabel(model.muted ? "speaker.slash" : "speaker.wave.2", model.muted ? "0" : "\(Int(volume * 100))")
                     }
                     Spacer()
-                    if media.bridgeActive, let icon = media.sourceIcon {
-                        Button { media.activateSource() } label: {
-                            Image(nsImage: icon).resizable().frame(width: 20, height: 20).contentShape(Circle())
-                        }.buttonStyle(.plain).help(media.sourceBundleID ?? "")
+                    if media.bridgeActive, !media.sessions.isEmpty {
+                        SourceStack(media: media)
                     } else if media.connected {
                         Menu {
                             ForEach(MusicSource.allCases) { source in Button(source.rawValue) { media.connect(source) } }
@@ -707,7 +728,11 @@ struct HomeView: View {
                         statusLabel(model.session.running ? "timer" : "timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
                     }.buttonStyle(.plain).help("Odak")
                 }
-                if media.hasTrack {
+                if media.hasTrack && !media.controllable {
+                    Button { media.activateSource() } label: {
+                        Label("Oynatıcıyı aç", systemImage: "arrow.up.forward.app").font(.system(size: 10.5, weight: .medium))
+                    }.buttonStyle(PillStyle()).help("Tarayıcı sekmesi artık sistemin Şimdi Çalıyor kaynağı değil; kontrol için oynatıcıya geç.")
+                } else if media.hasTrack {
                     HStack(spacing: 18) {
                         transport("backward.fill", "Önceki", size: 13) { media.command("previous track") }
                         Button { media.command("playpause") } label: {
@@ -736,6 +761,45 @@ struct HomeView: View {
             Image(systemName: icon).font(.system(size: size, weight: .semibold)).foregroundStyle(.white)
                 .frame(width: 32, height: 32).contentShape(Circle())
         }.buttonStyle(GlassCircleStyle()).help(label)
+    }
+}
+
+/// App icons of every player Damla has seen, overlapped like avatars; they fan out on hover. Tapping another
+/// icon shows that player; tapping the shown one brings its app forward.
+struct SourceStack: View {
+    @ObservedObject var media: MediaService
+    @State private var hovering = false
+    var body: some View {
+        let sessions = Array(media.sessions.suffix(3))
+        HStack(spacing: hovering || sessions.count == 1 ? 5 : -8) {
+            ForEach(sessions) { session in
+                let shown = session.bundleID == media.sourceBundleID
+                Button {
+                    if shown { media.activateSource() } else { withAnimation(Theme.quick) { media.select(session.bundleID) } }
+                } label: {
+                    ZStack(alignment: .bottomTrailing) {
+                        if let icon = MediaService.icon(for: session.bundleID) {
+                            Image(nsImage: icon).resizable().frame(width: 20, height: 20)
+                        } else {
+                            Image(systemName: "music.note").font(.system(size: 10, weight: .semibold)).frame(width: 20, height: 20)
+                        }
+                        if session.playing && media.isLive(session) && sessions.count > 1 {
+                            Circle().fill(Theme.accent).frame(width: 5, height: 5)
+                                .overlay(Circle().stroke(.black.opacity(0.7), lineWidth: 1)).offset(x: 1, y: 1)
+                        }
+                    }
+                    .opacity(shown || hovering ? 1 : 0.55)
+                    .scaleEffect(shown ? 1 : 0.86)
+                    .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .zIndex(shown ? 1 : 0)
+                .help(shown ? "\(MediaService.appName(for: session.bundleID)) · uygulamayı aç" : "\(session.title) · \(MediaService.appName(for: session.bundleID))")
+            }
+        }
+        .onHover { hovering = $0 }
+        .animation(Theme.quick, value: hovering)
+        .animation(Theme.quick, value: media.sourceBundleID)
     }
 }
 
@@ -1056,105 +1120,6 @@ struct FocusView: View {
 }
 
 // MARK: - Settings
-
-struct SettingsView: View {
-    @ObservedObject var model: AppState
-    @ObservedObject var keys: MediaKeyInterceptor
-    @ObservedObject var updater: UpdateService
-    init(model: AppState) { self.model = model; keys = model.keys; updater = model.updater }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Switches in a two-column grid, every switch flush right in its cell.
-            Grid(horizontalSpacing: 18, verticalSpacing: 0) {
-                GridRow {
-                    switchRow("Üzerine gelince aç", isOn: $model.automaticOpen)
-                    switchRow("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                }
-                GridRow {
-                    switchRow("Pano geçmişi", isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) }))
-                    switchRow("Sistem HUD’unu gizle", isOn: Binding(get: { model.hideSystemHUD }, set: { model.setHideSystemHUD($0) }))
-                        .help("Ses, sessiz ve parlaklık tuşlarını Damla uygular; macOS kendi göstergesini çizmez. Erişilebilirlik izni ister.")
-                }
-            }
-            .onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
-            divider
-            choiceRow("Ekran") {
-                ForEach(DisplayMode.allCases) { mode in
-                    Button(mode.rawValue) { model.displayMode = mode; model.savePreferences() }
-                        .buttonStyle(PillStyle(accent: model.displayMode == mode))
-                }
-            }
-            divider
-            choiceRow("Çentiksiz ekran") {
-                ForEach(ExternalStyle.allCases) { style in
-                    Button(style.rawValue) { model.externalStyle = style; model.savePreferences() }
-                        .buttonStyle(PillStyle(accent: model.externalStyle == style))
-                }
-            }
-            divider
-            choiceRow("Temizlik modu") {
-                Button("Klavyeyi kilitle · 60 sn") { model.startCleaning() }.buttonStyle(PillStyle())
-                    .help("Tüm klavyeler 60 saniye kilitlenir. Fare çalışır. Esc’yi 2 saniye tutarak çıkabilirsin.")
-            }
-            if updater.isConfigured {
-                divider
-                HStack {
-                    Text("Güncellemeler").foregroundStyle(.white.opacity(0.92))
-                    Spacer(minLength: 8)
-                    HStack(spacing: 8) {
-                        Toggle("", isOn: $updater.automaticChecks).labelsHidden().toggleStyle(GlassSwitchStyle())
-                            .help("Günde bir kez GitHub'daki sürüm listesine bakar; sunucu yok, veri gönderilmez.")
-                        Button(updater.availableVersion.map { "\($0) yükle" } ?? "Şimdi denetle") { updater.checkForUpdates() }
-                            .buttonStyle(PillStyle(accent: updater.availableVersion != nil)).font(.system(size: 10.5, weight: .medium))
-                    }
-                }
-                .frame(height: 28)
-            }
-            Spacer(minLength: 0)
-            HStack(spacing: 8) {
-                if model.hideSystemHUD && !keys.active {
-                    Button { MediaKeyInterceptor.openAccessibilitySettings() } label: {
-                        Label("Erişilebilirlik izni bekleniyor · Sistem Ayarları’nı aç", systemImage: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.amber).lineLimit(1)
-                    }.buttonStyle(.plain)
-                } else {
-                    Text("Damla \(updater.currentVersion) · ⌃⌥Space").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
-                }
-                Spacer()
-                Button("Çıkış") { NSApp.terminate(nil) }.font(.system(size: 10.5, weight: .medium)).buttonStyle(.plain).foregroundStyle(Theme.dim)
-            }
-            .frame(height: 16)
-        }
-        .font(.system(size: 11.5))
-        .tint(Theme.accent)
-        .padding(.top, 2)
-        .frame(maxHeight: .infinity)
-    }
-
-    private var divider: some View {
-        Rectangle().fill(.white.opacity(0.08)).frame(height: 0.5)
-    }
-
-    private func switchRow(_ title: String, isOn: Binding<Bool>) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.white.opacity(0.92)).lineLimit(1)
-            Spacer(minLength: 6)
-            Toggle("", isOn: isOn).labelsHidden().toggleStyle(GlassSwitchStyle())
-        }
-        .frame(height: 23)
-        .frame(maxWidth: .infinity)
-    }
-
-    private func choiceRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.white.opacity(0.92))
-            Spacer(minLength: 8)
-            HStack(spacing: 4, content: content).font(.system(size: 10.5, weight: .medium))
-        }
-        .frame(height: 28)
-    }
-}
 
 // MARK: - Controls
 

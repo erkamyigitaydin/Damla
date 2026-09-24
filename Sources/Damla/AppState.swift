@@ -49,7 +49,6 @@ final class AppState: ObservableObject {
     @Published var session = DiskStore.load(FocusSession.self, name: "focus.json") ?? FocusSession()
     @Published var now = Date()
     @Published var completedSessions = UserDefaults.standard.integer(forKey: "completedSessions")
-    @Published var settingsVisible = false
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
     let media = MediaService()
     let monitor = SystemMonitor()
@@ -69,6 +68,7 @@ final class AppState: ObservableObject {
     var setDialogMode: ((Bool) -> Void)?
     var requestQuickLook: ((Int?) -> Void)?
     var requestShare: ((URL) -> Void)?
+    var presentSettings: (() -> Void)?
     private var pinnedBeforeCleaning = false
 
     func state(for screenID: UInt32) -> NotchState {
@@ -85,6 +85,11 @@ final class AppState: ObservableObject {
             self?.volume = volume; self?.brightness = brightness; self?.muted = muted
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
+        media.onNotice = { [weak self] text in
+            self?.showNotice(text, duration: 8) {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") { NSWorkspace.shared.open(url) }
+            }
+        }
         monitor.start(); media.start()
         cleaning.$active.dropFirst().sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         cleaning.onEnd = { [weak self] in
@@ -190,8 +195,12 @@ final class AppState: ObservableObject {
         keys.stop()
         pinnedOpen = true; expanded = true
     }
+    /// Opens the settings window; the panel folds away so it does not sit over it.
+    func openSettings() {
+        pinnedOpen = false; expanded = false
+        presentSettings?()
+    }
     func select(_ tab: PanelTab) {
-        settingsVisible = false
         selectedTab = tab
         if tab == .clipboard { requestKeyFocus?() }
     }

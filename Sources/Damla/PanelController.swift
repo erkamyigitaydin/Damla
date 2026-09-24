@@ -239,7 +239,7 @@ final class PanelController {
         } else {
             enteredAt = nil
             if exitedAt == nil { exitedAt = now }
-            let editing = panel.isKeyWindow && (model.selectedTab == .clipboard || model.settingsVisible)
+            let editing = panel.isKeyWindow && model.selectedTab == .clipboard
             if model.expanded && isActive && !model.pinnedOpen && !editing && NSEvent.pressedMouseButtons == 0
                 && now.timeIntervalSince(exitedAt!) > 0.28 {
                 model.expanded = false
@@ -334,7 +334,7 @@ final class PanelManager {
                 self.model.pinnedOpen = false; self.model.expanded = false
                 return nil
             }
-            if event.keyCode == 49, self.model.expanded, self.model.selectedTab == .files, !self.model.settingsVisible,
+            if event.keyCode == 49, self.model.expanded, self.model.selectedTab == .files,
                event.modifierFlags.intersection([.command, .option, .control]).isEmpty { // Space
                 self.model.quickLook()
                 return nil
@@ -461,11 +461,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
+    private lazy var settings = SettingsWindowController(model: model)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         model = AppState()
         manager = PanelManager(model: model)
+        model.presentSettings = { [weak self] in self?.settings.present() }
         model.start()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "drop", accessibilityDescription: "Damla")
@@ -502,7 +504,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "tab-focus": model.select(.focus)
         case "tab-agents": model.select(.agents)
         case "share": model.select(.files); model.shareFile()
-        case "settings": model.settingsVisible = true
+        case "settings": model.openSettings()
+        case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
+        case "media-demo": model.media.injectDemoSessions()
+        case let body where body.hasPrefix("music:"): model.media.debugMusic(String(body.dropFirst(6)))
+        case "render-media": MainActor.assumeIsolated { renderMedia() }
+        case "media-sessions": NSLog("Damla media: %@", model.media.sessions.map { "\($0.bundleID) playing=\($0.playing) \($0.title)" }.joined(separator: " | "))
         case "display-notch": model.displayMode = .notch
         case "display-mouse": model.displayMode = .followMouse
         case "display-all": model.displayMode = .all
@@ -535,11 +542,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default: break
         }
     }
+    /// Draws the media views off screen into /tmp (for checks while the real screen is busy or protected).
+    @MainActor private func renderMedia() {
+        let m = Layout.Metrics(notchWidth: 180, notchHeight: 32, hasNotch: true)
+        let pairs: [(String, AnyView)] = [
+            ("home", AnyView(HomeView(model: model, media: model.media).padding(.horizontal, 24).padding(.vertical, 12)
+                .frame(width: Layout.panelWidth, height: Layout.contentHeight))),
+            ("compact", AnyView(CompactRow(model: model, media: model.media, metrics: m).padding(8)))
+        ]
+        for (name, view) in pairs {
+            let renderer = ImageRenderer(content: view.background(Color.black).environment(\.colorScheme, .dark))
+            renderer.scale = 2
+            if let image = renderer.nsImage, let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+               let png = rep.representation(using: .png, properties: [:]) {
+                try? png.write(to: URL(fileURLWithPath: "/tmp/damla-render-\(name).png"))
+            }
+        }
+    }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         manager.show(); return true
     }
     @objc func showPanel() { manager.show() }
-    @objc func showSettings() { model.settingsVisible = true; manager.show() }
+    @objc func showSettings() { model.openSettings() }
     @objc func startCleaning() { manager.show(); model.startCleaning() }
     @objc func checkForUpdates() { model.updater.checkForUpdates() }
     @objc func quit() { NSApp.terminate(nil) }
