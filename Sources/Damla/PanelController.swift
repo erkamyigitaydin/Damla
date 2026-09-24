@@ -532,6 +532,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "tab-home": model.select(.home)
         case "mixer": model.select(.home); model.homePane = .levels
         case "outputs": model.select(.home); model.homePane = .outputs
+        case "lyrics": model.select(.home); model.homePane = .lyrics
+        case "lyrics-on": model.lyrics.enabled = true
+        case "lyrics-off": model.lyrics.enabled = false
+        case "lyrics-probe":   // fetch a known song through the real service, report what came back
+            model.lyrics.show(title: "The Black Dog", artist: "Taylor Swift", album: "THE TORTURED POETS DEPARTMENT", duration: 238)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                guard let lyrics = self?.model.lyrics else { return }
+                MediaService.trace("lyrics-probe state=\(lyrics.state) lines=\(lyrics.lyrics.lines.count) first=\(lyrics.lyrics.lines.first?.text ?? "-") at60=\(lyrics.lyrics.index(at: 60).map { lyrics.lyrics.lines[$0].text } ?? "-")")
+            }
         case "tab-files": model.select(.files)
         case "tab-clipboard": model.select(.clipboard)
         case "tab-focus": model.select(.focus)
@@ -585,7 +594,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor private func renderMedia() {
         let m = Layout.Metrics(notchWidth: 180, notchHeight: 32, hasNotch: true)
         let pairs: [(String, AnyView)] = [
-            ("home", AnyView(HomeView(model: model, media: model.media).padding(.horizontal, 24).padding(.vertical, 12)
+            ("home", AnyView(HomeView(model: model, media: model.media, lyrics: model.lyrics).padding(.horizontal, 24).padding(.vertical, 12)
                 .frame(width: Layout.panelWidth, height: Layout.contentHeight))),
             ("compact", AnyView(CompactRow(model: model, media: model.media, metrics: m).padding(8))),
             ("agents", AnyView(AgentPanelView(service: model.agents).padding(.horizontal, 24).padding(.vertical, 12)

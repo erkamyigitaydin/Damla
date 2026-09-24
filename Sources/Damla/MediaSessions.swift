@@ -7,6 +7,8 @@ struct MediaSession: Identifiable {
     var id: String { bundleID }
     var title = ""
     var artist = ""
+    var album = ""
+    var artistKnown = false    // the player named an artist (not our fallback to the album or app name)
     var playing = false
     var duration = 0.0
     var position = 0.0
@@ -126,6 +128,7 @@ struct MediaSessionStore {
         session.title = item.title
         // Browsers often send no artist; fall back to the album, then to the player's name (Safari, Chrome…).
         session.artist = !item.artist.isEmpty ? item.artist : !item.album.isEmpty ? item.album : appName(id)
+        session.album = item.album; session.artistKnown = !item.artist.isEmpty
         session.playing = item.playing
         session.duration = item.duration.isFinite ? max(0, item.duration) : 0   // live streams report infinity
         session.position = item.elapsed.isFinite ? max(0, item.elapsed) : 0
@@ -172,7 +175,7 @@ struct MediaSessionStore {
             var session = session(id) ?? MediaSession(bundleID: id)
             let key = "script:\(title)|\(artist)"
             let trackChanged = session.title != title || session.artist != artist || session.artwork == nil
-            session.title = title; session.artist = artist.isEmpty ? appName(id) : artist
+            session.title = title; session.artist = artist.isEmpty ? appName(id) : artist; session.artistKnown = !artist.isEmpty
             session.duration = duration.isFinite ? max(0, duration) : 0
             session.position = max(0, position); session.positionDate = now
             session.playing = playing; session.lastSeen = now

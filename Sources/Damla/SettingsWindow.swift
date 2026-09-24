@@ -29,7 +29,7 @@ final class SettingsWindowController: NSWindowController {
         tabs.addTabViewItem(tab("Genel", "gearshape", GeneralSettings(model: model)))
         tabs.addTabViewItem(tab("Panel", "rectangle.topthird.inset.filled", PanelSettings(model: model)))
         tabs.addTabViewItem(tab("Ekran", "display", DisplaySettings(model: model, keys: model.keys)))
-        tabs.addTabViewItem(tab("Medya", "music.note", MediaSettings(media: model.media)))
+        tabs.addTabViewItem(tab("Medya", "music.note", MediaSettings(media: model.media, lyrics: model.lyrics)))
         tabs.addTabViewItem(tab("Ajanlar", "sparkles", AgentSettings(agents: model.agents)))
         tabs.addTabViewItem(tab("Hakkında", "info.circle", AboutSettings(updater: model.updater)))
         let window = NSWindow(contentViewController: tabs)
@@ -166,6 +166,7 @@ private struct DisplaySettings: View {
 
 private struct MediaSettings: View {
     @ObservedObject var media: MediaService
+    @ObservedObject var lyrics: LyricsService
     var body: some View {
         Form {
             Section {
@@ -197,6 +198,14 @@ private struct MediaSettings: View {
                     }
                 } footer: {
                     Text("İlk seferde macOS, Damla’nın Müzik veya Spotify’ı kontrol etmesi için izin ister.")
+                }
+                Section {
+                    Toggle(isOn: $lyrics.enabled) {
+                        Text("Şarkı sözleri")
+                        Text("Özet’te o an söylenen satır görünür; dokununca sözlerin tamamı akar.")
+                    }
+                } footer: {
+                    Text("Sözler lrclib.net’ten gelir: çalan şarkının adı, sanatçısı, albümü ve süresi gönderilir, başka hiçbir şey gitmez. Bulunan sözler bu Mac’te saklanır. Tarayıcı videoları ve canlı yayınlar için sorgu yapılmaz.")
                 }
             }
         }

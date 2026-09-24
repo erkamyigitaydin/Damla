@@ -577,9 +577,10 @@ struct ExpandedView: View {
                 switch model.selectedTab {
                 case .home:
                     switch model.homePane {
-                    case .player: HomeView(model: model, media: model.media)
+                    case .player: HomeView(model: model, media: model.media, lyrics: model.lyrics)
                     case .outputs: OutputsView(model: model)
                     case .levels: MixerView(model: model, media: model.media, apps: model.appVolumes)
+                    case .lyrics: LyricsView(model: model, media: model.media, lyrics: model.lyrics)
                     }
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
@@ -661,6 +662,7 @@ struct TabPill: View {
 struct HomeView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
+    @ObservedObject var lyrics: LyricsService
     @State private var appeared = false
     private var tint: Color { media.accent.map { Color(nsColor: $0) } ?? .white }
     private func entrance(_ order: Double) -> Animation {
@@ -677,9 +679,44 @@ struct HomeView: View {
                         HStack(alignment: .firstTextBaseline) {
                             Text(media.title).font(.system(size: 15, weight: .semibold)).tracking(-0.2).lineLimit(1)
                             Spacer(minLength: 6)
+                            if let favorited = media.favorited {
+                                Button { media.toggleFavorite() } label: {
+                                    Image(systemName: favorited ? "heart.fill" : "heart").font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundStyle(favorited ? Color.pink : Theme.dim).contentTransition(.symbolEffect(.replace))
+                                        .frame(width: 18, height: 18).contentShape(Rectangle())
+                                }.buttonStyle(.plain).help(favorited ? "Favorilerden çıkar" : "Favorilere ekle")
+                            }
+                            // Lyrics on/off right where they show; the first switch-on says where they come from.
+                            Button {
+                                lyrics.enabled.toggle()
+                                if lyrics.enabled && !UserDefaults.standard.bool(forKey: "lyricsNoticeShown") {
+                                    UserDefaults.standard.set(true, forKey: "lyricsNoticeShown")
+                                    model.showNotice("Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir", duration: 5)
+                                }
+                            } label: {
+                                Image(systemName: lyrics.enabled ? "quote.bubble.fill" : "quote.bubble").font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(lyrics.enabled ? tint : Theme.dim).contentTransition(.symbolEffect(.replace))
+                                    .frame(width: 18, height: 18).contentShape(Rectangle())
+                            }.buttonStyle(.plain).help(lyrics.enabled ? "Şarkı sözlerini kapat" : "Şarkı sözlerini aç")
                             Equalizer(playing: media.playing, color: tint).opacity(media.playing ? 1 : 0)
                         }
-                        Text(media.artist).font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
+                        // Which app is playing sits with the name it belongs to.
+                        HStack(spacing: 6) {
+                            sourceControl
+                            Text(media.artist).font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
+                        }
+                        if lyrics.state == .found {
+                            // The line being sung, in the artwork's colour; a tap opens the whole text.
+                            Button { withAnimation(Theme.quick) { model.homePane = .lyrics } } label: {
+                                Text(currentLyric.isEmpty ? "♪" : currentLyric)
+                                    .font(.system(size: 11, weight: .medium)).foregroundStyle(tint.opacity(0.95)).lineLimit(1)
+                                    .contentTransition(.opacity).animation(.easeInOut(duration: 0.25), value: currentLyric)
+                                    .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                            }.buttonStyle(.plain).help("Sözlerin tamamı")
+                        } else if lyrics.state == .loading || (lyrics.state == .missing && isSong) {
+                            Text(lyrics.state == .loading ? "Sözler aranıyor…" : "Bu şarkının sözü bulunamadı")
+                                .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.faint).lineLimit(1)
+                        }
                         Spacer(minLength: 4)
                         if media.controllable && media.duration <= 0 {
                             // Live streams report no (or infinite) duration: nothing to scrub.
@@ -715,38 +752,35 @@ struct HomeView: View {
             }
             .frame(height: 88)
             Spacer(minLength: 10)
-            // Left: the volume capsule; middle: transport; right: source and timer. The transport sits between the
-            // two groups rather than dead centre, so a long output name never runs under the buttons.
-            HStack(spacing: 8) {
-                    // Two controls: where sound goes (the output list) and how loud (system and per-app levels).
+            // Two columns matching the row above: under the artwork the sound controls (output, level); under
+            // the text the transport, centred on the progress line, with a running timer at its right end.
+            HStack(spacing: 14) {
+                HStack(spacing: 6) {
                     // Plain buttons: a SwiftUI Menu would flatten these labels to their first text.
                     Button { withAnimation(Theme.quick) { model.homePane = .outputs } } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold))
-                            if outputName.count <= 11 { Text(outputName).font(.system(size: 10.5, weight: .medium)).lineLimit(1) }
-                        }
-                        .foregroundStyle(.white).padding(.horizontal, 10).frame(height: 26)
-                        .glassLook(AnyShape(Capsule()))
-                        .contentShape(Capsule())
+                        Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: 28, height: 28).contentShape(Circle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(GlassCircleStyle())
                     .help("Ses çıkışı: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—") · değiştir")
                     if let volume = model.volume {
                         Button { withAnimation(Theme.quick) { model.homePane = .levels } } label: {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 4) {
                                 Image(systemName: model.muted ? "speaker.slash.fill" : volume < 0.34 ? "speaker.wave.1.fill" : "speaker.wave.2.fill")
-                                    .font(.system(size: 10.5, weight: .semibold))
+                                    .font(.system(size: 10, weight: .semibold))
                                 Text(model.muted ? "0" : "\(Int(volume * 100))")
                                     .font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
                             }
-                            .foregroundStyle(.white).padding(.horizontal, 10).frame(height: 26)
+                            .foregroundStyle(.white).padding(.horizontal, 8).frame(height: 28)
                             .glassLook(AnyShape(Capsule()))
                             .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
                         .help("Ses seviyesi · sistem ve uygulama sesleri")
                     }
-                    Spacer(minLength: 4)
+                }
+                .frame(width: 88, alignment: .leading)
+                ZStack {
                     if media.hasTrack && !media.controllable {
                         Button { media.activateSource() } label: {
                             Label("Oynatıcıyı aç", systemImage: "arrow.up.forward.app").font(.system(size: 10.5, weight: .medium))
@@ -762,32 +796,42 @@ struct HomeView: View {
                             transport("forward.fill", "Sonraki", size: 13) { media.command("next track") }
                         }
                     }
-                    Spacer(minLength: 4)
-                    HStack(spacing: 12) {
-                    if media.bridgeActive, !media.sessions.isEmpty {
-                        SourceStack(media: media)
-                    } else if !media.bridgeActive && media.connected {
-                        Menu {
-                            ForEach(MusicSource.allCases) { source in Button(source.rawValue) { media.connect(source) } }
-                            Divider(); Button("Bağlantıyı kes") { media.disconnect() }
-                        } label: {
-                            Image(systemName: media.source == .spotify ? "circle.hexagongrid.fill" : "music.note").font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(.white).frame(width: 26, height: 26).contentShape(Circle())
-                        }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 26)
-                            .glassLook(AnyShape(Circle())).help(media.source.rawValue)
-                    }
                     if model.session.hasStarted {   // only a running or paused timer takes room here
-                        Button { model.select(.focus) } label: {
-                            statusLabel("timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
-                        }.buttonStyle(.plain).help("Odak")
+                        HStack {
+                            Spacer()
+                            Button { model.select(.focus) } label: {
+                                statusLabel("timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
+                            }.buttonStyle(.plain).help("Odak")
+                        }
                     }
-                    }
+                }
+                .frame(maxWidth: .infinity)
             }
             .frame(height: 36)
             .offset(y: appeared ? 0 : 10).opacity(appeared ? 1 : 0)
             .animation(entrance(2), value: appeared)
         }
         .onAppear { appeared = true }
+    }
+    /// The playing app's icon (several overlap when more than one player is known); in the Apple Events
+    /// fallback, the picker between Apple Music and Spotify.
+    @ViewBuilder private var sourceControl: some View {
+        if media.bridgeActive, !media.sessions.isEmpty {
+            SourceStack(media: media, size: 14)
+        } else if !media.bridgeActive && media.connected {
+            Menu {
+                ForEach(MusicSource.allCases) { source in Button(source.rawValue) { media.connect(source) } }
+                Divider(); Button("Bağlantıyı kes") { media.disconnect() }
+            } label: {
+                Image(systemName: media.source == .spotify ? "circle.hexagongrid.fill" : "music.note").font(.system(size: 10, weight: .semibold))
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help(media.source.rawValue)
+        }
+    }
+    /// The same test that decides whether lyrics are looked up at all (see AppState).
+    private var isSong: Bool { media.artistKnown && media.duration >= 30 && media.duration <= 20 * 60 }
+    private var currentLyric: String {
+        guard !lyrics.lyrics.lines.isEmpty else { return lyrics.lyrics.plain.isEmpty ? "" : "Sözler" }
+        return lyrics.lyrics.index(at: media.livePosition(at: model.now)).map { lyrics.lyrics.lines[$0].text } ?? ""
     }
     private var outputIcon: String {
         model.outputs.first(where: { $0.id == model.currentOutput })?.icon ?? "hifispeaker"
@@ -815,10 +859,11 @@ struct HomeView: View {
 /// icon shows that player; tapping the shown one brings its app forward.
 struct SourceStack: View {
     @ObservedObject var media: MediaService
+    var size: CGFloat = 20
     @State private var hovering = false
     var body: some View {
         let sessions = Array(media.sessions.suffix(3))
-        HStack(spacing: hovering || sessions.count == 1 ? 5 : -8) {
+        HStack(spacing: hovering || sessions.count == 1 ? size / 4 : -size * 0.4) {
             ForEach(sessions) { session in
                 let shown = session.bundleID == media.sourceBundleID
                 Button {
@@ -826,9 +871,9 @@ struct SourceStack: View {
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
                         if let icon = MediaService.icon(for: session.bundleID) {
-                            Image(nsImage: icon).resizable().frame(width: 20, height: 20)
+                            Image(nsImage: icon).resizable().frame(width: size, height: size)
                         } else {
-                            Image(systemName: "music.note").font(.system(size: 10, weight: .semibold)).frame(width: 20, height: 20)
+                            Image(systemName: "music.note").font(.system(size: size / 2, weight: .semibold)).frame(width: size, height: size)
                         }
                         if session.playing && media.isLive(session) && sessions.count > 1 {
                             Circle().fill(Theme.accent).frame(width: 5, height: 5)

@@ -68,7 +68,7 @@ final class AppState: ObservableObject {
     @Published var muted = false
     @Published var outputs: [AudioOutput] = []
     /// What Özet shows: the player, the output list, or the volume levels.
-    enum HomePane { case player, outputs, levels }
+    enum HomePane { case player, outputs, levels, lyrics }
     @Published var homePane: HomePane = .player
     /// Scroll on the notch strip: vertical for volume, a horizontal swipe to skip tracks.
     @Published var notchGestures = UserDefaults.standard.object(forKey: "notchGestures") as? Bool ?? true {
@@ -86,6 +86,7 @@ final class AppState: ObservableObject {
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
     let media = MediaService()
     let appVolumes = AppVolumeController()
+    let lyrics = LyricsService()
     let monitor = SystemMonitor()
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
@@ -134,6 +135,14 @@ final class AppState: ObservableObject {
         }
         monitor.onDeviceBattery = { [weak self] icon, title, detail in self?.showDeviceHUD(icon, title, detail: detail) }
         appVolumes.start()
+        // Lyrics follow the shown track; only songs a player named an artist for, 30 s – 20 min long.
+        Publishers.CombineLatest4(media.$title, media.$artist, media.$duration, media.$artistKnown)
+            .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
+            .sink { [weak self] title, artist, duration, known in
+                guard let self else { return }
+                let song = self.media.hasTrack && known && duration >= 30 && duration <= 20 * 60
+                self.lyrics.show(title: song ? title : "", artist: song ? artist : "", album: self.media.album, duration: song ? duration : 0)
+            }.store(in: &cancellables)
         media.onNotice = { [weak self] text in
             self?.showNotice(text, duration: 8) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") { NSWorkspace.shared.open(url) }

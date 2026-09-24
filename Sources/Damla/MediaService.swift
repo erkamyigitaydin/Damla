@@ -30,6 +30,12 @@ final class MediaService: ObservableObject {
     @Published var connected = UserDefaults.standard.bool(forKey: "musicConnected")
     @Published var title = "Müziğine yer aç"
     @Published var artist = "Apple Music veya Spotify’ı bağla."
+    @Published private(set) var album = ""
+    /// The player named the artist itself: a real song worth looking up lyrics for.
+    @Published private(set) var artistKnown = false
+    /// Whether the shown Apple Music track is a favorite; nil for other players (Spotify has no such command).
+    @Published private(set) var favorited: Bool?
+    private var favoriteKey = ""
     @Published var playing = false
     @Published var duration: Double = 0
     @Published var position: Double = 0
@@ -161,6 +167,9 @@ final class MediaService: ObservableObject {
         let live = store.isLive(session)
         hasTrack = true
         title = session.title; artist = session.artist
+        if album != session.album { album = session.album }
+        if artistKnown != session.artistKnown { artistKnown = session.artistKnown }
+        refreshFavorite(session)
         playing = session.playing && live
         duration = session.duration
         position = session.position; positionDate = session.positionDate
@@ -292,6 +301,30 @@ final class MediaService: ObservableObject {
     func restoreDucked() {
         for (id, volume) in duckedVolumes { _ = Self.run("set sound volume to \(volume)", bundleID: id) }
         duckedVolumes.removeAll()
+    }
+
+    // MARK: Favorite (Apple Music)
+
+    /// Reads the heart once per Music track; other players clear it.
+    private func refreshFavorite(_ session: MediaSession) {
+        let key = "\(session.bundleID)|\(session.title)|\(session.artist)"
+        guard key != favoriteKey else { return }
+        favoriteKey = key
+        guard session.bundleID == MusicSource.music.bundleID, store.isLive(session) else { favorited = nil; return }
+        queue.async {
+            let (value, _) = Self.run("return favorited of current track", bundleID: MusicSource.music.bundleID)
+            DispatchQueue.main.async { if self.favoriteKey == key { self.favorited = value?.booleanValue } }
+        }
+    }
+
+    func toggleFavorite() {
+        guard let current = favorited else { return }
+        favorited = !current   // at once; corrected below if Music says otherwise
+        let key = favoriteKey
+        queue.async {
+            let (value, _) = Self.run("set favorited of current track to \(!current)\nreturn favorited of current track", bundleID: MusicSource.music.bundleID)
+            DispatchQueue.main.async { if self.favoriteKey == key, let value { self.favorited = value.booleanValue } }
+        }
     }
 
     // MARK: Per-app volume (Music, Spotify)

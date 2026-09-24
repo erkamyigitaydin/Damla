@@ -135,3 +135,49 @@ struct PaneHeader: View {
         }
     }
 }
+
+/// The whole lyrics, the sung line bright and kept in view; plain text when nobody timed them.
+struct LyricsView: View {
+    @ObservedObject var model: AppState
+    @ObservedObject var media: MediaService
+    @ObservedObject var lyrics: LyricsService
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            PaneHeader(title: media.title) { withAnimation(Theme.quick) { model.homePane = .player } }
+            if lyrics.lyrics.lines.isEmpty {
+                ScrollView {
+                    Text(lyrics.lyrics.instrumental ? "Enstrümantal" : lyrics.lyrics.plain)
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+                        .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
+                }.scrollIndicators(.hidden)
+            } else {
+                let current = lyrics.lyrics.index(at: media.livePosition(at: model.now))
+                ScrollViewReader { reader in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 5) {
+                            ForEach(Array(lyrics.lyrics.lines.enumerated()), id: \.offset) { index, line in
+                                Text(line.text.isEmpty ? "♪" : line.text)
+                                    .font(.system(size: index == current ? 13.5 : 12, weight: index == current ? .semibold : .medium))
+                                    .foregroundStyle(index == current ? Color.white : Theme.faint)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .id(index)
+                                    .onTapGesture { media.seek(line.time) }   // jump the song to this line
+                            }
+                        }
+                        .padding(.vertical, 40)
+                    }
+                    .scrollIndicators(.hidden)
+                    .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.18),
+                                                 .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .onChange(of: current) { _, line in
+                        guard let line else { return }
+                        withAnimation(.easeInOut(duration: 0.35)) { reader.scrollTo(line, anchor: .center) }
+                    }
+                    .onAppear { if let current { reader.scrollTo(current, anchor: .center) } }
+                }
+            }
+            Text("lrclib.net").font(.system(size: 8.5, weight: .medium)).foregroundStyle(Theme.faint)
+        }
+    }
+}
