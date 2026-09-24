@@ -138,6 +138,7 @@ func runSelfTests() -> Int32 {
         AgentEventStore.remove(id: records[0].id, directory: isolated)
         check(AgentEventStore.read(directory: isolated).count == 1, "Removed session leaves the store")
     } catch { failures.append("Agent fixture: \(error)") }
+    runMediaSelfTests { condition, name in check(condition, name) }
     print("Damla self-test: \(count - failures.count)/\(count) passed")
     for failure in failures { print("FAIL: \(failure)") }
     return failures.isEmpty ? 0 : 1

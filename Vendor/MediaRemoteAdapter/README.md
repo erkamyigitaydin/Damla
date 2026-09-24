@@ -10,3 +10,9 @@ bağlanılmaz, yalnızca perl içine yüklenir. Yeniden derlemek için:
 ```sh
 zsh Vendor/MediaRemoteAdapter/build-adapter.sh
 ```
+
+## Yerel yamalar
+
+- `src/utility/helpers.m`: JSON'a çevrilemeyen sayılar (canlı yayınların sonsuz `duration` değeri, NaN) atlanmak yerine
+  `null` olarak yazılır. Böylece fark (`diff`) akışında eski parçanın süresi temizlenir ve her güncellemede hata çıktısına
+  "Invalid JSON value type" uyarısı düşmez. Yama derlenmiş çerçeveye ancak `build-adapter.sh` yeniden çalıştırılınca girer.

@@ -23,9 +23,14 @@ ADAPTER_DST="$APP_DIR/Contents/Resources/MediaRemoteAdapter"
 rm -rf "$ADAPTER_DST"; mkdir -p "$ADAPTER_DST"
 cp -R "$ADAPTER_SRC/MediaRemoteAdapter.framework" "$ADAPTER_DST/"
 cp "$ADAPTER_SRC/MediaRemoteAdapterTestClient" "$ADAPTER_SRC/mediaremote-adapter.pl" "$ADAPTER_SRC/LICENSE" "$ADAPTER_DST/"
-# Sign with a stable identity so TCC permissions (Accessibility, Automation) survive rebuilds.
-# Override with DAMLA_SIGN_IDENTITY; falls back to the first Apple Development certificate, then ad-hoc.
+# Sign with the same identity as release.sh (Developer ID) so TCC permissions (Accessibility, Automation)
+# survive both rebuilds and Sparkle updates: macOS ties a grant to the signing identity, and a dev build
+# signed with another certificate loses it the moment an update replaces the bundle.
+# Override with DAMLA_SIGN_IDENTITY; falls back to Apple Development, then ad-hoc.
 IDENTITY="${DAMLA_SIGN_IDENTITY:-}"
+if [[ -z "$IDENTITY" ]]; then
+  IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+fi
 if [[ -z "$IDENTITY" ]]; then
   IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"')"
 fi
@@ -36,7 +41,8 @@ for item in "$FW/XPCServices/"*.xpc "$FW/Autoupdate" "$FW/Updater.app" "$APP_DIR
 done
 codesign --force --sign "$IDENTITY" --timestamp=none "$ADAPTER_DST/MediaRemoteAdapter.framework"
 codesign --force --sign "$IDENTITY" --timestamp=none "$ADAPTER_DST/MediaRemoteAdapterTestClient"
-codesign --force --sign "$IDENTITY" --timestamp=none "$APP_DIR"
+# Hardened runtime and entitlements as in release.sh, so signing problems show up before a release does.
+codesign --force --sign "$IDENTITY" --timestamp=none --options runtime --entitlements "$PROJECT_DIR/Resources/Damla.entitlements" "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
 printf 'Signed with: %s\n' "$IDENTITY"
 "$APP_DIR/Contents/MacOS/Damla" --self-test

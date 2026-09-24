@@ -112,7 +112,10 @@ static id sanitizeValueForJsonEncoding(id value, NSString *parentKey) {
         NSNumber *number = (NSNumber *)value;
         double unwrapped = [number doubleValue];
         if (isnan(unwrapped) || isinf(unwrapped)) {
-            return unsupported_type;
+            // Damla patch: live streams report an infinite duration. Send
+            // null instead of dropping the key, so a diff clears the old
+            // value rather than leaving the previous track's duration behind.
+            return [NSNull null];
         }
         return value;
     } else if ([value isKindOfClass:[NSDate class]]) {
