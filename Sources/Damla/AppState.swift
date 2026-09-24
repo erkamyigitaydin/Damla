@@ -106,6 +106,7 @@ final class AppState: ObservableObject {
     var requestShare: ((URL) -> Void)?
     var presentSettings: (() -> Void)?
     var presentPanel: (() -> Void)?
+    var presentOnboarding: (() -> Void)?
     private var openedForApproval = false   // the panel opened itself for a permission prompt
     private var pinnedBeforeApproval = false
     private var pinnedBeforeCleaning = false

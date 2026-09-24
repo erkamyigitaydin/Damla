@@ -31,7 +31,7 @@ final class SettingsWindowController: NSWindowController {
         tabs.addTabViewItem(tab("Ekran", "display", DisplaySettings(model: model, keys: model.keys)))
         tabs.addTabViewItem(tab("Medya", "music.note", MediaSettings(media: model.media, lyrics: model.lyrics)))
         tabs.addTabViewItem(tab("Ajanlar", "sparkles", AgentSettings(agents: model.agents)))
-        tabs.addTabViewItem(tab("Hakkında", "info.circle", AboutSettings(updater: model.updater)))
+        tabs.addTabViewItem(tab("Hakkında", "info.circle", AboutSettings(updater: model.updater) { [weak model] in model?.presentOnboarding?() }))
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
         window.toolbarStyle = .preference
@@ -260,6 +260,7 @@ private struct AgentSettings: View {
 
 private struct AboutSettings: View {
     @ObservedObject var updater: UpdateService
+    let showTour: () -> Void
     var body: some View {
         Form {
             Section {
@@ -283,6 +284,14 @@ private struct AboutSettings: View {
                     } label: {
                         Text(updater.availableVersion == nil ? "Güncel" : "Yeni sürüm hazır")
                     }
+                }
+            }
+            Section {
+                LabeledContent {
+                    Button("Tanıtımı göster", action: showTour)
+                } label: {
+                    Text("İlk açılış rehberi")
+                    Text("İzinleri ve ajan bağlantısını adım adım yeniden kur.")
                 }
             }
             Section {

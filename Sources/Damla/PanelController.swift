@@ -491,6 +491,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private lazy var settings = SettingsWindowController(model: model)
+    private lazy var onboarding = OnboardingWindowController(model: model)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -498,12 +499,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         manager = PanelManager(model: model)
         model.presentSettings = { [weak self] in self?.settings.present() }
         model.presentPanel = { [weak self] in self?.manager.show() }
+        model.presentOnboarding = { [weak self] in self?.onboarding.present() }
+        if OnboardingWindowController.shouldShowOnLaunch {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.onboarding.present() }
+        }
         model.start()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "drop", accessibilityDescription: "Damla")
         let menu = NSMenu()
         menu.addItem(withTitle: "Damla’yı aç", action: #selector(showPanel), keyEquivalent: "")
         menu.addItem(withTitle: "Ayarlar", action: #selector(showSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: "Tanıtım…", action: #selector(showOnboarding), keyEquivalent: "")
         menu.addItem(withTitle: "Temizlik modu · 60 sn", action: #selector(startCleaning), keyEquivalent: "")
         menu.addItem(withTitle: "Güncellemeleri denetle…", action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(.separator())
@@ -548,6 +554,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "tab-agents": model.select(.agents)
         case "share": model.select(.files); model.shareFile()
         case "settings": model.openSettings()
+        case "onboarding": onboarding.present()
+        case let step where step.hasPrefix("onboarding-"): onboarding.present(page: Int(step.dropFirst(11)))
         case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
         case "media-demo": model.media.injectDemoSessions()
         case let list where list.hasPrefix("tabs:"):   // e.g. tabs:home,focus,agents
@@ -615,6 +623,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func showPanel() { manager.show() }
     @objc func showSettings() { model.openSettings() }
+    @objc func showOnboarding() { onboarding.present() }
     @objc func startCleaning() { manager.show(); model.startCleaning() }
     @objc func checkForUpdates() { model.updater.checkForUpdates() }
     @objc func quit() { NSApp.terminate(nil) }
