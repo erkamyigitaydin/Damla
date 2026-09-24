@@ -156,6 +156,11 @@ func runSelfTests() -> Int32 {
     _ = gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false)
     _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
     check((0..<4).flatMap { _ in gesture.feed(up: 0, right: 20, precise: true, began: false, ended: false, momentum: false) } == [.previous], "Right swipe goes back")
+    let profile = #"{"SPBluetoothDataType":[{"device_connected":[{"Erkam’ın AirPods Pro":{"device_batteryLevelLeft":"80%","device_batteryLevelRight":"75 %","device_batteryLevelCase":"60%"}},{"MX Keys Mini":{"device_minorType":"Keyboard"}}],"device_not_connected":[{"iPhone":{}}]}]}"#
+    let buds = BluetoothBattery.parse(Data(profile.utf8), name: "Erkam’ın AirPods Pro")
+    check(buds?.summary == "S %80 · Sa %75 · K %60", "AirPods battery reads each bud and the case")
+    check(BluetoothBattery.parse(Data(profile.utf8), name: "iPhone") == nil && BluetoothBattery.parse(Data(profile.utf8), name: "MX Keys Mini") == nil,
+          "No battery line for disconnected or battery-less devices")
     runMediaSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
     print("Damla self-test: \(count - failures.count)/\(count) passed")

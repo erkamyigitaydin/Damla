@@ -30,6 +30,7 @@ final class SystemMonitor {
     var onHUD: ((String, String, Double) -> Void)?
     /// Output devices and the default one; called at start and whenever either changes.
     var onOutputs: (([AudioOutput], AudioDeviceID?) -> Void)?
+    var onDeviceBattery: ((String, String, String) -> Void)?   // icon, name, "S %80 · Sa %75 · K %60"
     private var devicesListenerBlock: AudioObjectPropertyListenerBlock?
     private var lastOutput: AudioDeviceID?
 
@@ -92,7 +93,14 @@ final class SystemMonitor {
         defer { lastOutput = current }
         guard let lastOutput, let current, current != lastOutput, let device = outputs.first(where: { $0.id == current }) else { return }
         let (volume, muted) = Self.audio()
-        onHUD?(device.icon, device.name, muted ? 0 : Double(volume ?? 1))
+        let title = AudioOutput.shortName(device.name, transport: device.transport)
+        onHUD?(device.icon, title, muted ? 0 : Double(volume ?? 1))
+        // AirPods and other Bluetooth headphones: follow up with their battery once it can be read.
+        guard device.isBluetooth else { return }
+        BluetoothBattery.levels(for: device.name) { [weak self] levels in
+            guard let self, let levels, AudioOutputs.defaultID() == current else { return }
+            self.onDeviceBattery?(device.icon, title, levels.summary)
+        }
     }
     func poll() {
         let (volume, muted) = Self.audio()

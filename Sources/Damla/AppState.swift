@@ -29,7 +29,7 @@ enum PanelTab: String, CaseIterable, Identifiable {
 }
 
 struct HUDItem: Identifiable {
-    enum Kind { case volume, mute, brightness, battery, done, agent }
+    enum Kind { case volume, mute, brightness, battery, done, agent, device }
     var id = UUID()
     var kind: Kind
     var icon: String
@@ -130,6 +130,7 @@ final class AppState: ObservableObject {
                 if switched { self.appVolumes.outputChanged() }   // turned-down apps follow the new output
             }
         }
+        monitor.onDeviceBattery = { [weak self] icon, title, detail in self?.showDeviceHUD(icon, title, detail: detail) }
         appVolumes.start()
         media.onNotice = { [weak self] text in
             self?.showNotice(text, duration: 8) {
@@ -215,6 +216,13 @@ final class AppState: ObservableObject {
         hud = HUDItem(kind: kind, icon: icon, title: title, level: min(1, max(0, level)))
         let work = DispatchWorkItem { [weak self] in self?.hud = nil }
         hudClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + 2.4, execute: work)
+    }
+    /// A device's name on the left, a line of text (AirPods battery) on the right.
+    func showDeviceHUD(_ icon: String, _ title: String, detail: String) {
+        hudClear?.cancel()
+        hud = HUDItem(kind: .device, icon: icon, title: title, level: 1, detail: detail)
+        let work = DispatchWorkItem { [weak self] in self?.hud = nil }
+        hudClear = work; DispatchQueue.main.asyncAfter(deadline: .now() + 3.2, execute: work)
     }
     func showAgentHUD(_ record: AgentSession) {
         hudClear?.cancel()

@@ -102,3 +102,52 @@ enum AudioOutputs {
         return value.takeRetainedValue() as String
     }
 }
+
+/// Battery levels of a connected Bluetooth audio device (AirPods: each bud and the case), read from
+/// `system_profiler SPBluetoothDataType -json`, which lists them for connected devices only.
+enum BluetoothBattery {
+    struct Levels: Equatable {
+        var left: Int?, right: Int?, `case`: Int?, main: Int?
+        var isEmpty: Bool { left == nil && right == nil && self.case == nil && main == nil }
+        /// "S %80 · Sa %75 · K %60", or "%70" for a single-battery device.
+        var summary: String {
+            if let main, left == nil, right == nil { return "%\(main)" }
+            return [left.map { "S %\($0)" }, right.map { "Sa %\($0)" }, self.case.map { "K %\($0)" }].compactMap { $0 }.joined(separator: " · ")
+        }
+    }
+
+    /// Runs off the main thread (system_profiler takes about a second) and answers on the main thread.
+    static func levels(for name: String, completion: @escaping (Levels?) -> Void) {
+        DispatchQueue.global(qos: .utility).async {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+            task.arguments = ["SPBluetoothDataType", "-json"]
+            let pipe = Pipe()
+            task.standardOutput = pipe; task.standardError = FileHandle.nullDevice
+            var result: Levels?
+            if (try? task.run()) != nil {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                task.waitUntilExit()
+                result = parse(data, name: name)
+            }
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    static func parse(_ data: Data, name: String) -> Levels? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let controllers = root["SPBluetoothDataType"] as? [[String: Any]] else { return nil }
+        for controller in controllers {
+            for entry in controller["device_connected"] as? [[String: Any]] ?? [] {
+                guard let info = entry[name] as? [String: Any] else { continue }
+                func percent(_ key: String) -> Int? {
+                    (info[key] as? String).flatMap { Int($0.trimmingCharacters(in: CharacterSet(charactersIn: "% "))) }
+                }
+                let levels = Levels(left: percent("device_batteryLevelLeft"), right: percent("device_batteryLevelRight"),
+                                    case: percent("device_batteryLevelCase"), main: percent("device_batteryLevelMain"))
+                return levels.isEmpty ? nil : levels
+            }
+        }
+        return nil
+    }
+}

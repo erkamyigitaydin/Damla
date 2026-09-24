@@ -527,6 +527,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "close": model.pinnedOpen = false; model.expanded = false
         case "hud-volume": model.showHUD("speaker.wave.2.fill", "Ses", 0.62)
         case "hud-brightness": model.showHUD("sun.max.fill", "Parlaklık", 0.8)
+        case "hud-airpods": model.showDeviceHUD("airpods.pro", "AirPods Pro", detail: "S %80 · Sa %75 · K %60")
         case "hud-battery": model.showHUD("battery.100percent.bolt", "Şarja bağlandı", 0.8)
         case "tab-home": model.select(.home)
         case "mixer": model.select(.home); model.mixerVisible = true

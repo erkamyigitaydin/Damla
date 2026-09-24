@@ -32,6 +32,7 @@ extension HUDItem {
         case .battery: return Theme.green
         case .done: return Theme.accent
         case .agent: return phase == .waiting || phase == .failed ? Theme.amber : Theme.accent
+        case .device: return Theme.green
         }
     }
 }
@@ -467,7 +468,11 @@ struct HUDRow: View {
             .padding(.leading, 14).frame(width: side, alignment: .leading)
             Spacer(minLength: 0).frame(width: metrics.notchWidth)
             Group {
-                if hud.kind == .agent {
+                if hud.kind == .device {
+                    Text(hud.detail).font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit().lineLimit(1)
+                        .minimumScaleFactor(0.8).foregroundStyle(Theme.green)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                } else if hud.kind == .agent {
                     HStack(spacing: 6) {
                         if let phase = hud.phase { AgentStatusMark(phase: phase) }
                         Text(hud.detail).font(.system(size: 11, weight: .semibold)).lineLimit(1).foregroundStyle(hud.tint)
