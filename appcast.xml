@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.6.1</title>
+      <pubDate>Thu, 24 Sep 2026 18:30:16 +0000</pubDate>
+      <sparkle:version>11</sparkle:version>
+      <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Sayfa seçimi ve daha akıcı ayarlar.</p><p>- Ayarlar → Panel: panelde hangi sayfaların (Özet, Dosyalar, Pano, Odak, Agent&#x27;lar) görüneceğini seç.</p><p>- Ayarlar penceresi sekme değiştirirken artık sıçramıyor.</p><p>- Safari&#x27;deki web medyası (ör. X videoları) artık Safari adı ve simgesiyle görünüyor.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.6.1/Damla-0.6.1.dmg" length="4330740" type="application/octet-stream" sparkle:edSignature="fijzgKo34lvrg58l5WIuVnLUOcz53hHDyuqlvSp/v3OVqbYQk+iKDnFFjkTbafggwcBOObgavibUxUyHaD6oCg=="/>
+    </item>
+    <item>
       <title>Damla 0.6.0</title>
       <pubDate>Thu, 24 Sep 2026 18:22:01 +0000</pubDate>
       <sparkle:version>10</sparkle:version>
