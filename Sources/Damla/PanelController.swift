@@ -620,6 +620,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationWillTerminate(_ notification: Notification) {
         model.media.restoreDucked()   // never leave the music quiet after a ducked handoff
+        model.appVolumes.stopAll()
         model.cleaning.onEnd = nil
         model.cleaning.stop()
         model.keys.stop()

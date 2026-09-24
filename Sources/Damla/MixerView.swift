@@ -7,28 +7,26 @@ import CoreAudio
 struct MixerView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
+    @ObservedObject var apps: AppVolumeController
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text("Ses").font(.system(size: 15, weight: .semibold))
-                Spacer()
-                Menu {
-                    ForEach(model.outputs) { output in
-                        Button { AudioOutputs.setDefault(output.id) } label: {
-                            Label(output.name, systemImage: output.id == model.currentOutput ? "checkmark" : output.icon)
+                // Outputs as chips: the chosen one is filled; a tap switches at once.
+                ScrollView(.horizontal) {
+                    HStack(spacing: 5) {
+                        ForEach(model.outputs) { output in
+                            let chosen = output.id == model.currentOutput
+                            Button { AudioOutputs.setDefault(output.id) } label: {
+                                Label(AudioOutput.shortName(output.name, transport: output.transport), systemImage: output.icon)
+                                    .font(.system(size: 10.5, weight: chosen ? .semibold : .medium)).lineLimit(1)
+                            }
+                            .buttonStyle(PillStyle(accent: chosen))
+                            .help(output.name)
                         }
                     }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: current?.icon ?? "speaker.wave.2").font(.system(size: 10, weight: .semibold))
-                        Text(current?.name ?? "Çıkış").font(.system(size: 10.5, weight: .medium)).lineLimit(1)
-                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 7.5, weight: .bold)).foregroundStyle(Theme.faint)
-                    }
-                    .foregroundStyle(.white).padding(.horizontal, 10).padding(.vertical, 5)
-                    .glassLook(AnyShape(Capsule()))
                 }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                .help("Ses çıkışı")
+                .scrollIndicators(.hidden)
+                .edgeFade()
                 IconButton(icon: "xmark", label: "Kapat", size: 24) { withAnimation(Theme.quick) { model.mixerVisible = false } }
             }
             ScrollView {
@@ -40,17 +38,28 @@ struct MixerView: View {
                                  name: MediaService.appName(for: id), value: media.appVolumes[id] ?? 0) { media.setAppVolume(id, $0) }
                             .opacity(media.appVolumes[id] == nil ? 0.5 : 1)
                     }
-                    if media.scriptablePlayers.isEmpty {
-                        Text("Apple Music veya Spotify açıkken burada kendi ses ayarları görünür.")
+                    ForEach(apps.apps) { app in
+                        MixerRow(icon: MediaService.icon(for: app.id).map { Image(nsImage: $0) } ?? Image(systemName: "app"),
+                                 name: app.name, value: apps.level(app.id)) { apps.setLevel(app.id, $0) }
+                            .opacity(app.playing ? 1 : 0.6)
+                    }
+                    if apps.permissionDenied {
+                        Button { AppVolumeController.openPermissionSettings() } label: {
+                            Label("Uygulama sesleri için “Sistem sesi kaydı” izni gerekli · ayarları aç", systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.amber).lineLimit(2)
+                        }.buttonStyle(.plain)
+                    }
+                    if media.scriptablePlayers.isEmpty && apps.apps.isEmpty {
+                        Text("Ses çalan uygulamalar burada görünür; her birinin sesini ayrı ayarlayabilirsin.")
                             .font(.system(size: 10.5)).foregroundStyle(Theme.faint).frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
             .scrollIndicators(.hidden)
         }
-        .onAppear { media.refreshAppVolumes() }
+        .onAppear { media.refreshAppVolumes(); apps.setWatching(true) }
+        .onDisappear { apps.setWatching(false) }
     }
-    private var current: AudioOutput? { model.outputs.first { $0.id == model.currentOutput } }
 }
 
 struct MixerRow: View {
@@ -61,7 +70,7 @@ struct MixerRow: View {
     var body: some View {
         HStack(spacing: 9) {
             icon.resizable().scaledToFit().frame(width: 16, height: 16).foregroundStyle(Theme.dim)
-            Text(name).font(.system(size: 11, weight: .medium)).lineLimit(1).frame(width: 78, alignment: .leading)
+            Text(name).font(.system(size: 11, weight: .medium)).lineLimit(1).frame(width: 100, alignment: .leading)
             LevelSlider(value: value, onChange: onChange)
             Text("\(Int(value.rounded()))").font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit()
                 .foregroundStyle(Theme.faint).frame(width: 24, alignment: .trailing)

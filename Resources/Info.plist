@@ -6,6 +6,7 @@
 	<string>Damla</string>
 	<key>CFBundleExecutable</key>
 	<string>Damla</string>
+	<key>NSAudioCaptureUsageDescription</key><string>Damla, uygulamaların sesini mikserde ayrı ayrı kısabilmek için uygulama sesini yakalar. Ses kaydedilmez ve hiçbir yere gönderilmez.</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>

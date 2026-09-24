@@ -142,6 +142,8 @@ func runSelfTests() -> Int32 {
     check(AudioOutput.icon(name: "Erkam’s AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth) == "airpods.pro"
           && AudioOutput.icon(name: "MacBook Pro Speakers", transport: kAudioDeviceTransportTypeBuiltIn) == "laptopcomputer"
           && AudioOutput.icon(name: "DELL U2723QE", transport: kAudioDeviceTransportTypeDisplayPort) == "display", "Output icons follow the device")
+    check(AudioOutput.shortName("Erkam’ın AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth) == "AirPods Pro"
+          && AudioOutput.shortName("MacBook Pro Hoparlörü", transport: kAudioDeviceTransportTypeBuiltIn) == "Hoparlör", "Output names fit the capsule")
     var gesture = NotchScrollGesture()
     check(gesture.feed(up: 1, right: 0, precise: false, began: false, ended: false, momentum: false) == [.volume(1)], "Wheel click is one volume step")
     _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)

@@ -83,6 +83,7 @@ final class AppState: ObservableObject {
     @Published var completedSessions = UserDefaults.standard.integer(forKey: "completedSessions")
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
     let media = MediaService()
+    let appVolumes = AppVolumeController()
     let monitor = SystemMonitor()
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
@@ -123,8 +124,13 @@ final class AppState: ObservableObject {
         monitor.onOutputs = { [weak self] outputs, current in
             guard let self else { return }
             if self.outputs != outputs { self.outputs = outputs }
-            if self.currentOutput != current { self.currentOutput = current }
+            if self.currentOutput != current {
+                let switched = self.currentOutput != nil
+                self.currentOutput = current
+                if switched { self.appVolumes.outputChanged() }   // turned-down apps follow the new output
+            }
         }
+        appVolumes.start()
         media.onNotice = { [weak self] text in
             self?.showNotice(text, duration: 8) {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") { NSWorkspace.shared.open(url) }

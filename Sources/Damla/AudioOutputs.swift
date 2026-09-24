@@ -13,6 +13,13 @@ struct AudioOutput: Identifiable, Equatable {
     /// SF Symbol for the device: AirPods by model, then by how it is connected.
     var icon: String { AudioOutput.icon(name: name, transport: transport) }
 
+    /// "Erkam’ın AirPods Pro" → "AirPods Pro"; the built-in speakers are just "Hoparlör".
+    static func shortName(_ name: String, transport: UInt32) -> String {
+        if transport == kAudioDeviceTransportTypeBuiltIn { return "Hoparlör" }
+        for model in ["AirPods", "Beats"] { if let range = name.range(of: model) { return String(name[range.lowerBound...]) } }
+        return name
+    }
+
     static func icon(name: String, transport: UInt32) -> String {
         let lower = name.lowercased()
         if lower.contains("airpods max") { return "airpodsmax" }

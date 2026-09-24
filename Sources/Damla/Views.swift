@@ -571,7 +571,7 @@ struct ExpandedView: View {
             Group {
                 switch model.selectedTab {
                 case .home:
-                    if model.mixerVisible { MixerView(model: model, media: model.media) }
+                    if model.mixerVisible { MixerView(model: model, media: model.media, apps: model.appVolumes) }
                     else { HomeView(model: model, media: model.media) }
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
@@ -707,22 +707,45 @@ struct HomeView: View {
             }
             .frame(height: 88)
             Spacer(minLength: 10)
-            ZStack {
-                HStack(spacing: 14) {
-                    if model.battery.available {
-                        statusLabel(model.battery.symbol, "\(model.battery.percentage)%", tint: model.battery.plugged ? Theme.green : nil)
-                    }
+            // Left: the volume capsule; middle: transport; right: source and timer. The transport sits between the
+            // two groups rather than dead centre, so a long output name never runs under the buttons.
+            HStack(spacing: 8) {
                     if let volume = model.volume {
-                        // Tap the level for the mixer (output device, per-app levels); away from the speakers it shows
-                        // that device's icon.
+                        // Where sound goes and how loud; a tap opens the mixer with the outputs and per-app levels.
+                        // (A SwiftUI Menu would flatten this label to its first text.)
                         Button { withAnimation(Theme.quick) { model.mixerVisible = true } } label: {
-                            statusLabel(model.muted ? "speaker.slash" : outputIcon, model.muted ? "0" : "\(Int(volume * 100))")
-                                .contentShape(Rectangle())
+                            HStack(spacing: 6) {
+                                Image(systemName: model.muted ? "speaker.slash.fill" : outputIcon).font(.system(size: 10.5, weight: .semibold))
+                                Text(outputName).font(.system(size: 10.5, weight: .medium)).lineLimit(1)
+                                Text(model.muted ? "0" : "\(Int(volume * 100))")
+                                    .font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(Theme.dim)
+                            }
+                            .foregroundStyle(.white).padding(.horizontal, 10).frame(height: 26)
+                            .frame(maxWidth: 118)
+                            .glassLook(AnyShape(Capsule()))
+                            .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
-                        .help("Ses: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—") · mikseri aç")
+                        .help("Ses çıkışı: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—") · çıkışı ve uygulama seslerini ayarla")
                     }
-                    Spacer()
+                    Spacer(minLength: 4)
+                    if media.hasTrack && !media.controllable {
+                        Button { media.activateSource() } label: {
+                            Label("Oynatıcıyı aç", systemImage: "arrow.up.forward.app").font(.system(size: 10.5, weight: .medium))
+                        }.buttonStyle(PillStyle()).help("Tarayıcı sekmesi artık sistemin Şimdi Çalıyor kaynağı değil; kontrol için oynatıcıya geç.")
+                    } else if media.hasTrack {
+                        HStack(spacing: 14) {
+                            transport("backward.fill", "Önceki", size: 13) { media.command("previous track") }
+                            Button { media.command("playpause") } label: {
+                                Image(systemName: media.playing ? "pause.fill" : "play.fill").font(.system(size: 15, weight: .bold))
+                                    .frame(width: 36, height: 36).contentShape(Circle())
+                                    .contentTransition(.symbolEffect(.replace))
+                            }.buttonStyle(GlassCircleStyle()).help(media.playing ? "Duraklat" : "Oynat")
+                            transport("forward.fill", "Sonraki", size: 13) { media.command("next track") }
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    HStack(spacing: 12) {
                     if media.bridgeActive, !media.sessions.isEmpty {
                         SourceStack(media: media)
                     } else if !media.bridgeActive && media.connected {
@@ -738,22 +761,7 @@ struct HomeView: View {
                     Button { model.select(.focus) } label: {
                         statusLabel(model.session.running ? "timer" : "timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
                     }.buttonStyle(.plain).help("Odak")
-                }
-                if media.hasTrack && !media.controllable {
-                    Button { media.activateSource() } label: {
-                        Label("Oynatıcıyı aç", systemImage: "arrow.up.forward.app").font(.system(size: 10.5, weight: .medium))
-                    }.buttonStyle(PillStyle()).help("Tarayıcı sekmesi artık sistemin Şimdi Çalıyor kaynağı değil; kontrol için oynatıcıya geç.")
-                } else if media.hasTrack {
-                    HStack(spacing: 18) {
-                        transport("backward.fill", "Önceki", size: 13) { media.command("previous track") }
-                        Button { media.command("playpause") } label: {
-                            Image(systemName: media.playing ? "pause.fill" : "play.fill").font(.system(size: 15, weight: .bold))
-                                .frame(width: 36, height: 36).contentShape(Circle())
-                                .contentTransition(.symbolEffect(.replace))
-                        }.buttonStyle(GlassCircleStyle()).help(media.playing ? "Duraklat" : "Oynat")
-                        transport("forward.fill", "Sonraki", size: 13) { media.command("next track") }
                     }
-                }
             }
             .frame(height: 36)
             .offset(y: appeared ? 0 : 10).opacity(appeared ? 1 : 0)
@@ -762,8 +770,13 @@ struct HomeView: View {
         .onAppear { appeared = true }
     }
     private var outputIcon: String {
-        guard let output = model.outputs.first(where: { $0.id == model.currentOutput }), output.transport != kAudioDeviceTransportTypeBuiltIn else { return "speaker.wave.2" }
+        guard let output = model.outputs.first(where: { $0.id == model.currentOutput }), output.transport != kAudioDeviceTransportTypeBuiltIn else { return "speaker.wave.2.fill" }
         return output.icon
+    }
+    /// Short enough for the capsule: "Hoparlör", "AirPods Pro", a display's name.
+    private var outputName: String {
+        guard let output = model.outputs.first(where: { $0.id == model.currentOutput }) else { return "Ses" }
+        return AudioOutput.shortName(output.name, transport: output.transport)
     }
     private func statusLabel(_ icon: String, _ text: String, tint: Color? = nil) -> some View {
         HStack(spacing: 4) {
