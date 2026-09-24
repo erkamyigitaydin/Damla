@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.5.0</title>
+      <pubDate>Thu, 24 Sep 2026 16:33:36 +0000</pubDate>
+      <sparkle:version>8</sparkle:version>
+      <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Birden fazla oynatıcı ve yeni ayarlar penceresi.</p><p>- Damla artık gördüğü her oynatıcıyı ayrı takip eder. Özet&#x27;in sağ altındaki ikonlara dokunarak Müzik, Spotify, Chrome, Safari… arasında geçiş yapabilirsin; çalan oynatıcının yanında yeşil nokta görünür.</p><p>- Apple Music ve Spotify arka plandayken de canlı kalır ve kumanda edilir. Arka plana düşen tarayıcı sekmesi son bilinen haliyle kalır, &quot;Oynatıcıyı aç&quot; ile ona geçebilirsin.</p><p>- Otomatik devir (varsayılan açık): tarayıcıda bir video başlayınca müzik duraklar, video durunca kaldığı yerden devam eder. İlk seferde macOS Otomasyon izni ister; Ayarlar → Medya&#x27;dan kapatılabilir.</p><p>- Duraklattığın oynatıcı ekranda kalır; macOS arkada çalan bir videoya geri döndüğünde gösterim kaymaz.</p><p>- Canlı yayınlarda ilerleme çubuğu yerine &quot;CANLI&quot; yazar.</p><p>- Ayarlar artık panelin içinde değil, normal bir macOS penceresinde: Genel, Ekran, Medya, Ajanlar, Hakkında.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.5.0/Damla-0.5.0.dmg" length="4078063" type="application/octet-stream" sparkle:edSignature="KlsVhOX/62V2oap2ZLBA70inIwxCK7eRcU16UyR3h9NX37ZlO4g/0PxiUgmjje+vCT/wXnJBNlBqPU39gUuDCw=="/>
+    </item>
+    <item>
       <title>Damla 0.4.3</title>
       <pubDate>Tue, 22 Sep 2026 19:42:47 +0000</pubDate>
       <sparkle:version>7</sparkle:version>
