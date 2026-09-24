@@ -530,7 +530,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "hud-airpods": model.showDeviceHUD("airpods.pro", "AirPods Pro", detail: "S %80 · Sa %75 · K %60")
         case "hud-battery": model.showHUD("battery.100percent.bolt", "Şarja bağlandı", 0.8)
         case "tab-home": model.select(.home)
-        case "mixer": model.select(.home); model.mixerVisible = true
+        case "mixer": model.select(.home); model.homePane = .levels
+        case "outputs": model.select(.home); model.homePane = .outputs
         case "tab-files": model.select(.files)
         case "tab-clipboard": model.select(.clipboard)
         case "tab-focus": model.select(.focus)

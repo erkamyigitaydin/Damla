@@ -576,8 +576,11 @@ struct ExpandedView: View {
             Group {
                 switch model.selectedTab {
                 case .home:
-                    if model.mixerVisible { MixerView(model: model, media: model.media, apps: model.appVolumes) }
-                    else { HomeView(model: model, media: model.media) }
+                    switch model.homePane {
+                    case .player: HomeView(model: model, media: model.media)
+                    case .outputs: OutputsView(model: model)
+                    case .levels: MixerView(model: model, media: model.media, apps: model.appVolumes)
+                    }
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
                 case .focus: FocusView(model: model)
@@ -585,7 +588,7 @@ struct ExpandedView: View {
                 }
             }
             .transition(.blurReplace)
-            .id(model.selectedTab == .home && model.mixerVisible ? "mixer" : model.selectedTab.rawValue)
+            .id(model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue)
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
             .frame(width: Layout.panelWidth, height: Layout.contentHeight)
         }
@@ -715,23 +718,33 @@ struct HomeView: View {
             // Left: the volume capsule; middle: transport; right: source and timer. The transport sits between the
             // two groups rather than dead centre, so a long output name never runs under the buttons.
             HStack(spacing: 8) {
+                    // Two controls: where sound goes (the output list) and how loud (system and per-app levels).
+                    // Plain buttons: a SwiftUI Menu would flatten these labels to their first text.
+                    Button { withAnimation(Theme.quick) { model.homePane = .outputs } } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold))
+                            if outputName.count <= 11 { Text(outputName).font(.system(size: 10.5, weight: .medium)).lineLimit(1) }
+                        }
+                        .foregroundStyle(.white).padding(.horizontal, 10).frame(height: 26)
+                        .glassLook(AnyShape(Capsule()))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Ses çıkışı: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—") · değiştir")
                     if let volume = model.volume {
-                        // Where sound goes and how loud; a tap opens the mixer with the outputs and per-app levels.
-                        // (A SwiftUI Menu would flatten this label to its first text.)
-                        Button { withAnimation(Theme.quick) { model.mixerVisible = true } } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: model.muted ? "speaker.slash.fill" : outputIcon).font(.system(size: 10.5, weight: .semibold))
-                                Text(outputName).font(.system(size: 10.5, weight: .medium)).lineLimit(1)
+                        Button { withAnimation(Theme.quick) { model.homePane = .levels } } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: model.muted ? "speaker.slash.fill" : volume < 0.34 ? "speaker.wave.1.fill" : "speaker.wave.2.fill")
+                                    .font(.system(size: 10.5, weight: .semibold))
                                 Text(model.muted ? "0" : "\(Int(volume * 100))")
-                                    .font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit().foregroundStyle(Theme.dim)
+                                    .font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
                             }
                             .foregroundStyle(.white).padding(.horizontal, 10).frame(height: 26)
-                            .frame(maxWidth: 118)
                             .glassLook(AnyShape(Capsule()))
                             .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
-                        .help("Ses çıkışı: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—") · çıkışı ve uygulama seslerini ayarla")
+                        .help("Ses seviyesi · sistem ve uygulama sesleri")
                     }
                     Spacer(minLength: 4)
                     if media.hasTrack && !media.controllable {
@@ -763,9 +776,11 @@ struct HomeView: View {
                         }.menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 26)
                             .glassLook(AnyShape(Circle())).help(media.source.rawValue)
                     }
-                    Button { model.select(.focus) } label: {
-                        statusLabel(model.session.running ? "timer" : "timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
-                    }.buttonStyle(.plain).help("Odak")
+                    if model.session.hasStarted {   // only a running or paused timer takes room here
+                        Button { model.select(.focus) } label: {
+                            statusLabel("timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
+                        }.buttonStyle(.plain).help("Odak")
+                    }
                     }
             }
             .frame(height: 36)
@@ -775,8 +790,7 @@ struct HomeView: View {
         .onAppear { appeared = true }
     }
     private var outputIcon: String {
-        guard let output = model.outputs.first(where: { $0.id == model.currentOutput }), output.transport != kAudioDeviceTransportTypeBuiltIn else { return "speaker.wave.2.fill" }
-        return output.icon
+        model.outputs.first(where: { $0.id == model.currentOutput })?.icon ?? "hifispeaker"
     }
     /// Short enough for the capsule: "Hoparlör", "AirPods Pro", a display's name.
     private var outputName: String {

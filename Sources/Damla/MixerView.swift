@@ -1,34 +1,15 @@
 import SwiftUI
 import CoreAudio
 
-/// Where sound goes and how loud each source is: the output device, the system volume, and one level per
-/// player Damla can reach. Opened from the volume reading on Özet; lives inside the panel (no popover over
-/// a screen-saver-level window).
+/// How loud each source is: the system volume and one level per player Damla can reach. Opened from the level
+/// on Özet; lives inside the panel (no popover over a screen-saver-level window).
 struct MixerView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
     @ObservedObject var apps: AppVolumeController
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                // Outputs as chips: the chosen one is filled; a tap switches at once.
-                ScrollView(.horizontal) {
-                    HStack(spacing: 5) {
-                        ForEach(model.outputs) { output in
-                            let chosen = output.id == model.currentOutput
-                            Button { AudioOutputs.setDefault(output.id) } label: {
-                                Label(AudioOutput.shortName(output.name, transport: output.transport), systemImage: output.icon)
-                                    .font(.system(size: 10.5, weight: chosen ? .semibold : .medium)).lineLimit(1)
-                            }
-                            .buttonStyle(PillStyle(accent: chosen))
-                            .help(output.name)
-                        }
-                    }
-                }
-                .scrollIndicators(.hidden)
-                .edgeFade()
-                IconButton(icon: "xmark", label: "Kapat", size: 24) { withAnimation(Theme.quick) { model.mixerVisible = false } }
-            }
+            PaneHeader(title: "Ses seviyesi") { withAnimation(Theme.quick) { model.homePane = .player } }
             ScrollView {
                 VStack(spacing: 7) {
                     MixerRow(icon: Image(systemName: model.muted ? "speaker.slash.fill" : "speaker.wave.2.fill"), name: "Sistem",
@@ -105,5 +86,52 @@ struct LevelSlider: View {
         .frame(height: 16)
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Where sound goes: every output device, the current one marked; a tap switches and returns to the player.
+struct OutputsView: View {
+    @ObservedObject var model: AppState
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PaneHeader(title: "Ses çıkışı") { withAnimation(Theme.quick) { model.homePane = .player } }
+            ScrollView {
+                VStack(spacing: 4) {
+                    ForEach(model.outputs) { output in
+                        let chosen = output.id == model.currentOutput
+                        Button {
+                            AudioOutputs.setDefault(output.id)
+                            withAnimation(Theme.quick) { model.homePane = .player }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: output.icon).font(.system(size: 13, weight: .medium)).frame(width: 20)
+                                    .foregroundStyle(chosen ? Theme.accent : Theme.dim)
+                                Text(output.name).font(.system(size: 11.5, weight: chosen ? .semibold : .medium)).lineLimit(1)
+                                Spacer(minLength: 6)
+                                if chosen { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.accent) }
+                            }
+                            .padding(.horizontal, 10).frame(height: 32)
+                            .background(chosen ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+}
+
+/// Title and close button shared by the panes that replace the player on Özet.
+struct PaneHeader: View {
+    let title: String
+    let close: () -> Void
+    var body: some View {
+        HStack {
+            Text(title).font(.system(size: 15, weight: .semibold))
+            Spacer()
+            IconButton(icon: "xmark", label: "Kapat", size: 24, action: close)
+        }
     }
 }
