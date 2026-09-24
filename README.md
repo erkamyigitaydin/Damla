@@ -1,145 +1,142 @@
-# Damla
+<p align="center">
+  <img src="docs/screenshots/home.png" width="600" alt="Damla's panel opened from the MacBook notch, playing a song">
+</p>
 
-Mac çentiği için Liquid Glass bir yardımcı: çalan müzik, ses, dosya rafı, pano, odak sayacı ve Claude Code / Codex ajanlarının durumu tek bir yerde, çentiğin içinde.
+<h1 align="center">Damla</h1>
 
-Çentiksiz ekranlarda (harici monitör, iMac) menü çubuğuna aynı biçimde bir çentik çizer. Hesap ya da sunucu yoktur, her şey Mac'inde kalır.
+<p align="center">
+  <b>Your notch, finally doing something.</b><br>
+  Music, sound, files, clipboard, focus and your AI coding agents, one glance away at the top of your screen.
+</p>
 
-## Kurulum
+<p align="center">
+  <a href="https://github.com/erkamyigitaydin/Damla/releases/latest"><img src="https://img.shields.io/github/v/release/erkamyigitaydin/Damla?label=download&color=f28b6d" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-26%2B-3d4a9e" alt="macOS 26 or later">
+  <img src="https://img.shields.io/badge/Apple%20Silicon%20%26%20Intel-universal-555" alt="Universal binary">
+</p>
 
-**Gereken:** macOS 26 veya üstü. Apple Silicon ve Intel Mac'lerde çalışır.
+---
 
-Homebrew ile:
+The notch sits there all day doing nothing. Damla turns it into a small Liquid Glass hub: hover over it and a panel melts out of the notch with whatever you need right now, then slips back when you move away. No external monitor gets left out either. On displays without a notch, Damla draws one into the menu bar.
+
+No account, no server, no tracking. Everything stays on your Mac.
+
+## Install
 
 ```sh
 brew install --cask erkamyigitaydin/tap/damla
 ```
 
-Ya da [son sürümün](https://github.com/erkamyigitaydin/Damla/releases/latest) `.dmg` dosyasını indir ve Damla'yı Applications klasörüne sürükle. Uygulama Apple tarafından noter onaylıdır, Gatekeeper uyarısı çıkmaz.
+Or grab the `.dmg` from the [latest release](https://github.com/erkamyigitaydin/Damla/releases/latest) and drag Damla to Applications. It's signed and notarized by Apple, so it opens without warnings, and it keeps itself up to date.
 
-İlk açılışta kısa bir tanıtım izinleri tek tek sorar. Hepsi isteğe bağlıdır:
+## What it does
 
-| İzin | Ne için |
+### Now playing, from anything
+
+<p align="center">
+  <img src="docs/screenshots/closed.png" width="550" alt="The closed notch showing album art, an equalizer and an agent waiting for approval">
+</p>
+
+Apple Music, Spotify, Podcasts, YouTube in the browser: if it's playing, Damla shows it. Cover art, progress, play/pause, skip, and a heart for your Apple Music favorites. No setup, no log-ins.
+
+- **Lyrics that scroll with the song.** Tap the lyrics button and the panel stretches down into an Apple Music-style lyrics view. Tap any line to jump there.
+- **Smart handoff.** Start a video and your music pauses (or ducks). Stop the video and the music picks up where it left off.
+- **Every player, side by side.** Several apps playing? Switch between them in one tap.
+- **Colors from the cover.** The whole panel picks up the tint of the album you're listening to.
+
+### Your AI agents, at a glance
+
+<p align="center">
+  <img src="docs/screenshots/agents.png" width="550" alt="The agents page showing one Claude Code session waiting for approval and one working">
+</p>
+
+Running Claude Code or Codex in the background? Damla shows every session: which project is working, which one needs you, and how long it's been waiting. A little droplet mascot lives in the notch and reacts: it bounces while an agent works, waves when one needs you, and smiles when it's done. Click a session to jump straight to its terminal or editor.
+
+### Approve commands without switching apps
+
+<p align="center">
+  <img src="docs/screenshots/approval.png" width="550" alt="A Claude Code permission request shown in the notch with Allow and Deny buttons">
+</p>
+
+When Claude Code asks for permission, the question drops out of the notch with the exact command. Hit **Allow** or **Deny** and keep working. If you're already looking at the terminal, Damla stays out of the way.
+
+### A shelf for your files
+
+<p align="center">
+  <img src="docs/screenshots/files.png" width="550" alt="The file shelf holding images and a PDF">
+</p>
+
+Start dragging a file anywhere and the notch opens into a drop zone. Park files there, preview them with **Space** (Quick Look), drag them out into another app, or AirDrop them. Damla only remembers where your files are; it never moves or copies them.
+
+### And more
+
+- **Sound, your way.** Switch outputs, see your AirPods' battery when they connect, and set the volume of each app separately. Scroll on the notch to change the volume, swipe to skip tracks.
+- **Beautiful volume and brightness indicators** that replace the system ones.
+- **Clipboard history** with search and pinning (off until you turn it on).
+- **Focus timer** for 25/45/50 minute sessions, with the countdown right in the notch.
+- **Full-screen aware.** The notch hides with the menu bar in full-screen apps and comes back when you reach for it.
+- **Cleaning mode** locks the keyboard for 60 seconds so you can wipe it without typing gibberish.
+- **English and Turkish** interface.
+
+## Getting started
+
+- **Open:** hover over the notch, click the droplet in the menu bar, or press **⌃⌥Space**.
+- **Close:** move the pointer away, click the notch, or press **Esc**.
+- **Keep it open:** the pin button.
+- **Settings:** the gear button, the menu bar icon or **⌘,**.
+
+A short tour on first launch asks for the few permissions Damla can use. Every one of them is optional:
+
+| Permission | What it unlocks |
 |---|---|
-| Otomasyon (Music, Spotify) | Apple Music ve Spotify'ı arka planda kumanda etmek, ses seviyelerini ayarlamak |
-| Erişilebilirlik | Ses ve parlaklık tuşlarını yakalayıp macOS göstergesi yerine Damla'nınkini göstermek; Temizlik modu |
-| Sistem sesi kaydı | Mikserde tek bir uygulamanın (ör. Chrome) sesini kısmak. Ses kaydedilmez, gönderilmez |
+| Automation (Music, Spotify) | Controlling Apple Music and Spotify in the background, and their volume |
+| Accessibility | Damla's own volume/brightness indicators and Cleaning mode |
+| System audio recording | Per-app volume in the mixer. Nothing is recorded or sent anywhere |
 
-Tanıtıma sonradan menü çubuğu → **Tanıtım…** ile dönülebilir.
+### Connecting your agents
 
-## Kullanım
-
-- **Açmak:** çentiğin üzerine gel, menü çubuğundaki damla simgesine tıkla ya da **⌃⌥Space**.
-- **Kapatmak:** fareyi panelden çek, çentik şeridine tıkla ya da **Esc**.
-- **Açık tutmak:** paneldeki iğne düğmesi.
-- **Ayarlar:** sekme kapsülündeki dişli, menü çubuğu → Ayarlar veya **⌘,**.
-
-## Özellikler
-
-### Müzik
-
-- Apple Music, Spotify, Podcasts ve tarayıcıdaki YouTube / Spotify Web dahil, çalan her şey: kapak, parça, ilerleme, oynatma düğmeleri. Kurulum gerekmez.
-- Aynı anda birden fazla oynatıcı varsa hepsi ayrı ayrı görünür ve aralarında geçilebilir.
-- Bir video başlayınca çalan müzik duraklatılır ya da kısılır, video bitince kaldığı yerden devam eder (Ayarlar → Medya).
-- Apple Music parçalarını favorilere ekleme.
-- Vurgu rengi albüm kapağından gelir.
-
-### Şarkı sözleri
-
-Sağ alttaki düğme paneli aşağı uzatır ve sözleri Apple Music'teki gibi akıtır: söylenen satır parlak, bir satıra dokunmak şarkıyı oraya sarar. Varsayılan olarak kapalıdır.
-
-Sözler [lrclib.net](https://lrclib.net)'ten gelir; yalnızca şarkının adı, sanatçısı, albümü ve süresi gönderilir.
-
-### Ses
-
-- Ses çıkışı seçici. Çıkış değişince (ör. AirPods bağlanınca) çentikte aygıt adı ve kulaklığın şarjı görünür.
-- Mikser: sistem sesi, Apple Music ve Spotify'ın kendi seviyeleri ve ses çalan diğer uygulamalar ayrı ayrı.
-- Çentik şeridinde dikey kaydırma sesi değiştirir, yatay kaydırma parça atlar.
-- Ses ve parlaklık göstergesi çentikte gösterilir.
-
-### Dosyalar
-
-Bir dosyayı sürüklemeye başlayınca çentik bir bırakma sepetine dönüşür. Rafa bırakılan dosyalar küçük resimleriyle durur: **Boşluk** ile Quick Look, çift tıkla aç, başka bir uygulamaya sürükle, sağ tıkla paylaş (AirDrop, Mail…). Damla dosyaları taşımaz ya da kopyalamaz, yalnızca yerlerini hatırlar.
-
-### Pano
-
-Kopyalanan metin, bağlantı, renk ve görsellerin geçmişi; arama ve sabitleme ile. Varsayılan olarak kapalıdır. Parola yöneticilerinin gizli işaretlediği içerik kaydedilmez.
-
-### Odak
-
-25/45/50 dakikalık çalışma ve 5 dakikalık mola sayacı. Kalan süre kapalı çentikte görünür.
-
-### Ajanlar
-
-[Claude Code](https://code.claude.com/docs/en/hooks) ve Codex oturumlarının durumu: hangi proje çalışıyor, onay bekliyor ya da bitti. Kapalı çentikte küçük bir damla maskotu durumu gösterir, tıklamak oturumun açık olduğu uygulamaya götürür.
-
-İsteğe bağlı olarak Claude Code'un izin soruları da çentikte açılır. Tam komutu görüp oradan **İzin ver** ya da **Reddet** diyebilirsin. Terminal öndeyse ya da süre dolarsa soru her zamanki gibi terminalde kalır.
-
-Kurulum için ilk açılış tanıtımındaki Ajanlar adımını kullanabilir ya da betiği çalıştırabilirsin:
+Use the Agents step of the first-launch tour (menu bar → **Tour…**), or run the installer from this repository:
 
 ```sh
-# Önce planı gösterir, --apply ile kurar; --approvals çentikten onayı da ekler.
+# Shows the plan first; --apply installs it. Add --approvals to answer Claude Code's prompts from the notch.
 python3 scripts/install-agent-hooks.py --binary /Applications/Damla.app/Contents/MacOS/Damla --apply
 ```
 
-Kurucu mevcut `~/.claude/settings.json` ve `~/.codex/hooks.json` ayarlarını korur ve değiştirdiği dosyaların yedeğini bırakır. Codex'te yeni hook'ları `/hooks` ile onaylamak gerekir.
+The installer keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. In Codex, approve the new hooks once with `/hooks`. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
 
-Hook'lar yalnızca durum bilgisini kaydeder: aşama, araç adı, süre. Mesajlar, komut çıktıları ve konuşmalar okunmaz.
+## Privacy
 
-### Ekranlar
+- No account, no server, no analytics.
+- Your shelf, clipboard history and timer live in `~/Library/Application Support/Damla/`.
+- Now-playing info is read locally from macOS.
+- Only two things ever touch the network: lyrics, if you turn them on (title, artist, album and duration go to [lrclib.net](https://lrclib.net)), and the daily update check.
 
-Varsayılan olarak çentik tüm ekranlarda görünür, panel ise yalnızca farenin olduğu ekranda açılır. Ayarlar → Ekran'dan tek ekran ya da "fareyi izle" seçilebilir. Çentiksiz ekranda sahte çentik yerine menü çubuğunun altında yüzen bir ada da seçilebilir.
+## Building from source
 
-Tam ekran uygulamalarda kapalı çentik menü çubuğuyla birlikte gizlenir, fare üst kenara gidince geri gelir.
-
-### Temizlik modu
-
-Klavyeyi 60 saniye kilitler; ekranı ya da klavyeyi silerken yanlışlıkla bir şey yazılmasın diye. **Esc**'yi 2 saniye basılı tutmak ya da **Kilidi aç** düğmesi erken açar.
-
-## Gizlilik
-
-- Hesap, sunucu ya da analitik yok.
-- Raf, pano ve sayaç verileri `~/Library/Application Support/Damla/` altında tutulur.
-- Müzik bilgisi macOS'un kendi "Şu An Çalıyor" kaydından yerel olarak okunur. (Bu köprü çalışmazsa Apple Events yoluna düşülür; o yolda Spotify kapağı Spotify'ın sunucusundan indirilir.)
-- Ağa çıkan iki şey var: açıksa şarkı sözleri (lrclib.net) ve güncelleme denetimi (bu depodaki `appcast.xml`). Güncelleme denetimi sistem bilgisi göndermez.
-
-## Güncellemeler
-
-Damla günde bir kez yeni sürüme bakar ([Sparkle](https://sparkle-project.org)). Yeni sürüm varsa çentikte bildirim çıkar. İndirilen dosya hem Apple noter onayıyla hem de Damla'nın imza anahtarıyla doğrulanır. Otomatik denetim Ayarlar → Hakkında'dan kapatılabilir.
-
-## Geliştirme
-
-Swift 6 ve Xcode Command Line Tools gerekir.
+You need Swift 6 and the Xcode Command Line Tools.
 
 ```sh
-zsh build.sh                                  # derler, imzalar, ../Damla.app üretir ve kendi testini çalıştırır
-../Damla.app/Contents/MacOS/Damla --self-test # otomatik kontroller
-../Damla.app/Contents/MacOS/Damla --diagnose  # ekranlar, pil, ses, parlaklık ve ses çıkışları
+zsh build.sh                                  # builds and signs ../Damla.app, then runs the self-test
+../Damla.app/Contents/MacOS/Damla --self-test # automated checks
+../Damla.app/Contents/MacOS/Damla --diagnose  # displays, battery, volume, brightness and audio outputs
 ```
 
-- `--debug` ile başlatılan uygulama `app.local.damla.debug` dağıtık bildirimleriyle yönetilebilir (`open`, `close`, `tab-files`, `hud-volume`…). Ekran görüntüsü otomasyonu içindir.
-- `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-agent-hooks.py` hook kurucusunu sınar.
-- **Arayüz dilleri:** Türkçe ve İngilizce. Anahtarlar Türkçe kaynak metinlerdir; İngilizcesi `Resources/en.lproj/Localizable.strings` içindedir.
-- **Kod yapısı:** `Layout.swift` şekil ve pencere ölçülerinin tek kaynağıdır. `PanelController.swift` ekran başına bir pencere yönetir. `MediaSessionStore` medya kararlarını AppKit'ten bağımsız tutar.
+<details>
+<summary>More for developers</summary>
 
-### Yayın
+- **Code map:** `Layout.swift` is the single source of truth for shapes and window sizes. `PanelController.swift` runs one window per display. `MediaSessionStore` keeps the media logic free of AppKit so it can be tested.
+- **Localization:** keys are the Turkish source strings; the English text lives in `Resources/en.lproj/Localizable.strings`.
+- **Automation:** launched with `--debug`, the app listens for `app.local.damla.debug` distributed notifications (`open`, `tab-agents`, `media-showcase`, `files:<paths>`…). With `DAMLA_SUPPORT_DIR` set, a debug run keeps its data in that folder. The screenshots above were made this way with demo data.
+- **Hook tests:** `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-agent-hooks.py`.
+- **Releasing:**
+  1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` and commit.
+  2. Write the release notes to `dist/notes-<version>.md`.
+  3. Run `zsh release.sh`. It builds a universal binary, signs it with Developer ID, notarizes it, signs the update for Sparkle, updates `appcast.xml`, publishes the GitHub Release and updates the Homebrew tap.
 
-`Resources/Info.plist`'te sürümü artırıp (`CFBundleShortVersionString` ve `CFBundleVersion`) commit'le, sürüm notlarını `dist/notes-<sürüm>.md` dosyasına yaz (yoksa son commit mesajı kullanılır) ve çalıştır:
+</details>
 
-```sh
-zsh release.sh
-```
+## Thanks
 
-Betik şunları yapar:
-
-- evrensel derler ve Developer ID ile imzalar;
-- dmg'yi Apple'a noter onayına gönderir;
-- Sparkle anahtarıyla imzalar ve `appcast.xml`'e ekler;
-- GitHub Release oluşturur ve Homebrew tarifini (`erkamyigitaydin/homebrew-tap`) günceller.
-
-Bir kerelik hazırlık: Keychain'de "Developer ID Application" sertifikası, `xcrun notarytool store-credentials damla-notary` ve Sparkle'ın `generate_keys` anahtarı.
-
-## Teşekkürler
-
-- [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (BSD-3, `Vendor/MediaRemoteAdapter`): macOS 15.4 sonrasında "Şu An Çalıyor" verisine erişim.
-- [Sparkle](https://sparkle-project.org): güncellemeler.
-- [LRCLIB](https://lrclib.net): şarkı sözleri.
+- [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (BSD-3, bundled in `Vendor/MediaRemoteAdapter`): now-playing info on modern macOS.
+- [Sparkle](https://sparkle-project.org): updates.
+- [LRCLIB](https://lrclib.net): lyrics.

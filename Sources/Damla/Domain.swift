@@ -94,7 +94,11 @@ enum ClipRules {
 enum DiskStore {
     static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let url = base.appendingPathComponent("Damla", isDirectory: true)
+        var url = base.appendingPathComponent("Damla", isDirectory: true)
+        // `--debug` runs can keep their data elsewhere (README screenshots with demo agents, shelf and clips).
+        if ProcessInfo.processInfo.arguments.contains("--debug"), let custom = ProcessInfo.processInfo.environment["DAMLA_SUPPORT_DIR"] {
+            url = URL(fileURLWithPath: custom, isDirectory: true)
+        }
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
         return url

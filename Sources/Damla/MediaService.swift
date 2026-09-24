@@ -193,6 +193,32 @@ final class MediaService: ObservableObject {
         applyDisplay()
     }
 
+    /// Debug builds only: an English track with drawn cover art, for the README screenshots.
+    func injectShowcase() {
+        let cover = NSImage(size: NSSize(width: 600, height: 600), flipped: false) { rect in
+            NSGradient(colors: [NSColor(red: 0.98, green: 0.45, blue: 0.35, alpha: 1), NSColor(red: 0.93, green: 0.30, blue: 0.55, alpha: 1),
+                                NSColor(red: 0.36, green: 0.22, blue: 0.62, alpha: 1)])?.draw(in: rect, angle: -90)
+            NSColor(red: 1, green: 0.84, blue: 0.55, alpha: 0.95).setFill()
+            NSBezierPath(ovalIn: NSRect(x: 180, y: 230, width: 240, height: 240)).fill()
+            for (index, y) in [150.0, 115, 85, 60].enumerated() {
+                NSColor(red: 0.20, green: 0.10, blue: 0.40, alpha: 0.55 + Double(index) * 0.1).setFill()
+                NSBezierPath(rect: NSRect(x: 0, y: y - 30 * Double(index), width: 600, height: 26)).fill()
+            }
+            return true
+        }
+        let second = NSImage(size: NSSize(width: 64, height: 64), flipped: false) { rect in
+            NSGradient(starting: .systemTeal, ending: .systemBlue)?.draw(in: rect, angle: 45); return true
+        }
+        store.inject([
+            MediaSession(bundleID: "com.spotify.client", title: "Ocean Drive Demo", artist: "Seaside FM", artistKnown: true, playing: false,
+                         duration: 187, position: 40, artwork: second, artworkKey: "showcase-2", accent: .systemTeal),
+            MediaSession(bundleID: MusicSource.music.bundleID, title: "Golden Hour", artist: "Nova Lane", album: "Afterglow", artistKnown: true,
+                         playing: true, duration: 214, position: 81, artwork: cover, artworkKey: "showcase-1",
+                         accent: NSColor(red: 1, green: 0.62, blue: 0.52, alpha: 1))
+        ], active: MusicSource.music.bundleID)
+        applyDisplay()
+    }
+
     /// `--debug` runs append media decisions to /tmp/damla-media.log.
     static let tracing = ProcessInfo.processInfo.arguments.contains("--debug")
     static func trace(_ line: String) {

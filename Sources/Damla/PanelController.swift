@@ -596,6 +596,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case let step where step.hasPrefix("onboarding-"): onboarding.present(page: Int(step.dropFirst(11)))
         case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
         case "media-demo": model.media.injectDemoSessions()
+        case "media-showcase": model.media.injectShowcase()
         case let id where id.hasPrefix("select:"): model.media.select(String(id.dropFirst(7)))
         case let list where list.hasPrefix("tabs:"):   // e.g. tabs:home,focus,agents
             let wanted = Set(list.dropFirst(5).split(separator: ",").compactMap { name in PanelTab.allCases.first { "\($0)" == name } })
@@ -630,6 +631,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "files-demo":
             let base = URL(fileURLWithPath: "/Users/erkamyigitaydin/Desktop/Projects/Damla")
             model.addFiles(["README.md", "Package.swift", "build.sh", "Resources/AppIcon.icns", "Sources/Damla/Views.swift"].map { base.appendingPathComponent($0) })
+        case let list where list.hasPrefix("files:"):   // files:/path/a.png,/path/b.pdf
+            model.addFiles(list.dropFirst(6).split(separator: ",").map { URL(fileURLWithPath: String($0)) })
         case "clip-demo":
             model.clips = [ClipEntry(kind: .text, text: "https://getdroppy.app/changelog"),
                            ClipEntry(kind: .text, text: "Invoice #2041 gönderildi. Cuma ödenmezse hatırlat."),
