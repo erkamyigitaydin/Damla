@@ -14,6 +14,23 @@ if let index = CommandLine.arguments.firstIndex(of: "--agent-event") {
     exit(0)
 }
 
+if let index = CommandLine.arguments.firstIndex(of: "--agent-approval") {
+    // Installed only on request (install-agent-hooks.py --approvals). Prints a decision only when the user
+    // made one in Damla; otherwise nothing, and Claude Code shows its own prompt.
+    if CommandLine.arguments.indices.contains(index + 1),
+       let provider = AgentProvider(rawValue: CommandLine.arguments[index + 1]) {
+        var data = Data()
+        while let chunk = try? FileHandle.standardInput.read(upToCount: 65_536), !chunk.isEmpty {
+            data.append(chunk)
+            if data.count > 2 * 1024 * 1024 { exit(0) }
+        }
+        if let decision = AgentApprovals.handle(provider: provider, input: data, host: ProcessAncestry.hostBundleID()) {
+            FileHandle.standardOutput.write(AgentApprovals.output(decision))
+        }
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--self-test") {
     exit(runSelfTests())
 }

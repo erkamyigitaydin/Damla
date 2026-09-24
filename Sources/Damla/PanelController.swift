@@ -468,6 +468,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model = AppState()
         manager = PanelManager(model: model)
         model.presentSettings = { [weak self] in self?.settings.present() }
+        model.presentPanel = { [weak self] in self?.manager.show() }
         model.start()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "drop", accessibilityDescription: "Damla")
@@ -509,6 +510,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "media-demo": model.media.injectDemoSessions()
         case let body where body.hasPrefix("music:"): model.media.debugMusic(String(body.dropFirst(6)))
         case "render-media": MainActor.assumeIsolated { renderMedia() }
+        case "approval-allow", "approval-deny":
+            if let request = model.agents.approvals.first { model.agents.decide(request, command == "approval-allow" ? .allow : .deny) }
         case "media-sessions": NSLog("Damla media: %@", model.media.sessions.map { "\($0.bundleID) playing=\($0.playing) \($0.title)" }.joined(separator: " | "))
         case "display-notch": model.displayMode = .notch
         case "display-mouse": model.displayMode = .followMouse
@@ -548,7 +551,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let pairs: [(String, AnyView)] = [
             ("home", AnyView(HomeView(model: model, media: model.media).padding(.horizontal, 24).padding(.vertical, 12)
                 .frame(width: Layout.panelWidth, height: Layout.contentHeight))),
-            ("compact", AnyView(CompactRow(model: model, media: model.media, metrics: m).padding(8)))
+            ("compact", AnyView(CompactRow(model: model, media: model.media, metrics: m).padding(8))),
+            ("agents", AnyView(AgentPanelView(service: model.agents).padding(.horizontal, 24).padding(.vertical, 12)
+                .frame(width: Layout.panelWidth, height: Layout.contentHeight)))
         ]
         for (name, view) in pairs {
             let renderer = ImageRenderer(content: view.background(Color.black).environment(\.colorScheme, .dark))

@@ -31,8 +31,26 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("Interrupt", result["hooks"])
         self.assertNotIn("Notification", result["hooks"])
         encoded = json.dumps(result)
-        for forbidden in ["behavior", "allow", "trust", "async", "SubagentStop"]:
+        for forbidden in ["behavior", "allow", "trust", "async", "SubagentStop", "--agent-approval"]:
             self.assertNotIn(forbidden, encoded)
+        # Codex never gets the approval hook, even when asked; Claude only gets it when asked.
+        self.assertNotIn("--agent-approval", json.dumps(installer.merge({}, "codex", Path("/tmp/Damla"), True)))
+        self.assertNotIn("--agent-approval", json.dumps(installer.merge({}, "claude", Path("/tmp/Damla"))))
+
+    def test_approval_hook_is_opt_in_and_removable(self):
+        with_approvals = installer.merge({}, "claude", Path("/tmp/Damla"), True)
+        groups = with_approvals["hooks"]["PermissionRequest"]
+        approval = [h for g in groups for h in g["hooks"] if "--agent-approval" in h["command"]]
+        self.assertEqual(len(approval), 1)
+        self.assertEqual(approval[0]["timeout"], installer.APPROVAL_TIMEOUT)
+        self.assertNotIn("async", approval[0])
+        # The static hook entry never carries a decision; decisions only come from a click at run time.
+        self.assertNotIn("behavior", json.dumps(with_approvals))
+        self.assertEqual(with_approvals, installer.merge(with_approvals, "claude", Path("/tmp/Damla"), True))
+        # Re-running without --approvals takes it out again and leaves the status hooks.
+        without = installer.merge(with_approvals, "claude", Path("/tmp/Damla"))
+        self.assertNotIn("--agent-approval", json.dumps(without))
+        self.assertIn("--agent-event", json.dumps(without["hooks"]["PermissionRequest"]))
 
     def test_apply_backups_and_idempotence(self):
         with tempfile.TemporaryDirectory(prefix="Damla-installer-test-") as tmp:

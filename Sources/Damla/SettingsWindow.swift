@@ -159,8 +159,31 @@ private struct MediaSettings: View {
 
 private struct AgentSettings: View {
     @ObservedObject var agents: AgentStatusService
+    @State private var approvalHookInstalled = AgentSettings.checkApprovalHook()
     var body: some View {
         Form {
+            Section {
+                Toggle(isOn: $agents.approvalsEnabled) {
+                    Text("İzinleri çentikten onayla")
+                    Text("Claude Code bir komut veya dosya için izin isteyince çentik açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin.")
+                }
+                Picker("Bekleme süresi", selection: $agents.approvalWait) {
+                    ForEach(AgentApprovals.waitChoices, id: \.self) { Text("\(Int($0)) sn").tag($0) }
+                }
+                .disabled(!agents.approvalsEnabled)
+                LabeledContent("Onay hook’u") {
+                    Text(approvalHookInstalled ? "Kurulu" : "Kurulu değil").foregroundStyle(approvalHookInstalled ? Color.secondary : Color.orange)
+                }
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sorunun sahibi uygulama (Terminal, Claude…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır.")
+                    if !approvalHookInstalled {
+                        Text("Kurmak için: python3 scripts/install-agent-hooks.py --binary <Damla.app/Contents/MacOS/Damla> --approvals --apply")
+                            .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                    }
+                }
+            }
+            .onAppear { approvalHookInstalled = AgentSettings.checkApprovalHook() }
             Section {
                 Toggle(isOn: $agents.soundEnabled) {
                     Text("Onay beklerken ses çal")
@@ -170,6 +193,13 @@ private struct AgentSettings: View {
                 Text("Durumlar Claude Code ve Codex hook’larıyla gelir. Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
             }
         }
+    }
+
+    /// True when ~/.claude/settings.json runs Damla's approval hook.
+    static func checkApprovalHook() -> Bool {
+        let file = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
+        guard let data = try? Data(contentsOf: file), data.count < 4_000_000 else { return false }
+        return String(decoding: data, as: UTF8.self).contains("--agent-approval")
     }
 }
 

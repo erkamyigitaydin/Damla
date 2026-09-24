@@ -304,6 +304,16 @@ enum AgentEventStore {
 final class AgentStatusService: ObservableObject {
     @Published private(set) var sessions: [AgentSession] = []
     @Published private(set) var todayTurns = 0
+    /// Permission prompts waiting for an answer from the notch, oldest first.
+    @Published private(set) var approvals: [ApprovalRequest] = []
+    @Published var approvalsEnabled = AgentApprovals.enabled {
+        didSet { UserDefaults.standard.set(approvalsEnabled, forKey: AgentApprovals.enabledKey) }
+    }
+    @Published var approvalWait = AgentApprovals.wait {
+        didSet { UserDefaults.standard.set(approvalWait, forKey: AgentApprovals.waitKey) }
+    }
+    /// Called with each request that just arrived.
+    var onApproval: ((ApprovalRequest) -> Void)?
     @Published var soundEnabled = UserDefaults.standard.bool(forKey: "agentSound") {
         didSet { UserDefaults.standard.set(soundEnabled, forKey: "agentSound") }
     }
@@ -319,8 +329,14 @@ final class AgentStatusService: ObservableObject {
         timer.setEventHandler { [weak self] in
             let records = AgentEventStore.read()
             let turns = AgentEventStore.todayTurns()
+            // Hooks wait for the notch only while this heartbeat is fresh; with the setting off they never do.
+            if AgentApprovals.enabled { AgentApprovals.heartbeat() }
+            let approvals = AgentApprovals.enabled ? AgentApprovals.pending() : []
             DispatchQueue.main.async {
                 guard let self else { return }
+                let known = Set(self.approvals.map(\.id))
+                if approvals != self.approvals { self.approvals = approvals }
+                for request in approvals where !known.contains(request.id) { self.onApproval?(request) }
                 if self.loaded {
                     for record in records where record.phase == .waiting || record.phase == .done || record.phase == .failed {
                         if let old = self.sessions.first(where: { $0.id == record.id }), old.phase != record.phase,
@@ -347,6 +363,12 @@ final class AgentStatusService: ObservableObject {
     func open(_ provider: AgentProvider) {
         guard let url = provider.appURL else { return }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration(), completionHandler: nil)
+    }
+    /// Answers a waiting prompt; the hook picks the decision up within 0.2 s.
+    func decide(_ request: ApprovalRequest, _ decision: ApprovalDecision) {
+        AgentApprovals.decide(request.id, decision)
+        approvals.removeAll { $0.id == request.id }
+        onRefresh?()
     }
     func remove(_ session: AgentSession) {
         AgentEventStore.remove(id: session.id)

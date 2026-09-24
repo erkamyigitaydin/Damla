@@ -77,6 +77,9 @@ struct AgentPanelView: View {
             let now = context.date
             let active = service.sessions.filter { $0.isActive(at: now) }
             let history = service.sessions.filter { !$0.isActive(at: now) }
+            if let request = service.approvals.first(where: { $0.deadline > now }) {
+                ApprovalCard(request: request, waiting: service.approvals.count, now: now, service: service)
+            } else {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(AgentText.summary(service.sessions, turns: service.todayTurns, at: now))
@@ -116,6 +119,82 @@ struct AgentPanelView: View {
                     }.scrollIndicators(.hidden)
                 }
             }
+            }
+        }
+    }
+}
+
+/// A permission prompt answered from the notch. The exact command or path is always shown in full (scrollable,
+/// selectable): allowing something unseen would defeat the point of asking.
+struct ApprovalCard: View {
+    let request: ApprovalRequest
+    let waiting: Int
+    let now: Date
+    @ObservedObject var service: AgentStatusService
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                if let icon = request.provider.icon {
+                    Image(nsImage: icon).resizable().frame(width: 16, height: 16)
+                }
+                Text(request.project).font(.system(size: 11.5, weight: .semibold)).lineLimit(1)
+                Text(Self.title(for: request.tool)).font(.system(size: 11)).foregroundStyle(Theme.amber).lineLimit(1)
+                Spacer(minLength: 4)
+                if waiting > 1 {
+                    Text("+\(waiting - 1)").font(.system(size: 9.5, weight: .semibold, design: .rounded)).foregroundStyle(Theme.dim)
+                        .padding(.horizontal, 5).padding(.vertical, 1).background(Theme.fill, in: Capsule())
+                        .help("\(waiting - 1) istek daha bekliyor")
+                }
+                Text("\(max(0, Int(request.deadline.timeIntervalSince(now).rounded()))) sn")
+                    .font(.system(size: 9.5, weight: .medium, design: .rounded)).monospacedDigit().foregroundStyle(Theme.faint)
+                    .help("Süre dolunca soru terminalde sorulur")
+            }
+            ScrollView {
+                Text(request.summary.isEmpty ? request.tool : request.summary)
+                    .font(.system(size: 10.5, design: .monospaced)).foregroundStyle(.white.opacity(0.92))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+            }
+            .frame(maxHeight: 66)
+            .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.08), lineWidth: 0.5))
+            if !request.detail.isEmpty {
+                Text(request.detail).font(.system(size: 10)).foregroundStyle(Theme.dim).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+                Button { activateHost() } label: {
+                    Label(hostName.map { "\($0)’a git" } ?? "Terminale git", systemImage: "arrow.up.forward.app")
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
+                }.buttonStyle(.plain).help("Soruyu orada yanıtla")
+                Spacer()
+                Button("Reddet") { service.decide(request, .deny) }
+                    .font(.system(size: 11, weight: .medium)).buttonStyle(PillStyle())
+                Button("İzin ver") { service.decide(request, .allow) }
+                    .font(.system(size: 11, weight: .semibold)).buttonStyle(PillStyle(accent: true))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+    }
+
+    private var hostName: String? { request.host.flatMap(AppIcons.name(bundleID:)) }
+
+    private func activateHost() {
+        if let session = service.sessions.first(where: { $0.id == request.session }) { service.activate(session); return }
+        if let host = request.host { NSRunningApplication.runningApplications(withBundleIdentifier: host).first?.activate() }
+    }
+
+    static func title(for tool: String) -> String {
+        switch tool {
+        case "Bash": return "komut çalıştırmak istiyor"
+        case "Edit", "MultiEdit", "NotebookEdit": return "dosya düzenlemek istiyor"
+        case "Write": return "dosya yazmak istiyor"
+        case "Read": return "dosya okumak istiyor"
+        case "WebFetch": return "web sayfası açmak istiyor"
+        case "WebSearch": return "web’de aramak istiyor"
+        default: return tool.hasPrefix("mcp__") ? "\(tool.components(separatedBy: "__").dropFirst().first ?? "MCP") aracını kullanmak istiyor" : "\(tool) kullanmak istiyor"
         }
     }
 }

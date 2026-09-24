@@ -69,6 +69,9 @@ final class AppState: ObservableObject {
     var requestQuickLook: ((Int?) -> Void)?
     var requestShare: ((URL) -> Void)?
     var presentSettings: (() -> Void)?
+    var presentPanel: (() -> Void)?
+    private var openedForApproval = false   // the panel opened itself for a permission prompt
+    private var pinnedBeforeApproval = false
     private var pinnedBeforeCleaning = false
 
     func state(for screenID: UInt32) -> NotchState {
@@ -97,8 +100,21 @@ final class AppState: ObservableObject {
             self.pinnedOpen = self.pinnedBeforeCleaning
             if self.hideSystemHUD { self.keys.start(prompt: false) }
         }
+        agents.onApproval = { [weak self] _ in
+            // A permission prompt needs an answer: open on the agents tab, where the approval card waits.
+            guard let self, !self.cleaning.active else { return }
+            if !self.expanded { self.openedForApproval = true; self.pinnedBeforeApproval = self.pinnedOpen }
+            self.select(.agents)
+            self.presentPanel?()
+        }
         agents.onRefresh = { [weak self] in
             guard let self else { return }
+            if self.openedForApproval && self.agents.approvals.isEmpty {
+                // Answered (here or in the terminal) or timed out: give the notch back.
+                self.openedForApproval = false
+                self.pinnedOpen = self.pinnedBeforeApproval
+                if !self.pinnedOpen { self.expanded = false }
+            }
             let badge = self.agents.sessions.first { $0.visibleInNotch(at: Date()) }
             if self.agentBadge != badge { self.agentBadge = badge }
         }

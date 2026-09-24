@@ -9,10 +9,12 @@ import shlex
 import tempfile
 
 MARKER = "Damla durumunu güncelle"
+APPROVAL_MARKER = "Damla onayı bekleniyor · çentikten yanıtla"
+APPROVAL_TIMEOUT = 150  # longer than the longest wait offered in Damla (120 s)
 COMMON = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "Stop", "SessionEnd"]
 
 
-def merge(original, provider, binary):
+def merge(original, provider, binary, approvals=False):
     data = json.loads(json.dumps(original))
     hooks = data.setdefault("hooks", {})
     if not isinstance(hooks, dict):
@@ -25,7 +27,8 @@ def merge(original, provider, binary):
         for group in groups:
             copy = dict(group)
             handlers = copy.get("hooks", [])
-            ours = lambda h: h.get("statusMessage") == MARKER and "--agent-event" in h.get("command", "")
+            ours = lambda h: ((h.get("statusMessage") == MARKER and "--agent-event" in h.get("command", ""))
+                              or (h.get("statusMessage") == APPROVAL_MARKER and "--agent-approval" in h.get("command", "")))
             copy["hooks"] = [h for h in handlers if not ours(h)]
             if copy["hooks"] or not handlers:
                 kept.append(copy)
@@ -37,6 +40,12 @@ def merge(original, provider, binary):
         if event == "Notification":
             group["matcher"] = "permission_prompt|elicitation_dialog"
         hooks.setdefault(event, []).append(group)
+    # Opt-in: lets the user answer Claude Code's permission prompts from the notch. The hook prints a decision
+    # only when the user clicked one in Damla; otherwise nothing, and Claude Code asks as usual.
+    if approvals and provider == "claude":
+        hooks.setdefault("PermissionRequest", []).append({"hooks": [{
+            "type": "command", "command": shlex.quote(str(binary)) + " --agent-approval " + provider,
+            "timeout": APPROVAL_TIMEOUT, "statusMessage": APPROVAL_MARKER}]})
     return data
 
 
@@ -58,6 +67,8 @@ def main():
     parser.add_argument("--home", type=Path, default=Path.home())
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--approvals", action="store_true",
+                        help="Claude Code izin sorularını çentikten yanıtlamayı da kur (yalnızca Claude Code)")
     args = parser.parse_args()
     if not args.binary.is_file():
         parser.error("Damla uygulaması bulunamadı")
@@ -65,7 +76,7 @@ def main():
     for provider, path in [("claude", args.home / ".claude/settings.json"), ("codex", args.home / ".codex/hooks.json")]:
         old = path.read_bytes() if path.exists() else None
         original = json.loads(old) if old else {}
-        updated = merge(original, provider, args.binary.resolve())
+        updated = merge(original, provider, args.binary.resolve(), args.approvals)
         if updated == original:
             print(provider + ": zaten kurulu")
             continue
