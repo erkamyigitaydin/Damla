@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.7.0</title>
+      <pubDate>Thu, 24 Sep 2026 21:19:30 +0000</pubDate>
+      <sparkle:version>12</sparkle:version>
+      <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Ses kontrolü, şarkı sözleri, İngilizce arayüz ve çok daha az işlemci.</p><p>- Şarkı sözleri: sağ alttaki düğmeyle panel uzar, sözler Apple Music tarzında oynatıcının altında akar; şarkı değişince başa döner.</p><p>- Ses: çıkış aygıtı seçici (değişince HUD), Music/Spotify ve uygulama bazında ses seviyesi, sesi kısma modu.</p><p>- Çentikte kaydırma: ses seviyesini değiştir ya da parça atla.</p><p>- AirPods şarj HUD&#x27;u ve Apple Music&#x27;te favoriye ekleme.</p><p>- Vurgu rengi albüm kapağından gelir; açık panelde okunabilirlik için hafif perde.</p><p>- Yenilenen Ajanlar sayfası ve Damla maskotu.</p><p>- İlk açılış rehberi; Claude Code hook&#x27;ları artık uygulamanın içinden kurulabilir.</p><p>- İngilizce arayüz ve Ayarlar&#x27;dan dil seçimi.</p><p>- Homebrew ile kurulum: `brew install --cask erkamyigitaydin/tap/damla`.</p><p>- Kapalı çentik çok daha az işlemci kullanır (müzik + ajan çalışırken ~%15 → ~%3); menü çubuğu denetimi de artık yalnızca gerektiğinde sık çalışır.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.7.0/Damla-0.7.0.dmg" length="5102766" type="application/octet-stream" sparkle:edSignature="l5CaGz6y69bxyo5FW1/JauRSbmFkvPWdby0jaAMDvGJFT1nLLYhWjYN1sKTahO8UCnGHjxPvwNXq1jF3dcJMAw=="/>
+    </item>
+    <item>
       <title>Damla 0.6.1</title>
       <pubDate>Thu, 24 Sep 2026 18:30:16 +0000</pubDate>
       <sparkle:version>11</sparkle:version>
