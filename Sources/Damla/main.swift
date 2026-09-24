@@ -32,6 +32,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--agent-approval") {
 }
 
 if CommandLine.arguments.contains("--self-test") {
+    // The checks compare Turkish texts; run them in Turkish whatever the Mac's language is.
+    UserDefaults.standard.setVolatileDomain(["AppleLanguages": ["tr"]], forName: UserDefaults.argumentDomain)
     exit(runSelfTests())
 }
 

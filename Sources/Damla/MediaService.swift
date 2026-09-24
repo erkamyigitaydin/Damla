@@ -14,7 +14,7 @@ enum HandoffMode: String, CaseIterable, Identifiable {
     case pause, duck, off
     var id: String { rawValue }
     var title: String {
-        switch self { case .pause: return "Duraklat"; case .duck: return "Sesini kıs"; case .off: return "Hiçbir şey yapma" }
+        switch self { case .pause: return String(localized: "Duraklat"); case .duck: return String(localized: "Sesini kıs"); case .off: return String(localized: "Hiçbir şey yapma") }
     }
     static let duckLevel = 0.2   // ducked music plays at a fifth of its volume
 
@@ -28,8 +28,8 @@ enum HandoffMode: String, CaseIterable, Identifiable {
 final class MediaService: ObservableObject {
     @Published var source: MusicSource = MusicSource(rawValue: UserDefaults.standard.string(forKey: "musicSource") ?? "") ?? .music
     @Published var connected = UserDefaults.standard.bool(forKey: "musicConnected")
-    @Published var title = "Müziğine yer aç"
-    @Published var artist = "Apple Music veya Spotify’ı bağla."
+    @Published var title = String(localized: "Müziğine yer aç")
+    @Published var artist = String(localized: "Apple Music veya Spotify’ı bağla.")
     @Published private(set) var album = ""
     /// The player named the artist itself: a real song worth looking up lyrics for.
     @Published private(set) var artistKnown = false
@@ -99,7 +99,7 @@ final class MediaService: ObservableObject {
     }
     private func startBridge() {
         bridgeActive = true; connected = true; status = nil
-        title = "Müzik"; artist = "Bir şey çal: Müzik, Spotify, Safari…"
+        title = String(localized: "Müzik"); artist = String(localized: "Bir şey çal: Müzik, Spotify, Safari…")
         bridge.onUpdate = { [weak self] item, image in self?.bridgeUpdate(item, image) }
         bridge.start()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -161,7 +161,7 @@ final class MediaService: ObservableObject {
         sessions = store.sessions
         guard let session = store.displayed else {
             hasTrack = false; playing = false; artwork = nil; accent = nil; sourceBundleID = nil; controllable = true
-            title = "Müzik"; artist = "Bir şey çal: Müzik, Spotify, Safari…"
+            title = String(localized: "Müzik"); artist = String(localized: "Bir şey çal: Müzik, Spotify, Safari…")
             return
         }
         let live = store.isLive(session)
@@ -240,7 +240,7 @@ final class MediaService: ObservableObject {
     private func noticeDenied(_ id: String) {
         guard !deniedNoticeShown else { return }
         deniedNoticeShown = true
-        onNotice?("\(Self.appName(for: id)) için otomasyon izni kapalı · Sistem Ayarları → Gizlilik → Otomasyon")
+        onNotice?(String(localized: "\(Self.appName(for: id)) için otomasyon izni kapalı · Sistem Ayarları → Gizlilik → Otomasyon"))
     }
 
     // MARK: Handoff
@@ -367,7 +367,7 @@ final class MediaService: ObservableObject {
         UserDefaults.standard.set(true, forKey: "musicConnected")
         if !isRunning {
             guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: source.bundleID) else {
-                status = "\(source.rawValue) bu Mac’te yüklü değil."; return
+                status = String(localized: "\(source.rawValue) bu Mac’te yüklü değil."); return
             }
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) { self.refresh() }
@@ -377,7 +377,7 @@ final class MediaService: ObservableObject {
     func disconnect() {
         guard !bridgeActive else { return }
         generation += 1; connected = false; hasTrack = false; playing = false; artwork = nil; accent = nil
-        title = "Müziğine yer aç"; artist = "Apple Music veya Spotify’ı bağla."; status = nil
+        title = String(localized: "Müziğine yer aç"); artist = String(localized: "Apple Music veya Spotify’ı bağla."); status = nil
         UserDefaults.standard.set(false, forKey: "musicConnected")
     }
     var isRunning: Bool { Self.isRunning(source.bundleID) }
@@ -387,7 +387,7 @@ final class MediaService: ObservableObject {
         // The bridge owns the state while it runs; the Apple Events path must not overwrite it.
         guard !bridgeActive, connected, !busy else { return }
         guard isRunning else {
-            playing = false; hasTrack = false; status = "\(source.rawValue) açık değil."; return
+            playing = false; hasTrack = false; status = String(localized: "\(source.rawValue) açık değil."); return
         }
         busy = true; lastRefresh = Date()
         let selected = source, currentGeneration = generation
@@ -404,10 +404,10 @@ final class MediaService: ObservableObject {
                 guard self.generation == currentGeneration, self.connected else { return }
                 if let error {
                     self.playing = false; self.hasTrack = false
-                    self.status = error == -1743 ? "Müzik erişimi kapalı. Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon." : "\(selected.rawValue)’te bir parça aç."
+                    self.status = error == -1743 ? String(localized: "Müzik erişimi kapalı. Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon.") : String(localized: "\(selected.rawValue)’te bir parça aç.")
                     return
                 }
-                self.title = name.isEmpty ? "Bir parça seç" : name; self.artist = artist
+                self.title = name.isEmpty ? String(localized: "Bir parça seç") : name; self.artist = artist
                 self.duration = max(0, duration); self.position = max(0, position); self.positionDate = Date()
                 self.playing = playing; self.hasTrack = !name.isEmpty; self.status = nil
                 let key = "\(selected.rawValue)|\(name)|\(artist)"

@@ -107,17 +107,17 @@ final class SystemMonitor {
         let brightness = brightnessValue()
         onLevels?(volume, brightness, muted)
         if let volume, let oldVolume, abs(volume - oldVolume) > 0.005 || muted != oldMuted {
-            onHUD?(muted ? "speaker.slash.fill" : "speaker.wave.2.fill", muted ? "Ses kapalı" : "Ses", muted ? 0 : Double(volume))
+            onHUD?(muted ? "speaker.slash.fill" : "speaker.wave.2.fill", muted ? String(localized: "Ses kapalı") : String(localized: "Ses"), muted ? 0 : Double(volume))
         }
         if let brightness, let oldBrightness, abs(brightness - oldBrightness) > 0.009 {
-            onHUD?("sun.max.fill", "Parlaklık", Double(brightness))
+            onHUD?("sun.max.fill", String(localized: "Parlaklık"), Double(brightness))
         }
         oldVolume = volume; oldBrightness = brightness; oldMuted = muted
         if tickCount % 5 == 0 {
             let battery = Self.battery()
             onBattery?(battery)
             if let oldPlugged, oldPlugged != battery.plugged {
-                onHUD?(battery.symbol, battery.plugged ? "Şarja bağlandı" : "Pil kullanılıyor", Double(battery.percentage) / 100)
+                onHUD?(battery.symbol, battery.plugged ? String(localized: "Şarja bağlandı") : String(localized: "Pil kullanılıyor"), Double(battery.percentage) / 100)
             }
             oldPlugged = battery.plugged
         }
@@ -145,7 +145,7 @@ final class SystemMonitor {
         let (applied, nowMuted) = Self.audio()
         oldVolume = applied ?? value; oldMuted = nowMuted
         onLevels?(applied ?? value, brightnessValue(), nowMuted)
-        onHUD?(nowMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", nowMuted ? "Ses kapalı" : "Ses", nowMuted ? 0 : Double(applied ?? value))
+        onHUD?(nowMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", nowMuted ? String(localized: "Ses kapalı") : String(localized: "Ses"), nowMuted ? 0 : Double(applied ?? value))
         if feedback { Self.feedbackSound?.stop(); Self.feedbackSound?.play() }
     }
     func toggleMute() {
@@ -154,7 +154,7 @@ final class SystemMonitor {
         let (applied, nowMuted) = Self.audio()
         oldVolume = applied ?? volume; oldMuted = nowMuted
         onLevels?(applied ?? volume, brightnessValue(), nowMuted)
-        onHUD?(nowMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", nowMuted ? "Ses kapalı" : "Ses", nowMuted ? 0 : Double(applied ?? volume ?? 0))
+        onHUD?(nowMuted ? "speaker.slash.fill" : "speaker.wave.2.fill", nowMuted ? String(localized: "Ses kapalı") : String(localized: "Ses"), nowMuted ? 0 : Double(applied ?? volume ?? 0))
     }
     func adjustBrightness(by delta: Float) {
         guard let setter = brightnessSetter, let id = builtInDisplayID, let current = brightnessValue() else { return }
@@ -163,7 +163,7 @@ final class SystemMonitor {
         let applied = brightnessValue() ?? value
         oldBrightness = applied
         onLevels?(oldVolume, applied, oldMuted ?? false)
-        onHUD?("sun.max.fill", "Parlaklık", Double(applied))
+        onHUD?("sun.max.fill", String(localized: "Parlaklık"), Double(applied))
     }
     private static func defaultOutputDevice() -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,

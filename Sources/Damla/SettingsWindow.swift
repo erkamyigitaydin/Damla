@@ -15,7 +15,8 @@ final class SettingsWindowController: NSWindowController {
         tabs = NSTabViewController()
         tabs.tabStyle = .toolbar
         tabs.transitionOptions = [.allowUserInteraction, .crossfade]
-        func tab<Content: View>(_ title: String, _ symbol: String, _ content: Content) -> NSTabViewItem {
+        func tab<Content: View>(_ title: String.LocalizationValue, _ symbol: String, _ content: Content) -> NSTabViewItem {
+            let title = String(localized: title)
             let size = SettingsWindowController.contentSize
             let host = NSHostingController(rootView: content.formStyle(.grouped).frame(width: size.width, height: size.height))
             host.sizingOptions = []
@@ -57,6 +58,8 @@ final class SettingsWindowController: NSWindowController {
 
 private struct GeneralSettings: View {
     @ObservedObject var model: AppState
+    @State private var language = AppLanguage.current
+    @State private var restartNeeded = AppLanguage.pendingRestart
     var body: some View {
         Form {
             Section {
@@ -66,6 +69,20 @@ private struct GeneralSettings: View {
                 Toggle(isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) })) {
                     Text("Pano geçmişini tut")
                     Text("Kopyaladığın metin ve görseller Pano sekmesinde listelenir. Parola yöneticilerinden gelenler atlanır.")
+                }
+            }
+            Section {
+                Picker(selection: $language) {
+                    ForEach(AppLanguage.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    Text("Dil")
+                    Text("Değişiklik Damla yeniden açılınca uygulanır.")
+                }
+                .onChange(of: language) { _, picked in AppLanguage.set(picked); restartNeeded = AppLanguage.pendingRestart }
+                if restartNeeded {
+                    LabeledContent {
+                        Button("Yeniden başlat") { AppLanguage.relaunch() }
+                    } label: { Text("Yeni dil için Damla’yı yeniden başlat") }
                 }
             }
             Section("Kısayol") {
@@ -94,7 +111,7 @@ private struct PanelSettings: View {
                     let on = model.enabledTabs.contains(tab)
                     Toggle(isOn: Binding(get: { on }, set: { model.setTab(tab, enabled: $0) })) {
                         Label {
-                            Text(tab.rawValue)
+                            Text(tab.title)
                             Text(tab.summary)
                         } icon: {
                             Image(systemName: tab.icon)
@@ -126,16 +143,16 @@ private struct DisplaySettings: View {
         Form {
             Section {
                 Picker(selection: $model.displayMode) {
-                    ForEach(DisplayMode.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(DisplayMode.allCases) { Text($0.title).tag($0) }
                 } label: {
                     Text("Gösterilen ekranlar")
                     Text(displayHint)
                 }
                 Picker(selection: $model.externalStyle) {
-                    ForEach(ExternalStyle.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(ExternalStyle.allCases) { Text($0.title).tag($0) }
                 } label: {
                     Text("Çentiksiz ekranda")
-                    Text(model.externalStyle == .menuBar ? "Menü çubuğuna çentik biçiminde oturur." : "Menü çubuğunun hemen altında yüzen bir hap.")
+                    Text(model.externalStyle == .menuBar ? "Menü çubuğuna çentik biçiminde oturur." as LocalizedStringKey : "Menü çubuğunun hemen altında yüzen bir hap.")
                 }
             }
             .onChange(of: model.displayMode) { _, _ in model.savePreferences() }
@@ -157,9 +174,9 @@ private struct DisplaySettings: View {
     }
     private var displayHint: String {
         switch model.displayMode {
-        case .all: return "Her ekranın üstünde ayrı bir çentik."
-        case .followMouse: return "Yalnızca imlecin bulunduğu ekranda."
-        case .notch: return "Yalnızca çentikli yerleşik ekranda."
+        case .all: return String(localized: "Her ekranın üstünde ayrı bir çentik.")
+        case .followMouse: return String(localized: "Yalnızca imlecin bulunduğu ekranda.")
+        case .notch: return String(localized: "Yalnızca çentikli yerleşik ekranda.")
         }
     }
 }
@@ -301,6 +318,36 @@ private struct AboutSettings: View {
                     Text("Damla’dan çık")
                 }
             }
+        }
+    }
+}
+
+/// The language Damla shows: the Mac's own, or one picked here (stored as the app's AppleLanguages).
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case system, tr, en
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .system: return String(localized: "Sistem"); case .tr: return "Türkçe"; case .en: return "English" }
+    }
+    static var current: AppLanguage {
+        guard let saved = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "")?["AppleLanguages"] as? [String],
+              let first = saved.first else { return .system }
+        return first.hasPrefix("tr") ? .tr : .en
+    }
+    /// Set once a different language is picked, until Damla restarts.
+    nonisolated(unsafe) static var pendingRestart = false
+    static func set(_ language: AppLanguage) {
+        guard language != current else { return }
+        if language == .system { UserDefaults.standard.removeObject(forKey: "AppleLanguages") }
+        else { UserDefaults.standard.set([language.rawValue], forKey: "AppleLanguages") }
+        pendingRestart = true
+    }
+    /// Opens a fresh copy of Damla and quits this one.
+    static func relaunch() {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
         }
     }
 }

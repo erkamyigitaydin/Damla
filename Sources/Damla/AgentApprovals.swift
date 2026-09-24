@@ -67,7 +67,7 @@ enum AgentApprovals {
     /// The hook's stdout for Claude Code's PermissionRequest decision control.
     static func output(_ decision: ApprovalDecision) -> Data {
         var inner: [String: Any] = ["behavior": decision.rawValue]
-        if decision == .deny { inner["message"] = "Kullanıcı Damla'dan reddetti." }
+        if decision == .deny { inner["message"] = String(localized: "Kullanıcı Damla'dan reddetti.") }
         let object: [String: Any] = ["hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": inner]]
         return (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
     }
@@ -100,7 +100,7 @@ enum AgentApprovals {
         let cwd = event["cwd"] as? String ?? ""
         let (summary, detail) = Self.summary(tool: tool, input: event["tool_input"] as? [String: Any] ?? [:])
         let request = ApprovalRequest(id: UUID().uuidString, session: AgentSession.identifier(provider: provider, session: sessionKey),
-                                      provider: provider, project: cwd.isEmpty ? "Oturum" : clean(URL(fileURLWithPath: cwd).lastPathComponent, limit: 80),
+                                      provider: provider, project: cwd.isEmpty ? String(localized: "Oturum") : clean(URL(fileURLWithPath: cwd).lastPathComponent, limit: 80),
                                       tool: clean(tool, limit: 120), summary: summary, detail: detail, host: host,
                                       created: start, deadline: start.addingTimeInterval(env.wait()))
         guard write(request, directory: directory) else { return nil }

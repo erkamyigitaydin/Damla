@@ -235,8 +235,8 @@ final class PanelController {
         for action in actions {
             switch action {
             case .volume(let steps): model.monitor.adjustVolume(by: Float(steps) / 16, feedback: false)
-            case .next: model.media.command("next track"); model.showHUD("forward.fill", "Sonraki parça", 1)
-            case .previous: model.media.command("previous track"); model.showHUD("backward.fill", "Önceki parça", 1)
+            case .next: model.media.command("next track"); model.showHUD("forward.fill", String(localized: "Sonraki parça"), 1)
+            case .previous: model.media.command("previous track"); model.showHUD("backward.fill", String(localized: "Önceki parça"), 1)
             }
         }
     }
@@ -507,13 +507,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "drop", accessibilityDescription: "Damla")
         let menu = NSMenu()
-        menu.addItem(withTitle: "Damla’yı aç", action: #selector(showPanel), keyEquivalent: "")
-        menu.addItem(withTitle: "Ayarlar", action: #selector(showSettings), keyEquivalent: ",")
-        menu.addItem(withTitle: "Tanıtım…", action: #selector(showOnboarding), keyEquivalent: "")
-        menu.addItem(withTitle: "Temizlik modu · 60 sn", action: #selector(startCleaning), keyEquivalent: "")
-        menu.addItem(withTitle: "Güncellemeleri denetle…", action: #selector(checkForUpdates), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "Damla’yı aç"), action: #selector(showPanel), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "Ayarlar"), action: #selector(showSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: String(localized: "Tanıtım…"), action: #selector(showOnboarding), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "Temizlik modu · 60 sn"), action: #selector(startCleaning), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "Güncellemeleri denetle…"), action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Damla’dan çık", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: String(localized: "Damla’dan çık"), action: #selector(quit), keyEquivalent: "q")
         for item in menu.items { item.target = self }
         statusItem.menu = menu
         registerShortcut()
@@ -637,7 +637,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }, 1, &event, Unmanaged.passUnretained(self).toOpaque(), &eventHandler)
         let identifier = EventHotKeyID(signature: 0x444D4C41, id: 1)
         let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), identifier, GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { model.showNotice("Kısayol kullanılıyor. Menüdeki damladan açabilirsin.") }
+        if status != noErr { model.showNotice(String(localized: "Kısayol kullanılıyor. Menüdeki damladan açabilirsin.")) }
     }
     func applicationWillTerminate(_ notification: Notification) {
         model.media.restoreDucked()   // never leave the music quiet after a ducked handoff

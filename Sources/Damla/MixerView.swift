@@ -10,10 +10,10 @@ struct MixerView: View {
     @ObservedObject var apps: AppVolumeController
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PaneHeader(title: "Ses seviyesi") { withAnimation(Theme.quick) { model.homePane = .player } }
+            PaneHeader(title: Text("Ses seviyesi")) { withAnimation(Theme.quick) { model.homePane = .player } }
             ScrollView {
                 VStack(spacing: 7) {
-                    MixerRow(icon: Image(systemName: model.muted ? "speaker.slash.fill" : "speaker.wave.2.fill"), name: "Sistem",
+                    MixerRow(icon: Image(systemName: model.muted ? "speaker.slash.fill" : "speaker.wave.2.fill"), name: String(localized: "Sistem"),
                              value: Double(model.volume ?? 0) * 100) { SystemMonitor.setVolume(Float($0 / 100)) }
                     ForEach(media.scriptablePlayers, id: \.self) { id in
                         MixerRow(icon: MediaService.icon(for: id).map { Image(nsImage: $0) } ?? Image(systemName: "music.note"),
@@ -95,7 +95,7 @@ struct OutputsView: View {
     @ObservedObject var model: AppState
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PaneHeader(title: "Ses çıkışı") { withAnimation(Theme.quick) { model.homePane = .player } }
+            PaneHeader(title: Text("Ses çıkışı")) { withAnimation(Theme.quick) { model.homePane = .player } }
             ScrollView {
                 VStack(spacing: 4) {
                     ForEach(model.outputs) { output in
@@ -126,11 +126,11 @@ struct OutputsView: View {
 
 /// Title and close button shared by the panes that replace the player on Özet.
 struct PaneHeader: View {
-    let title: String
+    let title: Text
     let close: () -> Void
     var body: some View {
         HStack {
-            Text(title).font(.system(size: 15, weight: .semibold))
+            title.font(.system(size: 15, weight: .semibold)).lineLimit(1)
             Spacer()
             IconButton(icon: "xmark", label: "Kapat", size: 24, action: close)
         }
@@ -144,10 +144,10 @@ struct LyricsView: View {
     @ObservedObject var lyrics: LyricsService
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            PaneHeader(title: media.title) { withAnimation(Theme.quick) { model.homePane = .player } }
+            PaneHeader(title: Text(verbatim: media.title)) { withAnimation(Theme.quick) { model.homePane = .player } }
             if lyrics.lyrics.lines.isEmpty {
                 ScrollView {
-                    Text(lyrics.lyrics.instrumental ? "Enstrümantal" : lyrics.lyrics.plain)
+                    Text(lyrics.lyrics.instrumental ? String(localized: "Enstrümantal") : lyrics.lyrics.plain)
                         .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.85))
                         .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
                 }.scrollIndicators(.hidden)
@@ -189,7 +189,7 @@ struct SourcesView: View {
     @ObservedObject var media: MediaService
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PaneHeader(title: "Kaynaklar") { withAnimation(Theme.quick) { model.homePane = .player } }
+            PaneHeader(title: Text("Kaynaklar")) { withAnimation(Theme.quick) { model.homePane = .player } }
             ScrollView {
                 VStack(spacing: 4) {
                     ForEach(media.sessions) { session in
@@ -216,7 +216,7 @@ struct SourcesView: View {
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(session.title.isEmpty ? MediaService.appName(for: session.bundleID) : session.title)
                                             .font(.system(size: 11.5, weight: shown ? .semibold : .medium)).lineLimit(1)
-                                        Text(live ? session.artist : "\(MediaService.appName(for: session.bundleID)) · arka planda")
+                                        Text(live ? session.artist : String(localized: "\(MediaService.appName(for: session.bundleID)) · arka planda"))
                                             .font(.system(size: 10)).foregroundStyle(Theme.dim).lineLimit(1)
                                     }
                                     Spacer(minLength: 6)

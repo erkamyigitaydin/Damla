@@ -48,6 +48,7 @@ SPARKLE_BIN="$(dirname "$(find "$BUILD_DIR/artifacts" -type f -name sign_update 
 cp "$BIN" "$APP/Contents/MacOS/Damla"
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP/Contents/Info.plist"
 [[ -f "$PROJECT_DIR/Resources/AppIcon.icns" ]] && cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP/Contents/Resources/"
+for lproj in "$PROJECT_DIR"/Resources/*.lproj; do cp -R "$lproj" "$APP/Contents/Resources/"; done
 ADAPTER_SRC="$PROJECT_DIR/Vendor/MediaRemoteAdapter"
 ADAPTER_DST="$APP/Contents/Resources/MediaRemoteAdapter"
 mkdir -p "$ADAPTER_DST"

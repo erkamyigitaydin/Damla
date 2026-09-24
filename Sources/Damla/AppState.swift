@@ -5,19 +5,25 @@ import ServiceManagement
 import UniformTypeIdentifiers
 
 enum PanelTab: String, CaseIterable, Identifiable {
-    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", agents = "Agent’lar"
+    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", agents = "Agent’lar"   // raw values are stored settings
     var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .home: return String(localized: "Özet"); case .files: return String(localized: "Dosyalar"); case .clipboard: return String(localized: "Pano")
+        case .focus: return String(localized: "Odak"); case .agents: return String(localized: "Agent’lar")
+        }
+    }
     var icon: String {
         switch self { case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"; case .agents: return "terminal" }
     }
     /// One line for the settings page that turns pages on and off.
     var summary: String {
         switch self {
-        case .home: return "Şimdi çalan, pil, ses ve odak sayacı"
-        case .files: return "Sürükleyip bıraktığın dosyalar; kapalıyken sürükleme tepsisi de açılmaz"
-        case .clipboard: return "Kopyaladıkların; geçmişi tutmayı Genel’den ayrıca kapatabilirsin"
-        case .focus: return "Pomodoro sayacı"
-        case .agents: return "Claude Code ve Codex oturumları; izin soruları kapalıyken de gelir"
+        case .home: return String(localized: "Şimdi çalan, ses ve odak sayacı")
+        case .files: return String(localized: "Sürükleyip bıraktığın dosyalar; kapalıyken sürükleme tepsisi de açılmaz")
+        case .clipboard: return String(localized: "Kopyaladıkların; geçmişi tutmayı Genel’den ayrıca kapatabilirsin")
+        case .focus: return String(localized: "Pomodoro sayacı")
+        case .agents: return String(localized: "Claude Code ve Codex oturumları; izin soruları kapalıyken de gelir")
         }
     }
     /// Pages the user keeps in the panel, in the fixed order; never empty.
@@ -189,12 +195,12 @@ final class AppState: ObservableObject {
         agents.start()
         updater.onUpdateFound = { [weak self] version in
             guard let self else { return }
-            self.showNotice("Damla \(version) hazır · yüklemek için dokun", duration: 12) { [weak self] in self?.updater.checkForUpdates() }
-            self.showHUD("arrow.down.circle.fill", "Damla \(version) hazır", 1)
+            self.showNotice(String(localized: "Damla \(version) hazır · yüklemek için dokun"), duration: 12) { [weak self] in self?.updater.checkForUpdates() }
+            self.showHUD("arrow.down.circle.fill", String(localized: "Damla \(version) hazır"), 1)
         }
         updater.start()
         keys.onDenied = { [weak self] in
-            self?.showNotice("Erişilebilirlik izni gerekli · ayarları açmak için dokun", duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
+            self?.showNotice(String(localized: "Erişilebilirlik izni gerekli · ayarları açmak için dokun"), duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
         }
         if hideSystemHUD { keys.start(prompt: false) }
         $expanded.removeDuplicates().sink { [weak self] expanded in
@@ -215,8 +221,8 @@ final class AppState: ObservableObject {
                 }
                 self.saveSession()
                 NSSound(named: "Glass")?.play()
-                self.showHUD("checkmark.circle.fill", self.session.phase == .focus ? "Odak tamamlandı" : "Mola tamamlandı", 1)
-                self.showNotice(self.session.phase == .focus ? "Güzel iş. Kısa bir mola ver." : "Yeni bir odak turuna hazırsın.")
+                self.showHUD("checkmark.circle.fill", self.session.phase == .focus ? String(localized: "Odak tamamlandı") : String(localized: "Mola tamamlandı"), 1)
+                self.showNotice(self.session.phase == .focus ? String(localized: "Güzel iş. Kısa bir mola ver.") : String(localized: "Yeni bir odak turuna hazırsın."))
             }
         }
         clipboardTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in self?.captureClipboard() }
@@ -254,11 +260,11 @@ final class AppState: ObservableObject {
             if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             launchAtLogin = SMAppService.mainApp.status == .enabled
             if enabled && SMAppService.mainApp.status == .requiresApproval {
-                showNotice("Giriş öğesi onay bekliyor · Sistem Ayarları'nı aç", duration: 8) { SMAppService.openSystemSettingsLoginItems() }
+                showNotice(String(localized: "Giriş öğesi onay bekliyor · Sistem Ayarları'nı aç"), duration: 8) { SMAppService.openSystemSettingsLoginItems() }
             }
         } catch {
             launchAtLogin = SMAppService.mainApp.status == .enabled
-            showNotice("Girişte başlatma ayarlanamadı: \(error.localizedDescription)", duration: 6)
+            showNotice(String(localized: "Girişte başlatma ayarlanamadı: \(error.localizedDescription)"), duration: 6)
         }
     }
     func setHideSystemHUD(_ enabled: Bool) {
@@ -269,11 +275,11 @@ final class AppState: ObservableObject {
     func startCleaning() {
         guard !cleaning.active else { return }
         guard MediaKeyInterceptor.trusted else {
-            showNotice("Temizlik modu için Erişilebilirlik izni gerekli · ayarları aç", duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
+            showNotice(String(localized: "Temizlik modu için Erişilebilirlik izni gerekli · ayarları aç"), duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
             return
         }
         pinnedBeforeCleaning = pinnedOpen
-        guard cleaning.start() else { showNotice("Klavye kilitlenemedi. Erişilebilirlik iznini kontrol et.", duration: 6); return }
+        guard cleaning.start() else { showNotice(String(localized: "Klavye kilitlenemedi. Erişilebilirlik iznini kontrol et."), duration: 6); return }
         keys.stop()
         pinnedOpen = true; expanded = true
     }
@@ -327,7 +333,7 @@ final class AppState: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([item])
         pasteboardCount = NSPasteboard.general.changeCount
-        showNotice("Kopyalandı · ⌘V ile yapıştır")
+        showNotice(String(localized: "Kopyalandı · ⌘V ile yapıştır"))
     }
     func pinClip(_ entry: ClipEntry) {
         guard let index = clips.firstIndex(where: { $0.id == entry.id }) else { return }
@@ -345,7 +351,7 @@ final class AppState: ObservableObject {
         }
         DiskStore.save(files, name: "shelf.json")
         selectedTab = .files; expanded = true
-        if added > 0 { showNotice("\(added) öğe rafa eklendi") }
+        if added > 0 { showNotice(String(localized: "\(added) öğe rafa eklendi")) }
     }
     func removeFile(_ item: ShelfItem) {
         files.removeAll { $0.id == item.id }; DiskStore.save(files, name: "shelf.json")
@@ -360,7 +366,7 @@ final class AppState: ObservableObject {
         requestQuickLook?(index)
     }
     func openFile(_ item: ShelfItem) {
-        if !NSWorkspace.shared.open(item.url) { showNotice("Dosya bulunamadı. Rafa yeniden ekleyebilirsin.") }
+        if !NSWorkspace.shared.open(item.url) { showNotice(String(localized: "Dosya bulunamadı. Rafa yeniden ekleyebilirsin.")) }
     }
     func shareFile(_ item: ShelfItem? = nil) {
         guard let item = item ?? files.first(where: { $0.id == selectedFile }) ?? files.first else { return }

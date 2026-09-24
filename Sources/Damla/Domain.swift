@@ -68,7 +68,7 @@ struct ClipEntry: Identifiable, Codable {
     var pinned = false
     var byteSize: Int { (text?.utf8.count ?? 0) + (imageData?.count ?? 0) }
     var title: String {
-        kind == .image ? "Kopyalanan görsel" : (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        kind == .image ? String(localized: "Kopyalanan görsel") : (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

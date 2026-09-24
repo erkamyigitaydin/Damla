@@ -14,7 +14,7 @@ final class ShelfSharing: NSObject, NSSharingServicePickerDelegate, NSSharingSer
         let scoped = url.startAccessingSecurityScopedResource()
         guard url.isFileURL, FileManager.default.fileExists(atPath: url.path) else {
             if scoped { url.stopAccessingSecurityScopedResource() }
-            model.showNotice("Dosya bulunamadı. Rafa yeniden ekleyebilirsin."); return
+            model.showNotice(String(localized: "Dosya bulunamadı. Rafa yeniden ekleyebilirsin.")); return
         }
         if scoped { scopedURLs = [url] }
         self.model = model; window = view.window
@@ -36,7 +36,7 @@ final class ShelfSharing: NSObject, NSSharingServicePickerDelegate, NSSharingSer
     func sharingService(_ sharingService: NSSharingService, didShareItems items: [Any]) { finish() }
     func sharingService(_ sharingService: NSSharingService, didFailToShareItems items: [Any], error: Error) {
         finish()
-        if (error as NSError).code != NSUserCancelledError { model?.showNotice("Paylaşım tamamlanamadı: \(error.localizedDescription)") }
+        if (error as NSError).code != NSUserCancelledError { model?.showNotice(String(localized: "Paylaşım tamamlanamadı: \(error.localizedDescription)")) }
     }
     func sharingService(_ sharingService: NSSharingService, sourceWindowForShareItems items: [Any], sharingContentScope: UnsafeMutablePointer<NSSharingService.SharingContentScope>) -> NSWindow? { window }
 

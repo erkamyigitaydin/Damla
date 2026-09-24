@@ -15,7 +15,7 @@ struct AudioOutput: Identifiable, Equatable {
 
     /// "Erkam’ın AirPods Pro" → "AirPods Pro"; the built-in speakers are just "Hoparlör".
     static func shortName(_ name: String, transport: UInt32) -> String {
-        if transport == kAudioDeviceTransportTypeBuiltIn { return "Hoparlör" }
+        if transport == kAudioDeviceTransportTypeBuiltIn { return String(localized: "Hoparlör") }
         for model in ["AirPods", "Beats"] { if let range = name.range(of: model) { return String(name[range.lowerBound...]) } }
         return name
     }
@@ -112,7 +112,8 @@ enum BluetoothBattery {
         /// "S %80 · Sa %75 · K %60", or "%70" for a single-battery device.
         var summary: String {
             if let main, left == nil, right == nil { return "%\(main)" }
-            return [left.map { "S %\($0)" }, right.map { "Sa %\($0)" }, self.case.map { "K %\($0)" }].compactMap { $0 }.joined(separator: " · ")
+            return [left.map { String(localized: "S %\($0)") }, right.map { String(localized: "Sa %\($0)") },
+                    self.case.map { String(localized: "K %\($0)") }].compactMap { $0 }.joined(separator: " · ")
         }
     }
 

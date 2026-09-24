@@ -40,7 +40,7 @@ enum HookInstaller {
         var data = original
         var hooks: [String: Any]
         if let existing = data["hooks"] {
-            guard let dictionary = existing as? [String: Any] else { throw Failure(description: "hooks alanı nesne olmalı; mevcut ayarlar değiştirilmedi") }
+            guard let dictionary = existing as? [String: Any] else { throw Failure(description: String(localized: "hooks alanı nesne olmalı; mevcut ayarlar değiştirilmedi")) }
             hooks = dictionary
         } else { hooks = [:] }
         func ours(_ handler: [String: Any]) -> Bool {
@@ -48,7 +48,7 @@ enum HookInstaller {
             return (message == marker && command.contains("--agent-event")) || (message == approvalMarker && command.contains("--agent-approval"))
         }
         for (event, value) in hooks {
-            guard let groups = value as? [[String: Any]] else { throw Failure(description: "Beklenmeyen hook biçimi: \(event)") }
+            guard let groups = value as? [[String: Any]] else { throw Failure(description: String(localized: "Beklenmeyen hook biçimi: \(event)")) }
             hooks[event] = groups.compactMap { group -> [String: Any]? in
                 var copy = group
                 let handlers = group["hooks"] as? [[String: Any]] ?? []
@@ -84,14 +84,14 @@ enum HookInstaller {
         let old = try? Data(contentsOf: url)
         var original: [String: Any] = [:]
         if let old, !old.isEmpty {
-            guard let parsed = try JSONSerialization.jsonObject(with: old) as? [String: Any] else { throw Failure(description: "\(url.path) bir JSON nesnesi değil") }
+            guard let parsed = try JSONSerialization.jsonObject(with: old) as? [String: Any] else { throw Failure(description: String(localized: "\(url.path) bir JSON nesnesi değil")) }
             original = parsed
         }
         let updated = try merge(original, provider: provider, binary: binary, approvals: approvals)
         guard !NSDictionary(dictionary: updated).isEqual(to: original) else { return false }
         let new = try JSONSerialization.data(withJSONObject: updated, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) + Data("\n".utf8)
         // Never overwrite an edit made while we were merging.
-        guard (try? Data(contentsOf: url)) == old else { throw Failure(description: "Ayarlar değişti; yeniden dene: \(url.path)") }
+        guard (try? Data(contentsOf: url)) == old else { throw Failure(description: String(localized: "Ayarlar değişti; yeniden dene: \(url.path)")) }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let old {
             let stamp = DateFormatter()

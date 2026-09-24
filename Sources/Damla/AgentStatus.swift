@@ -37,25 +37,25 @@ enum AgentPhase: String, Codable {
     case working, waiting, done, interrupted, failed, idle, stale
     var title: String {
         switch self {
-        case .working: return "Çalışıyor"
-        case .waiting: return "Seni bekliyor"
-        case .done: return "Yanıt tamamlandı"
-        case .interrupted: return "Durduruldu"
-        case .failed: return "Hata oluştu"
-        case .idle: return "Hazır"
-        case .stale: return "Durum güncel değil"
+        case .working: return String(localized: "Çalışıyor")
+        case .waiting: return String(localized: "Seni bekliyor")
+        case .done: return String(localized: "Yanıt tamamlandı")
+        case .interrupted: return String(localized: "Durduruldu")
+        case .failed: return String(localized: "Hata oluştu")
+        case .idle: return String(localized: "Hazır")
+        case .stale: return String(localized: "Durum güncel değil")
         }
     }
     /// Fits beside the notch in the HUD (about 90 pt).
     var shortTitle: String {
         switch self {
-        case .working: return "Çalışıyor"
-        case .waiting: return "Onay bekliyor"
-        case .done: return "Tamamlandı"
-        case .interrupted: return "Durduruldu"
-        case .failed: return "Hata"
-        case .idle: return "Hazır"
-        case .stale: return "Güncel değil"
+        case .working: return String(localized: "Çalışıyor")
+        case .waiting: return String(localized: "Onay bekliyor")
+        case .done: return String(localized: "Tamamlandı")
+        case .interrupted: return String(localized: "Durduruldu")
+        case .failed: return String(localized: "Hata")
+        case .idle: return String(localized: "Hazır")
+        case .stale: return String(localized: "Güncel değil")
         }
     }
     var icon: String {
@@ -115,20 +115,20 @@ struct AgentSession: Codable, Identifiable, Equatable {
     /// Turkish verb for what a tool does; unknown tools keep their name.
     static func toolLabel(_ tool: String) -> String {
         switch tool {
-        case "Bash": return "Komut çalıştırıyor"
-        case "Read": return "Dosya okuyor"
-        case "Edit", "Write", "MultiEdit", "NotebookEdit": return "Dosya düzenliyor"
-        case "Grep", "Glob": return "Kod arıyor"
-        case "WebFetch", "WebSearch": return "Web'de arıyor"
-        case "Agent", "Task", "Workflow": return "Alt görev çalıştırıyor"
-        case "TodoWrite": return "Plan yazıyor"
-        case "Skill": return "Beceri kullanıyor"
+        case "Bash": return String(localized: "Komut çalıştırıyor")
+        case "Read": return String(localized: "Dosya okuyor")
+        case "Edit", "Write", "MultiEdit", "NotebookEdit": return String(localized: "Dosya düzenliyor")
+        case "Grep", "Glob": return String(localized: "Kod arıyor")
+        case "WebFetch", "WebSearch": return String(localized: "Web'de arıyor")
+        case "Agent", "Task", "Workflow": return String(localized: "Alt görev çalıştırıyor")
+        case "TodoWrite": return String(localized: "Plan yazıyor")
+        case "Skill": return String(localized: "Beceri kullanıyor")
         default:
             if tool.hasPrefix("mcp__") {
                 let parts = tool.split(separator: "_", omittingEmptySubsequences: true)
-                return "\(parts.last.map(String.init) ?? tool) kullanıyor"
+                return String(localized: "\(parts.last.map(String.init) ?? tool) kullanıyor")
             }
-            return "\(tool) kullanıyor"
+            return String(localized: "\(tool) kullanıyor")
         }
     }
 
@@ -149,7 +149,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
             phase = .working; pending = []; tool = nil; clearWaiting()
             turnStarted = now; toolCalls = 0
         case "PermissionRequest":
-            pending.insert(key); phase = .waiting; detail = "Onay bekliyor"
+            pending.insert(key); phase = .waiting; detail = String(localized: "Onay bekliyor")
             waitingTool = toolName; if waitingSince == nil { waitingSince = now }
         case "PermissionDenied":
             pending.remove(key); if let toolName { pending.remove(toolName) }
@@ -157,7 +157,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
             if pending.isEmpty { clearWaiting() }
         case "PreToolUse":
             if let toolName, Self.questionTools.contains(toolName) {
-                pending.insert(key); phase = .waiting; detail = "Yanıt bekliyor"
+                pending.insert(key); phase = .waiting; detail = String(localized: "Yanıt bekliyor")
                 waitingTool = toolName; if waitingSince == nil { waitingSince = now }
             } else {
                 tool = toolName
@@ -174,7 +174,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
             if pending.isEmpty { clearWaiting() }
         case "Notification":
             guard ["permission_prompt", "elicitation_dialog"].contains(event["notification_type"] as? String ?? "") else { return false }
-            pending.insert("notification"); phase = .waiting; detail = "Yanıt / onay bekliyor"
+            pending.insert("notification"); phase = .waiting; detail = String(localized: "Yanıt / onay bekliyor")
             if waitingSince == nil { waitingSince = now }
         case "Stop": finishTurn(.done)
         case "StopFailure": finishTurn(.failed)
@@ -241,7 +241,7 @@ enum AgentEventStore {
         var completedTurn = false
         try withLock(id + ".lock", in: directory) {
             let cwd = event["cwd"] as? String ?? ""
-            let name = cwd.isEmpty ? "Oturum" : URL(fileURLWithPath: cwd).lastPathComponent
+            let name = cwd.isEmpty ? String(localized: "Oturum") : URL(fileURLWithPath: cwd).lastPathComponent
             let project = String(name.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }.prefix(80).map(String.init).joined())
             var value = (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode(AgentSession.self, from: $0) }
                 ?? AgentSession(id: id, provider: provider, project: project, updated: now)

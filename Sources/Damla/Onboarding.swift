@@ -189,7 +189,7 @@ private struct OnboardingView: View {
 
     // MARK: Pieces
 
-    private func page<Content: View>(icon: String, title: String, text: String, @ViewBuilder content: () -> Content) -> some View {
+    private func page<Content: View>(icon: String, title: LocalizedStringKey, text: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Image(systemName: icon).font(.system(size: 34, weight: .light)).foregroundStyle(Color.accentColor).frame(height: 44)
             Text(title).font(.title.weight(.semibold))
@@ -198,7 +198,7 @@ private struct OnboardingView: View {
         }
     }
 
-    private func feature(_ icon: String, _ title: String, _ text: String) -> some View {
+    private func feature(_ icon: String, _ title: LocalizedStringKey, _ text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon).font(.system(size: 15)).foregroundStyle(Color.accentColor).frame(width: 22)
             VStack(alignment: .leading, spacing: 1) {
@@ -208,7 +208,7 @@ private struct OnboardingView: View {
         }
     }
 
-    private func status(_ ok: Bool, _ yes: String, _ no: String) -> some View {
+    private func status(_ ok: Bool, _ yes: LocalizedStringKey, _ no: LocalizedStringKey) -> some View {
         Label(ok ? yes : no, systemImage: ok ? "checkmark.circle.fill" : "circle.dashed")
             .foregroundStyle(ok ? Color.green : Color.secondary)
     }
@@ -243,7 +243,7 @@ private struct OnboardingView: View {
             try HookInstaller.install(provider, approvals: approvals && provider == .claude)
             hookError = nil
         } catch {
-            hookError = "Kurulamadı: \(error)"
+            hookError = String(localized: "Kurulamadı: \(String(describing: error))")
         }
         refresh()
     }

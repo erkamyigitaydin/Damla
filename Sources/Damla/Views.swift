@@ -286,7 +286,7 @@ struct CompactRow: View {
             case .timer: return "Odak · \(model.timeLabel)"
             case .agent(let agent): return "\(agent.provider.title) · \(agent.project) · \(agent.phase.title)"
             case .media:
-                guard media.hasTrack else { return "Müzik" }
+                guard media.hasTrack else { return String(localized: "Müzik") }
                 let other = media.otherPlaying.map { "\n\($0.title) · \(MediaService.appName(for: $0.bundleID))" } ?? ""
                 return "\(media.title) · \(media.artist)" + other
             }
@@ -527,7 +527,7 @@ struct DropRow: View {
                     .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 0.5))
                     .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(dragged.count > 1 ? "\(dragged.count) öğe" : first.lastPathComponent)
+                        Text(dragged.count > 1 ? String(localized: "\(dragged.count) öğe") : first.lastPathComponent)
                             .font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
                         Text(targeted ? "Bırak" : "Buraya bırak").font(.system(size: 10.5, weight: .medium)).foregroundStyle(targeted ? Theme.accent : Theme.dim)
                     }
@@ -636,7 +636,7 @@ struct TabPill: View {
                     .foregroundStyle(selected ? Color.white : Theme.dim)
                     .background(selected ? Theme.fillStrong : .clear, in: Capsule())
                     .contentShape(Capsule())
-                }.buttonStyle(.plain).help(tab.rawValue).accessibilityLabel(tab.rawValue)
+                }.buttonStyle(.plain).help(tab.title).accessibilityLabel(tab.title)
             }
             Rectangle().fill(.white.opacity(0.14)).frame(width: 1, height: 14).padding(.horizontal, 4)
             pillButton(model.pinnedOpen ? "pin.fill" : "pin", "Açık tut", active: model.pinnedOpen) { model.pinnedOpen.toggle() }
@@ -648,13 +648,13 @@ struct TabPill: View {
         .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
         .animation(Theme.quick, value: model.selectedTab)
     }
-    private func pillButton(_ icon: String, _ label: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func pillButton(_ icon: String, _ label: LocalizedStringKey, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon).font(.system(size: 11.5, weight: .medium)).frame(width: 30, height: 28)
                 .foregroundStyle(active ? Color.white : Theme.dim)
                 .background(active ? Theme.fillStrong : .clear, in: Capsule())
                 .contentShape(Capsule())
-        }.buttonStyle(.plain).help(label).accessibilityLabel(label)
+        }.buttonStyle(.plain).help(label).accessibilityLabel(Text(label))
     }
 }
 
@@ -723,7 +723,7 @@ struct HomeView: View {
                         }
                     } else {
                         Text("Müzik").font(.system(size: 15, weight: .semibold))
-                        Text(media.status ?? (media.bridgeActive ? "Bir şey çal: Müzik, Spotify, Safari…" : "Apple Music veya Spotify’ı bağla."))
+                        Text(media.status ?? (media.bridgeActive ? String(localized: "Bir şey çal: Müzik, Spotify, Safari…") : String(localized: "Apple Music veya Spotify’ı bağla.")))
                             .font(.system(size: 11)).foregroundStyle(Theme.dim).lineLimit(2)
                         Spacer(minLength: 4)
                         if !media.bridgeActive {
@@ -798,7 +798,7 @@ struct HomeView: View {
                                 lyrics.enabled.toggle()
                                 if lyrics.enabled && !UserDefaults.standard.bool(forKey: "lyricsNoticeShown") {
                                     UserDefaults.standard.set(true, forKey: "lyricsNoticeShown")
-                                    model.showNotice("Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir", duration: 5)
+                                    model.showNotice(String(localized: "Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir"), duration: 5)
                                 }
                             } label: {
                                 Image(systemName: lyrics.enabled ? "quote.bubble.fill" : "quote.bubble").font(.system(size: 11, weight: .semibold))
@@ -835,7 +835,7 @@ struct HomeView: View {
     /// The same test that decides whether lyrics are looked up at all (see AppState).
     private var isSong: Bool { media.artistKnown && media.duration >= 30 && media.duration <= 20 * 60 }
     private var currentLyric: String {
-        guard !lyrics.lyrics.lines.isEmpty else { return lyrics.lyrics.plain.isEmpty ? "" : "Sözler" }
+        guard !lyrics.lyrics.lines.isEmpty else { return lyrics.lyrics.plain.isEmpty ? "" : String(localized: "Sözler") }
         return lyrics.lyrics.index(at: media.livePosition(at: model.now)).map { lyrics.lyrics.lines[$0].text } ?? ""
     }
     private var outputIcon: String {
@@ -852,7 +852,7 @@ struct HomeView: View {
             Text(text).font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit()
         }.foregroundStyle(tint ?? Theme.dim)
     }
-    private func transport(_ icon: String, _ label: String, size: CGFloat, action: @escaping () -> Void) -> some View {
+    private func transport(_ icon: String, _ label: LocalizedStringKey, size: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon).font(.system(size: size, weight: .semibold)).foregroundStyle(.white)
                 .frame(width: 32, height: 32).contentShape(Circle())
@@ -1112,7 +1112,7 @@ struct ClipCard: View {
         guard let t = entry.text?.trimmingCharacters(in: .whitespaces), t.hasPrefix("#"), t.count == 7 || t.count == 4 else { return false }
         return t.dropFirst().allSatisfy(\.isHexDigit)
     }
-    private var kindLabel: String { entry.kind == .image ? "Görsel" : isColor ? "Renk" : isLink ? "Bağlantı" : "Metin" }
+    private var kindLabel: String { entry.kind == .image ? String(localized: "Görsel") : isColor ? String(localized: "Renk") : isLink ? String(localized: "Bağlantı") : String(localized: "Metin") }
     private var kindIcon: String { entry.kind == .image ? "photo" : isColor ? "paintpalette" : isLink ? "link" : "text.alignleft" }
     var body: some View {
         Button(action: onCopy) {
@@ -1228,7 +1228,7 @@ extension View {
 /// Small round Liquid Glass button used for secondary actions.
 struct IconButton: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     var tint: Color = .white
     var size: CGFloat = 26
     let action: () -> Void
@@ -1238,7 +1238,7 @@ struct IconButton: View {
                 .frame(width: size, height: size).contentShape(Circle())
         }
         .buttonStyle(GlassCircleStyle())
-        .help(label).accessibilityLabel(label)
+        .help(label).accessibilityLabel(Text(label))
     }
 }
 
@@ -1289,7 +1289,7 @@ struct GlassSwitchStyle: ToggleStyle {
             .animation(Theme.quick, value: configuration.isOn)
         }
         .buttonStyle(.plain)
-        .accessibilityValue(configuration.isOn ? "açık" : "kapalı")
+        .accessibilityValue(configuration.isOn ? Text("açık") : Text("kapalı"))
     }
 }
 

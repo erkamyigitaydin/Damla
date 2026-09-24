@@ -28,9 +28,9 @@ enum AgentText {
     /// "42 sn", "4 dk", "1 sa 12 dk"; with `seconds` on, "3 dk 12 sn" for the waiting timer.
     static func duration(_ interval: TimeInterval, seconds: Bool = false) -> String {
         let total = max(0, Int(interval))
-        if total < 60 { return "\(total) sn" }
-        if total < 3600 { return seconds ? "\(total / 60) dk \(total % 60) sn" : "\(total / 60) dk" }
-        return "\(total / 3600) sa \(total % 3600 / 60) dk"
+        if total < 60 { return String(localized: "\(total) sn") }
+        if total < 3600 { return seconds ? String(localized: "\(total / 60) dk \(total % 60) sn") : String(localized: "\(total / 60) dk") }
+        return String(localized: "\(total / 3600) sa \(total % 3600 / 60) dk")
     }
 
     /// One line under the project name: what the agent is doing, for how long, how much it has done.
@@ -39,12 +39,12 @@ enum AgentText {
         var parts: [String] = []
         switch phase {
         case .working:
-            parts.append(s.tool.map(AgentSession.toolLabel) ?? "Düşünüyor")
+            parts.append(s.tool.map(AgentSession.toolLabel) ?? String(localized: "Düşünüyor"))
             if let start = s.turnStarted { parts.append(duration(now.timeIntervalSince(start))) }
         case .waiting:
-            if let tool = s.waitingTool, AgentSession.questionTools.contains(tool) { parts.append("Yanıt bekliyor") }
-            else if let tool = s.waitingTool { parts.append("\(tool) için onay bekliyor") }
-            else { parts.append(s.detail.isEmpty ? "Onay bekliyor" : s.detail) }
+            if let tool = s.waitingTool, AgentSession.questionTools.contains(tool) { parts.append(String(localized: "Yanıt bekliyor")) }
+            else if let tool = s.waitingTool { parts.append(String(localized: "\(tool) için onay bekliyor")) }
+            else { parts.append(s.detail.isEmpty ? String(localized: "Onay bekliyor") : s.detail) }
             if let since = s.waitingSince { parts.append(duration(now.timeIntervalSince(since), seconds: true)) }
         case .done, .failed, .interrupted:
             parts.append(phase.shortTitle)
@@ -52,7 +52,7 @@ enum AgentText {
         case .idle, .stale:
             parts.append(phase.title)
         }
-        if let calls = s.toolCalls, calls > 0, phase != .idle { parts.append("\(calls) çağrı") }
+        if let calls = s.toolCalls, calls > 0, phase != .idle { parts.append(String(localized: "\(calls) çağrı")) }
         return (parts.joined(separator: " · "), phase == .waiting || phase == .failed)
     }
 
@@ -61,10 +61,10 @@ enum AgentText {
         let working = phases.filter { $0 == .working }.count
         let waiting = phases.filter { $0 == .waiting }.count
         var parts: [String] = []
-        if working > 0 { parts.append("\(working) çalışıyor") }
-        if waiting > 0 { parts.append("\(waiting) onay bekliyor") }
-        if parts.isEmpty { parts.append("Aktif oturum yok") }
-        if turns > 0 { parts.append("bugün \(turns) tur") }
+        if working > 0 { parts.append(String(localized: "\(working) çalışıyor")) }
+        if waiting > 0 { parts.append(String(localized: "\(waiting) onay bekliyor")) }
+        if parts.isEmpty { parts.append(String(localized: "Aktif oturum yok")) }
+        if turns > 0 { parts.append(String(localized: "bugün \(turns) tur")) }
         return parts.joined(separator: " · ")
     }
 }
@@ -165,7 +165,7 @@ struct ApprovalCard: View {
             Spacer(minLength: 0)
             HStack(spacing: 6) {
                 Button { activateHost() } label: {
-                    Label(hostName.map { "\($0)’a git" } ?? "Terminale git", systemImage: "arrow.up.forward.app")
+                    Label(hostName.map { String(localized: "\($0)’a git") } ?? String(localized: "Terminale git"), systemImage: "arrow.up.forward.app")
                         .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
                 }.buttonStyle(.plain).help("Soruyu orada yanıtla")
                 Spacer()
@@ -188,13 +188,13 @@ struct ApprovalCard: View {
 
     static func title(for tool: String) -> String {
         switch tool {
-        case "Bash": return "komut çalıştırmak istiyor"
-        case "Edit", "MultiEdit", "NotebookEdit": return "dosya düzenlemek istiyor"
-        case "Write": return "dosya yazmak istiyor"
-        case "Read": return "dosya okumak istiyor"
-        case "WebFetch": return "web sayfası açmak istiyor"
-        case "WebSearch": return "web’de aramak istiyor"
-        default: return tool.hasPrefix("mcp__") ? "\(tool.components(separatedBy: "__").dropFirst().first ?? "MCP") aracını kullanmak istiyor" : "\(tool) kullanmak istiyor"
+        case "Bash": return String(localized: "komut çalıştırmak istiyor")
+        case "Edit", "MultiEdit", "NotebookEdit": return String(localized: "dosya düzenlemek istiyor")
+        case "Write": return String(localized: "dosya yazmak istiyor")
+        case "Read": return String(localized: "dosya okumak istiyor")
+        case "WebFetch": return String(localized: "web sayfası açmak istiyor")
+        case "WebSearch": return String(localized: "web’de aramak istiyor")
+        default: return tool.hasPrefix("mcp__") ? String(localized: "\(tool.components(separatedBy: "__").dropFirst().first ?? "MCP") aracını kullanmak istiyor") : String(localized: "\(tool) kullanmak istiyor")
         }
     }
 }

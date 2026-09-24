@@ -4,8 +4,11 @@ import CoreGraphics
 enum NotchState: Equatable { case closed, hud, drop, expanded }
 
 enum DisplayMode: String, CaseIterable, Identifiable {
-    case all = "Tümü", followMouse = "Fareyi izle", notch = "Çentikli"
+    case all = "Tümü", followMouse = "Fareyi izle", notch = "Çentikli"   // raw values are stored settings
     var id: String { rawValue }
+    var title: String {
+        switch self { case .all: return String(localized: "Tümü"); case .followMouse: return String(localized: "Fareyi izle"); case .notch: return String(localized: "Çentikli") }
+    }
 }
 
 /// How the panel sits on a screen that has no physical notch.
@@ -13,6 +16,7 @@ enum ExternalStyle: String, CaseIterable, Identifiable {
     case menuBar = "Menü çubuğu"   // a fake notch drawn into the menu bar, same shape as the real one
     case island = "Ada"            // a floating pill just under the menu bar
     var id: String { rawValue }
+    var title: String { self == .menuBar ? String(localized: "Menü çubuğu") : String(localized: "Ada") }
 }
 
 /// Single source of truth for sizes. Both the AppKit window and the SwiftUI shape read from here,
