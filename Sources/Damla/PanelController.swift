@@ -322,6 +322,9 @@ final class PanelManager {
     private var dragMonitors: [Any] = []
     private var dragTimer: Timer?
     private var menuBarTimer: Timer?
+    private var menuBarFastUntil: CFAbsoluteTime = 0
+    private var lastMenuBarCheck: CFAbsoluteTime = 0
+    private var lastMenuBarScreens: [UInt32] = []
     private var revealedNotchBars = Set<UInt32>()
     private var lastDragCount = NSPasteboard(name: .drag).changeCount
     private weak var quickLookOwner: PanelController?
@@ -382,14 +385,47 @@ final class PanelManager {
             else if self.model.dragActive && !self.holdBasket { self.endDrag() }
         }
         if let dragTimer { RunLoop.main.add(dragTimer, forMode: .common) }
-        menuBarTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.updateMenuBars() }
+        menuBarTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.menuBarTick() }
+        menuBarTimer?.tolerance = 0.03
         if let menuBarTimer { RunLoop.main.add(menuBarTimer, forMode: .common) }
+        // Entering or leaving full screen switches Space; keep checking while the Space animation settles.
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.publisher(for: NSWorkspace.activeSpaceDidChangeNotification)
+            .merge(with: workspace.publisher(for: NSWorkspace.didActivateApplicationNotification))
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.menuBarsMayChange(for: 1.5) }.store(in: &cancellables)
+    }
+
+    /// The window-list query behind `updateMenuBars` was the largest idle cost at 0.15 s. The tick itself only
+    /// reads the pointer: the full check runs every tick after a Space or app switch and while the pointer is
+    /// near a menu bar (it can reveal one, and a revealed bar hides a moment after the pointer leaves),
+    /// otherwise once a second as a fallback.
+    private func menuBarsMayChange(for seconds: CFAbsoluteTime) {
+        menuBarFastUntil = max(menuBarFastUntil, CFAbsoluteTimeGetCurrent() + seconds)
+        updateMenuBars()
+    }
+
+    private func menuBarTick() {
+        let now = CFAbsoluteTimeGetCurrent()
+        let mouse = NSEvent.mouseLocation
+        let nearBar = controllers.contains { controller in
+            guard let frame = controller.screen?.frame else { return false }
+            let band = max(40, (controller.screen?.safeAreaInsets.top ?? 0) + 8)
+            return NSMouseInRect(mouse, frame, false) && mouse.y >= frame.maxY - band
+        }
+        if nearBar { menuBarFastUntil = max(menuBarFastUntil, now + 2) }
+        // A roaming controller that just moved to another screen needs that screen's state right away.
+        let screens = controllers.map { $0.screen?.displayID ?? 0 }
+        guard now < menuBarFastUntil || now - lastMenuBarCheck >= 1 || screens != lastMenuBarScreens else { return }
+        lastMenuBarScreens = screens
+        updateMenuBars()
     }
 
     /// The menu bar is one Window Server window per display at the main-menu level. It leaves the on-screen
     /// window list while a full-screen app (or the auto-hide setting) keeps it away, and returns when the
     /// pointer reveals it (measured on macOS 27). Owner name and layer need no screen-recording permission.
     private func updateMenuBars() {
+        lastMenuBarCheck = CFAbsoluteTimeGetCurrent()
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return }
         let menuLevel = Int(CGWindowLevelForKey(.mainMenuWindow))
         let bars: [CGRect] = list.compactMap { info in
