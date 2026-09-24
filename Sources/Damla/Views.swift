@@ -362,58 +362,41 @@ struct Equalizer: View {
 
 // MARK: - Agent mascot
 
-/// The agent app's icon, alive while it works: a slow breath and a soft ring in the status colour
-/// (amber and slower while it waits for you), a small badge for waiting / done / failed, and optionally
-/// the host app (Terminal, VS Code, Claude…) in the lower-left corner.
+/// Damla's drop mascot acting out the session's phase, with the agent's app icon (Claude, Codex) as a badge
+/// and, when the session runs in another app (Terminal, VS Code…), that host's icon in the lower-left corner.
 struct AgentMascot: View {
     let session: AgentSession
     var size: CGFloat = 22
     var pulse = false
     var showHost = false
     private var tint: Color { session.phase == .waiting || session.phase == .failed ? Theme.amber : Theme.accent }
-    private var working: Bool { session.phase == .working }
-    private var waiting: Bool { session.phase == .waiting }
-    private var live: Bool { working || waiting }
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Group {
+        // Damla's drop acts out the phase; the agent's own app icon rides the corner as a badge.
+        DropletMascot(phase: session.phase, size: size)
+            .overlay(alignment: .bottomTrailing) {
                 if let icon = session.provider.icon {
                     Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
-                } else {
-                    Image(systemName: "terminal").font(.system(size: size * 0.5, weight: .semibold)).foregroundStyle(.white)
+                        .frame(width: size * 0.44, height: size * 0.44)
+                        .clipShape(RoundedRectangle(cornerRadius: size * 0.1, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: size * 0.1, style: .continuous).strokeBorder(.black, lineWidth: max(0.8, size * 0.03)))
+                        .offset(x: size * 0.14, y: size * 0.08)
                 }
             }
-            .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous).strokeBorder(tint.opacity(live ? 0.9 : 0.55), lineWidth: 1))
-            .phaseAnimator([false, true], trigger: live) { view, breathe in
-                view.scaleEffect(working && breathe ? 1.06 : 1)
-                    .shadow(color: tint.opacity(live && breathe ? (waiting ? 0.9 : 0.65) : 0.2), radius: live && breathe ? (waiting ? 8 : 6) : 2)
-            } animation: { _ in
-                Theme.reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: waiting ? 0.8 : 1.1).repeatForever(autoreverses: true)
+            .overlay(alignment: .bottomLeading) {
+                // The host badge only adds something when the session runs elsewhere (Terminal, VS Code…).
+                if showHost, let host = session.hostIcon, !session.provider.bundleIDs.contains(session.host ?? "") {
+                    Image(nsImage: host).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+                        .frame(width: size * 0.4, height: size * 0.4)
+                        .clipShape(RoundedRectangle(cornerRadius: size * 0.1, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: size * 0.1, style: .continuous).strokeBorder(.black, lineWidth: max(0.8, size * 0.03)))
+                        .offset(x: -size * 0.14, y: size * 0.08)
+                }
             }
             .scaleEffect(pulse ? 1.3 : 1)
             .shadow(color: tint.opacity(pulse ? 0.9 : 0), radius: pulse ? 10 : 0)
             .animation(Theme.reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.45, bounce: 0.55), value: pulse)
-            .overlay(alignment: .bottomLeading) {
-                if showHost, let host = session.hostIcon {
-                    Image(nsImage: host).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
-                        .frame(width: size * 0.5, height: size * 0.5)
-                        .clipShape(RoundedRectangle(cornerRadius: size * 0.12, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: size * 0.12, style: .continuous).strokeBorder(.black, lineWidth: 1))
-                        .offset(x: -size * 0.16, y: size * 0.16)
-                }
-            }
-            if session.phase != .working {
-                Image(systemName: session.phase.icon).font(.system(size: size * 0.32, weight: .bold)).foregroundStyle(.black)
-                    .frame(width: size * 0.5, height: size * 0.5).background(tint, in: Circle())
-                    .overlay(Circle().strokeBorder(.black, lineWidth: 1))
-                    .offset(x: size * 0.16, y: size * 0.16)
-                    .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .animation(Theme.quick, value: session.phase)
-        .accessibilityLabel("\(session.provider.title) · \(session.phase.title)")
+            .animation(Theme.quick, value: session.phase)
+            .accessibilityLabel("\(session.provider.title) · \(session.phase.title)")
     }
 }
 
@@ -696,18 +679,6 @@ struct HomeView: View {
                             sourceControl
                             Text(media.artist).font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
                         }
-                        if lyrics.state == .found && !model.tallPanel {
-                            // The line being sung, in the artwork's colour; a tap opens the whole text.
-                            Button { withAnimation(Theme.motion(open: true)) { model.lyricsExpanded = true } } label: {
-                                Text(currentLyric.isEmpty ? "♪" : currentLyric)
-                                    .font(.system(size: 11, weight: .medium)).foregroundStyle(tint.opacity(0.95)).lineLimit(1)
-                                    .contentTransition(.opacity).animation(.easeInOut(duration: 0.25), value: currentLyric)
-                                    .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                            }.buttonStyle(.plain).help("Sözlerin tamamı")
-                        } else if !model.tallPanel && (lyrics.state == .loading || (lyrics.state == .missing && isSong)) {
-                            Text(lyrics.state == .loading ? "Sözler aranıyor…" : "Bu şarkının sözü bulunamadı")
-                                .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.faint).lineLimit(1)
-                        }
                         Spacer(minLength: 4)
                         if media.controllable && media.duration <= 0 {
                             // Live streams report no (or infinite) duration: nothing to scrub.
@@ -841,12 +812,6 @@ struct HomeView: View {
                 Image(systemName: media.source == .spotify ? "circle.hexagongrid.fill" : "music.note").font(.system(size: 10, weight: .semibold))
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help(media.source.rawValue)
         }
-    }
-    /// The same test that decides whether lyrics are looked up at all (see AppState).
-    private var isSong: Bool { media.artistKnown && media.duration >= 30 && media.duration <= 20 * 60 }
-    private var currentLyric: String {
-        guard !lyrics.lyrics.lines.isEmpty else { return lyrics.lyrics.plain.isEmpty ? "" : String(localized: "Sözler") }
-        return lyrics.lyrics.index(at: media.livePosition(at: model.now)).map { lyrics.lyrics.lines[$0].text } ?? ""
     }
     private var outputIcon: String {
         model.outputs.first(where: { $0.id == model.currentOutput })?.icon ?? "hifispeaker"

@@ -56,6 +56,21 @@ enum AgentText {
         return (parts.joined(separator: " · "), phase == .waiting || phase == .failed)
     }
 
+    /// A small picture for a tool in the trail on the big card.
+    static func symbol(for tool: String) -> String {
+        switch tool {
+        case "Bash": return "terminal"
+        case "Read": return "doc.text"
+        case "Edit", "MultiEdit", "Write", "NotebookEdit": return "pencil"
+        case "Grep", "Glob": return "magnifyingglass"
+        case "WebFetch", "WebSearch": return "globe"
+        case "Agent", "Task", "Workflow": return "person.2"
+        case "TodoWrite": return "checklist"
+        case "Skill": return "wand.and.stars"
+        default: return tool.hasPrefix("mcp__") ? "puzzlepiece.extension" : "wrench.and.screwdriver"
+        }
+    }
+
     static func summary(_ sessions: [AgentSession], turns: Int, at now: Date) -> String {
         let phases = sessions.map { $0.effectivePhase(at: now) }
         let working = phases.filter { $0 == .working }.count
@@ -66,6 +81,54 @@ enum AgentText {
         if parts.isEmpty { parts.append(String(localized: "Aktif oturum yok")) }
         if turns > 0 { parts.append(String(localized: "bugün \(turns) tur")) }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The session that matters right now, large: the mascot acting it out, the project, what it is doing and for
+/// how long, and a trail of the tools it used this turn (oldest faintest). A tap brings its app forward.
+struct HeroAgentCard: View {
+    let session: AgentSession
+    let now: Date
+    @ObservedObject var service: AgentStatusService
+    var body: some View {
+        let phase = session.effectivePhase(at: now)
+        let activity = AgentText.activity(session, at: now)
+        let tint = phase == .waiting ? Theme.amber : phase == .failed ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.accent
+        Button { service.activate(session) } label: {
+            HStack(spacing: 14) {
+                AgentMascot(session: session, size: 56, showHost: true).frame(width: 64, height: 64)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(session.project).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                        Text(session.provider.title).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.faint)
+                        Spacer(minLength: 4)
+                        Text(session.updated, style: .relative).font(.system(size: 9, design: .rounded)).foregroundStyle(Theme.faint)
+                    }
+                    Text(activity.text).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                        .foregroundStyle(activity.urgent ? Theme.amber : .white.opacity(0.85))
+                        .contentTransition(.numericText())
+                    if let tools = session.recentTools, !tools.isEmpty {
+                        HStack(spacing: 5) {
+                            ForEach(Array(tools.enumerated()), id: \.offset) { index, tool in
+                                Image(systemName: AgentText.symbol(for: tool)).font(.system(size: 9.5, weight: .semibold))
+                                    .frame(width: 20, height: 20).background(Theme.fill, in: Circle())
+                                    .opacity(0.35 + 0.65 * Double(index + 1) / Double(tools.count))
+                                    .help(AgentSession.toolLabel(tool))
+                            }
+                        }
+                        .foregroundStyle(.white)
+                    }
+                }
+            }
+            .padding(12)
+            .background(LinearGradient(colors: [tint.opacity(0.16), Theme.fill], startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(tint.opacity(0.25), lineWidth: 0.8))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help("Tıkla: \(session.hostName ?? session.provider.title) öne gelsin")
+        .animation(Theme.quick, value: phase)
     }
 }
 
@@ -100,7 +163,10 @@ struct AgentPanelView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 5) {
-                            ForEach(active) { AgentRow(session: $0, now: now, service: service) }
+                            // The session that needs eyes (working or waiting, else the latest) gets the big card.
+                            let hero = active.first { [.working, .waiting].contains($0.effectivePhase(at: now)) } ?? active.first
+                            if let hero { HeroAgentCard(session: hero, now: now, service: service) }
+                            ForEach(active.filter { $0.id != hero?.id }) { AgentRow(session: $0, now: now, service: service) }
                             if !history.isEmpty {
                                 Button { withAnimation(Theme.quick) { showHistory.toggle() } } label: {
                                     HStack(spacing: 6) {

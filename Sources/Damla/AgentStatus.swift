@@ -90,6 +90,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
     var toolCalls: Int? = nil
     var waitingSince: Date? = nil
     var host: String? = nil          // bundle id of the app hosting the session: Terminal, Claude, VS Code, ChatGPT…
+    var recentTools: [String]? = nil // names of the last few tools this turn (no arguments), newest last
 
     func effectivePhase(at now: Date) -> AgentPhase {
         if (phase == .working || phase == .waiting), now.timeIntervalSince(updated) > 30 * 60 { return .stale }
@@ -146,7 +147,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
             // Compaction/resume can happen in the middle of a turn.
             if phase != .working && phase != .waiting { phase = .idle }
         case "UserPromptSubmit":
-            phase = .working; pending = []; tool = nil; clearWaiting()
+            phase = .working; pending = []; tool = nil; clearWaiting(); recentTools = nil
             turnStarted = now; toolCalls = 0
         case "PermissionRequest":
             pending.insert(key); phase = .waiting; detail = String(localized: "Onay bekliyor")
@@ -161,6 +162,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
                 waitingTool = toolName; if waitingSince == nil { waitingSince = now }
             } else {
                 tool = toolName
+                if let toolName { recentTools = Array(((recentTools ?? []) + [toolName]).suffix(6)) }
                 phase = pending.isEmpty ? .working : .waiting
             }
         case "PostToolUse", "PostToolUseFailure":

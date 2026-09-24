@@ -609,6 +609,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ("home", AnyView(HomeView(model: model, media: model.media, lyrics: model.lyrics).padding(.horizontal, 24).padding(.vertical, 12)
                 .frame(width: Layout.panelWidth, height: Layout.contentHeight))),
             ("compact", AnyView(CompactRow(model: model, media: model.media, metrics: m).padding(8))),
+            ("mascots", AnyView(HStack(spacing: 18) {
+                ForEach([AgentPhase.working, .waiting, .done, .failed, .idle, .stale], id: \.self) { phase in
+                    VStack(spacing: 6) { DropletMascot(phase: phase, size: 64); Text(phase.shortTitle).font(.caption).foregroundStyle(.white) }
+                }
+            }.padding(20))),
             ("agents", AnyView(AgentPanelView(service: model.agents).padding(.horizontal, 24).padding(.vertical, 12)
                 .frame(width: Layout.panelWidth, height: Layout.contentHeight)))
         ]
