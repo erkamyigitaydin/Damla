@@ -9,6 +9,22 @@ enum MusicSource: String, CaseIterable, Identifiable {
     static func scriptable(_ bundleID: String) -> Bool { allCases.contains { $0.bundleID == bundleID } }
 }
 
+/// What happens to Music/Spotify when a video (or any other player) starts.
+enum HandoffMode: String, CaseIterable, Identifiable {
+    case pause, duck, off
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .pause: return "Duraklat"; case .duck: return "Sesini kıs"; case .off: return "Hiçbir şey yapma" }
+    }
+    static let duckLevel = 0.2   // ducked music plays at a fifth of its volume
+
+    /// Earlier versions stored an on/off switch.
+    static var saved: HandoffMode {
+        if let raw = UserDefaults.standard.string(forKey: "mediaHandoffMode"), let mode = HandoffMode(rawValue: raw) { return mode }
+        return (UserDefaults.standard.object(forKey: "mediaHandoff") as? Bool) == false ? .off : .pause
+    }
+}
+
 final class MediaService: ObservableObject {
     @Published var source: MusicSource = MusicSource(rawValue: UserDefaults.standard.string(forKey: "musicSource") ?? "") ?? .music
     @Published var connected = UserDefaults.standard.bool(forKey: "musicConnected")
@@ -33,9 +49,14 @@ final class MediaService: ObservableObject {
     /// False when the shown session is a background browser tab the bridge no longer reports: no transport.
     @Published private(set) var controllable = true
     /// Pause Music/Spotify when a video (or any other player) starts, resume when it stops.
-    @Published var handoffEnabled = UserDefaults.standard.object(forKey: "mediaHandoff") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(handoffEnabled, forKey: "mediaHandoff"); store.handoffEnabled = handoffEnabled }
+    @Published var handoffMode = HandoffMode.saved {
+        didSet { UserDefaults.standard.set(handoffMode.rawValue, forKey: "mediaHandoffMode"); store.handoffEnabled = handoffMode != .off }
     }
+    /// Music/Spotify volume (0–100) per bundle id, read when the mixer opens and after every change.
+    @Published private(set) var appVolumes: [String: Double] = [:]
+    /// Volumes to put back once a ducked handoff ends (or Damla quits).
+    private var duckedVolumes: [String: Int] = [:]
+    private var volumeWork: [String: DispatchWorkItem] = [:]
     var onNotice: ((String) -> Void)?
     let bridge = NowPlayingBridge()
     private var pollTimer: Timer?
@@ -52,6 +73,7 @@ final class MediaService: ObservableObject {
     var wantsFrequentUpdates = false
 
     func start() {
+        store.handoffEnabled = handoffMode != .off   // the saved choice, not the store's default
         if NowPlayingBridge.isBundled {
             bridge.test { [weak self] ok in
                 guard let self else { return }
@@ -214,30 +236,94 @@ final class MediaService: ObservableObject {
 
     // MARK: Handoff
 
+    /// Pauses (or, in duck mode, quiets) whatever Music/Spotify is playing, and reports each one to the store.
     private func pauseMusic() {
-        Self.trace("handoff start: pausing music for \(store.activeBundleID ?? "-")")
+        let duck = handoffMode == .duck
+        Self.trace("handoff start (\(duck ? "duck" : "pause")) for \(store.activeBundleID ?? "-")")
         for source in MusicSource.allCases where Self.isRunning(source.bundleID) && !store.scriptDenied.contains(source.bundleID) {
             let id = source.bundleID
+            let script = duck
+                ? "if player state is playing then\nset v to sound volume\nset sound volume to (round (v * \(HandoffMode.duckLevel)))\nreturn v\nend if\nreturn -1"
+                : "if player state is playing then\npause\nreturn 1\nend if\nreturn -1"
             queue.async {
-                let (value, error) = Self.run("if player state is playing then\npause\nreturn true\nend if\nreturn false", bundleID: id)
-                Self.trace("handoff pause \(id) paused=\(value?.booleanValue == true) error=\(error.map(String.init) ?? "nil")")
+                let (value, error) = Self.run(script, bundleID: id)
+                let result = Int(value?.int32Value ?? -1)
+                Self.trace("handoff \(duck ? "duck" : "pause") \(id) result=\(result) error=\(error.map(String.init) ?? "nil")")
                 DispatchQueue.main.async {
                     if error == -1743 { self.store.automationDenied(id); self.noticeDenied(id); self.applyDisplay(); return }
-                    guard value?.booleanValue == true else { return }
+                    guard result >= 0 else { return }
+                    if duck { self.duckedVolumes[id] = result }
                     self.perform(self.store.musicPaused(id))
                 }
             }
         }
     }
 
+    /// Plays paused music again, or fades ducked music back up to where it was.
     private func resume(_ ids: [String]) {
         Self.trace("handoff resume \(ids.joined(separator: ","))")
         for id in ids {
+            if let volume = duckedVolumes.removeValue(forKey: id) {
+                fadeVolume(id, to: volume)
+                continue
+            }
             queue.async {
                 _ = Self.run("if player state is paused then play", bundleID: id)
                 DispatchQueue.main.async { self.poll(id) }
             }
         }
+    }
+
+    /// Four steps over about 0.6 s, so the music swells back instead of jumping.
+    private func fadeVolume(_ id: String, to target: Int) {
+        queue.async {
+            let (value, _) = Self.run("return sound volume", bundleID: id)
+            let start = Int(value?.int32Value ?? Int32(target))
+            for step in 1...4 {
+                let level = start + (target - start) * step / 4
+                _ = Self.run("set sound volume to \(level)", bundleID: id)
+                if step < 4 { Thread.sleep(forTimeInterval: 0.15) }
+            }
+            DispatchQueue.main.async { self.appVolumes[id] = Double(target) }
+        }
+    }
+
+    /// Puts ducked music back at once; called when Damla quits so nothing stays quiet.
+    func restoreDucked() {
+        for (id, volume) in duckedVolumes { _ = Self.run("set sound volume to \(volume)", bundleID: id) }
+        duckedVolumes.removeAll()
+    }
+
+    // MARK: Per-app volume (Music, Spotify)
+
+    /// Music/Spotify apps that are running and reachable: the rows the mixer can offer today.
+    var scriptablePlayers: [String] {
+        MusicSource.allCases.map(\.bundleID).filter { Self.isRunning($0) && !store.scriptDenied.contains($0) }
+    }
+
+    func refreshAppVolumes() {
+        for id in scriptablePlayers {
+            queue.async {
+                let (value, error) = Self.run("return sound volume", bundleID: id)
+                DispatchQueue.main.async {
+                    if error == -1743 { self.store.automationDenied(id); self.noticeDenied(id); return }
+                    if let value { self.appVolumes[id] = Double(value.int32Value) }
+                }
+            }
+        }
+    }
+
+    /// Slider moves arrive many times a second; the player gets the last one after a short pause.
+    func setAppVolume(_ id: String, _ volume: Double) {
+        let level = Int(min(100, max(0, volume)).rounded())
+        appVolumes[id] = Double(level)
+        duckedVolumes.removeValue(forKey: id)   // a hand-picked level wins over a pending restore
+        volumeWork[id]?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.queue.async { _ = Self.run("set sound volume to \(level)", bundleID: id) }
+        }
+        volumeWork[id] = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
     }
 
     func connect(_ selected: MusicSource) {

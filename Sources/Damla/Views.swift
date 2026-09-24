@@ -570,7 +570,9 @@ struct ExpandedView: View {
                 .help("Kapat")
             Group {
                 switch model.selectedTab {
-                case .home: HomeView(model: model, media: model.media)
+                case .home:
+                    if model.mixerVisible { MixerView(model: model, media: model.media) }
+                    else { HomeView(model: model, media: model.media) }
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
                 case .focus: FocusView(model: model)
@@ -578,7 +580,7 @@ struct ExpandedView: View {
                 }
             }
             .transition(.blurReplace)
-            .id(model.selectedTab.rawValue)
+            .id(model.selectedTab == .home && model.mixerVisible ? "mixer" : model.selectedTab.rawValue)
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
             .frame(width: Layout.panelWidth, height: Layout.contentHeight)
         }
@@ -711,18 +713,14 @@ struct HomeView: View {
                         statusLabel(model.battery.symbol, "\(model.battery.percentage)%", tint: model.battery.plugged ? Theme.green : nil)
                     }
                     if let volume = model.volume {
-                        // Tap the level to pick where sound goes; away from the speakers it shows that device's icon.
-                        Menu {
-                            ForEach(model.outputs) { output in
-                                Button { AudioOutputs.setDefault(output.id) } label: {
-                                    Label(output.name, systemImage: output.id == model.currentOutput ? "checkmark" : output.icon)
-                                }
-                            }
-                        } label: {
+                        // Tap the level for the mixer (output device, per-app levels); away from the speakers it shows
+                        // that device's icon.
+                        Button { withAnimation(Theme.quick) { model.mixerVisible = true } } label: {
                             statusLabel(model.muted ? "speaker.slash" : outputIcon, model.muted ? "0" : "\(Int(volume * 100))")
+                                .contentShape(Rectangle())
                         }
-                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                        .help("Ses çıkışı: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—")")
+                        .buttonStyle(.plain)
+                        .help("Ses: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—") · mikseri aç")
                     }
                     Spacer()
                     if media.bridgeActive, !media.sessions.isEmpty {

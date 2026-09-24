@@ -185,9 +185,15 @@ private struct MediaSettings: View {
             }
             if media.bridgeActive {
                 Section {
-                    Toggle(isOn: $media.handoffEnabled) {
-                        Text("Video başlayınca müziği duraklat")
-                        Text("Tarayıcıda ya da başka bir oynatıcıda bir şey çalmaya başlayınca Apple Music ve Spotify duraklar; o durunca müzik kaldığı yerden devam eder.")
+                    Picker(selection: $media.handoffMode) {
+                        ForEach(HandoffMode.allCases) { Text($0.title).tag($0) }
+                    } label: {
+                        Text("Video başlayınca müzik")
+                        Text(media.handoffMode == .duck
+                             ? "Apple Music ve Spotify’ın sesi %20’ye iner; video durunca yavaşça eski seviyesine döner."
+                             : media.handoffMode == .pause
+                             ? "Apple Music ve Spotify duraklar; video durunca kaldığı yerden devam eder."
+                             : "Müziğe dokunulmaz.")
                     }
                 } footer: {
                     Text("İlk seferde macOS, Damla’nın Müzik veya Spotify’ı kontrol etmesi için izin ister.")
