@@ -243,7 +243,7 @@ final class PanelController {
 
     func visibleRect() -> NSRect {
         guard let screen else { return .zero }
-        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY)
+        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY, tall: model.tallPanel)
     }
 
     private func trackHover() {
@@ -269,7 +269,9 @@ final class PanelController {
             enteredAt = nil
             if exitedAt == nil { exitedAt = now }
             let editing = panel.isKeyWindow && model.selectedTab == .clipboard
-            if model.expanded && isActive && !model.pinnedOpen && !editing && NSEvent.pressedMouseButtons == 0
+            // Lyrics are read from a distance while the song plays: they stay open until closed by hand
+            // (the X, a click on the notch, ⌃⌥Space).
+            if model.expanded && isActive && !model.pinnedOpen && !editing && !model.tallPanel && NSEvent.pressedMouseButtons == 0
                 && now.timeIntervalSince(exitedAt!) > 0.28 {
                 model.expanded = false
             }
@@ -558,6 +560,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case let step where step.hasPrefix("onboarding-"): onboarding.present(page: Int(step.dropFirst(11)))
         case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
         case "media-demo": model.media.injectDemoSessions()
+        case let id where id.hasPrefix("select:"): model.media.select(String(id.dropFirst(7)))
         case let list where list.hasPrefix("tabs:"):   // e.g. tabs:home,focus,agents
             let wanted = Set(list.dropFirst(5).split(separator: ",").compactMap { name in PanelTab.allCases.first { "\($0)" == name } })
             for tab in PanelTab.allCases { model.setTab(tab, enabled: true) }

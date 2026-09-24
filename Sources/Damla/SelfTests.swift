@@ -54,6 +54,8 @@ func runSelfTests() -> Int32 {
     check(Layout.shapeSize(.closed, notch, compactSlots: 2).width > Layout.shapeSize(.closed, notch, compactSlots: 1).width, "Two activities widen the closed notch")
     check(Layout.shapeSize(.expanded, notch, compactSlots: 0).height == 32 + Layout.contentHeight, "Expanded panel sits under the notch")
     check(Layout.shapeSize(.expanded, flat, compactSlots: 0).height == 12 + Layout.contentHeight, "Notchless panel uses a slim header")
+    check(Layout.shapeSize(.expanded, notch, compactSlots: 0, tall: true).height == 32 + Layout.tallContentHeight
+          && Layout.windowSize(notch).height >= 32 + Layout.tallContentHeight + Layout.pillGap + Layout.pillHeight, "Lyrics panel grows down inside the window")
     let window = Layout.windowSize(notch)
     let visible = Layout.visibleRect(.expanded, notch, compactSlots: 2, midX: 0, top: 0)
     check(window.width >= visible.width && window.height >= visible.height, "Window always contains the drawn shape")

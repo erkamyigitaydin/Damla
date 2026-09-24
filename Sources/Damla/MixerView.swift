@@ -137,49 +137,148 @@ struct PaneHeader: View {
     }
 }
 
-/// The whole lyrics, the sung line bright and kept in view; plain text when nobody timed them.
+/// Lyrics the way Apple Music shows them: big bold lines, the sung one bright and held a third of the way down,
+/// the rest dimmed and softly blurred the further they are. Scrolling by hand pauses the follow for a few
+/// seconds; tapping a line jumps the song there. The panel grows down for it (see AppState.tallPanel).
 struct LyricsView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
     @ObservedObject var lyrics: LyricsService
+    @State private var followPausedUntil = Date.distantPast
+    private var tint: Color { media.accent.map { Color(nsColor: $0) } ?? .white }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            PaneHeader(title: Text(verbatim: media.title)) { withAnimation(Theme.quick) { model.homePane = .player } }
-            if lyrics.lyrics.lines.isEmpty {
-                ScrollView {
-                    Text(lyrics.lyrics.instrumental ? String(localized: "Enstrümantal") : lyrics.lyrics.plain)
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.85))
-                        .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
-                }.scrollIndicators(.hidden)
-            } else {
-                let current = lyrics.lyrics.index(at: media.livePosition(at: model.now))
-                ScrollViewReader { reader in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 5) {
-                            ForEach(Array(lyrics.lyrics.lines.enumerated()), id: \.offset) { index, line in
-                                Text(line.text.isEmpty ? "♪" : line.text)
-                                    .font(.system(size: index == current ? 13.5 : 12, weight: index == current ? .semibold : .medium))
-                                    .foregroundStyle(index == current ? Color.white : Theme.faint)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(index)
-                                    .onTapGesture { media.seek(line.time) }   // jump the song to this line
-                            }
-                        }
-                        .padding(.vertical, 40)
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Artwork(image: media.artwork, placeholder: "music.note", size: 38)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: media.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    Text(verbatim: media.artist).font(.system(size: 11)).foregroundStyle(Theme.dim).lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                IconButton(icon: "xmark", label: "Kapat", size: 24) { withAnimation(Theme.quick) { model.homePane = .player } }
+            }
+            Group {
+                if !lyrics.lyrics.lines.isEmpty { synced }
+                else if !lyrics.lyrics.plain.isEmpty || lyrics.lyrics.instrumental { plain }
+                else {
+                    // Still looking, or nothing to show: say so instead of an empty panel.
+                    VStack(spacing: 8) {
+                        Image(systemName: lyrics.state == .loading ? "text.magnifyingglass" : "text.quote").font(.system(size: 24, weight: .light))
+                        Text(lyrics.state == .loading ? "Sözler aranıyor…" : "Bu şarkının sözü bulunamadı").font(.system(size: 13, weight: .medium))
                     }
-                    .scrollIndicators(.hidden)
-                    .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.18),
-                                                 .init(color: .black, location: 0.82), .init(color: .clear, location: 1)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .onChange(of: current) { _, line in
-                        guard let line else { return }
-                        withAnimation(.easeInOut(duration: 0.35)) { reader.scrollTo(line, anchor: .center) }
-                    }
-                    .onAppear { if let current { reader.scrollTo(current, anchor: .center) } }
+                    .foregroundStyle(Theme.faint)
                 }
             }
-            Text("lrclib.net").font(.system(size: 8.5, weight: .medium)).foregroundStyle(Theme.faint)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack(spacing: 10) {
+                small("backward.fill", "Önceki") { media.command("previous track") }
+                Button { media.command("playpause") } label: {
+                    Image(systemName: media.playing ? "pause.fill" : "play.fill").font(.system(size: 12.5, weight: .bold))
+                        .frame(width: 30, height: 30).contentShape(Circle()).contentTransition(.symbolEffect(.replace))
+                }.buttonStyle(GlassCircleStyle()).help(media.playing ? "Duraklat" : "Oynat")
+                small("forward.fill", "Sonraki") { media.command("next track") }
+                ScrubBar(position: media.livePosition(at: model.now), duration: media.duration, tint: tint) { media.seek($0) }
+                    .padding(.leading, 4)
+            }
+            .frame(height: 32)
         }
+    }
+
+    private var synced: some View {
+        let lines = lyrics.lyrics.lines
+        let current = lyrics.lyrics.index(at: media.livePosition(at: model.now))
+        let following = model.now >= followPausedUntil
+        return ScrollViewReader { reader in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 13) {
+                    Color.clear.frame(height: 24)
+                    ForEach(lines.indices, id: \.self) { index in
+                        LyricLineView(text: lines[index].text,
+                                      role: index == current ? .current : (current.map { index < $0 } ?? false) ? .past : .upcoming,
+                                      distance: abs(index - (current ?? 0)), blurred: following)
+                            .id(index)
+                            .contentShape(Rectangle())
+                            .onTapGesture { media.seek(lines[index].time + 0.05); followPausedUntil = .distantPast }
+                    }
+                    Color.clear.frame(height: 150)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.1),
+                                         .init(color: .black, location: 0.8), .init(color: .clear, location: 1)],
+                                 startPoint: .top, endPoint: .bottom))
+            .onScrollPhaseChange { _, phase in
+                // Only the user's own scrolling pauses the follow, not our animated scrollTo.
+                if phase == .interacting || phase == .decelerating { followPausedUntil = Date().addingTimeInterval(3) }
+            }
+            .onChange(of: current) { _, line in
+                guard let line, Date() >= followPausedUntil else { return }
+                withAnimation(.spring(duration: 0.65, bounce: 0.12)) { reader.scrollTo(line, anchor: UnitPoint(x: 0, y: 0.3)) }
+            }
+            .onChange(of: following) { _, resumed in
+                if resumed, let current { withAnimation(.spring(duration: 0.65, bounce: 0.12)) { reader.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) } }
+            }
+            .onAppear {
+                MediaService.trace("lyrics view: \(lines.count) lines, current=\(current.map(String.init) ?? "nil"), state=\(lyrics.state)")
+                if let current { reader.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.3)) }
+            }
+        }
+    }
+
+    private var plain: some View {
+        ScrollView {
+            Group {
+                if lyrics.lyrics.instrumental {
+                    Label("Enstrümantal", systemImage: "music.note").font(.system(size: 20, weight: .bold)).foregroundStyle(.white.opacity(0.8))
+                } else {
+                    Text(verbatim: lyrics.lyrics.plain).font(.system(size: 16, weight: .semibold)).lineSpacing(5)
+                        .foregroundStyle(.white.opacity(0.85)).textSelection(.enabled)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
+        }.scrollIndicators(.hidden)
+    }
+
+    private func small(_ icon: String, _ label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.white)
+                .frame(width: 26, height: 26).contentShape(Circle())
+        }.buttonStyle(GlassCircleStyle()).help(label)
+    }
+}
+
+/// One lyric line: bright and full size while sung, dim before and after, blurred a little more with distance.
+/// An empty line is an instrumental gap and shows three breathing dots.
+struct LyricLineView: View {
+    enum Role { case past, current, upcoming }
+    let text: String
+    let role: Role
+    let distance: Int
+    let blurred: Bool
+    var body: some View {
+        Group {
+            if text.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(0..<3, id: \.self) { dot in
+                        Circle().frame(width: 7, height: 7)
+                            .phaseAnimator(role == .current ? [0.35, 1] : [0.35]) { view, phase in view.opacity(phase) } animation: { _ in
+                                .easeInOut(duration: 0.6).delay(Double(dot) * 0.2)
+                            }
+                    }
+                }
+                .frame(height: 24)
+            } else {
+                Text(verbatim: text).font(.system(size: 21, weight: .bold)).lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .foregroundStyle(.white.opacity(role == .current ? 1 : role == .past ? 0.3 : 0.45))
+        .scaleEffect(role == .current ? 1 : 0.965, anchor: .leading)
+        .blur(radius: blurred && role != .current ? min(Double(distance) * 0.55, 2.4) : 0)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeOut(duration: 0.35), value: role)
+        .animation(.easeOut(duration: 0.35), value: blurred)
     }
 }
 

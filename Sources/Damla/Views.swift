@@ -100,11 +100,11 @@ struct DamlaView: View {
     @State private var glassVisible = false
     init(model: AppState, screen: ScreenMetrics) { self.model = model; media = model.media; self.screen = screen }
 
-    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics }
+    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics; var tall: Bool }
     private var state: NotchState { model.state(for: screen.id) }
     private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
-    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots) }
+    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots, tall: model.tallPanel) }
     private var shape: NotchShape {
         let bottom: CGFloat = open ? 26 : state == .drop ? 24 : 13
         return metrics.hasNotch
@@ -123,7 +123,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics, tall: model.tallPanel))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -171,6 +171,9 @@ struct DamlaView: View {
                 .init(color: .black.opacity(open ? 0 : 1), location: notchEdge + bodyHeight * 0.97),
                 .init(color: .black.opacity(open ? 0 : 1), location: 1)
             ], startPoint: .top, endPoint: .bottom))
+            // Lyrics are long white text over the glass: darken the whole body so what is behind never reads through.
+            shape.fill(Color.black.opacity(open && model.tallPanel ? 0.55 : 0))
+                .animation(.easeInOut(duration: 0.35), value: model.tallPanel)
             content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
         }
         .clipShape(shape)
@@ -210,7 +213,7 @@ struct DamlaView: View {
                         .padding(.top, Layout.headerHeight(metrics))
                 } else { ExpandedView(model: model, metrics: metrics) }
             }
-                .frame(width: Layout.panelWidth, height: Layout.headerHeight(metrics) + Layout.contentHeight)
+                .frame(width: Layout.panelWidth, height: Layout.headerHeight(metrics) + Layout.contentHeight(tall: model.tallPanel))
                 .transition(AnyTransition.asymmetric(
                     insertion: AnyTransition(.blurReplace),
                     removal: .opacity.animation(.easeOut(duration: 0.12))
@@ -592,7 +595,7 @@ struct ExpandedView: View {
             .transition(.blurReplace)
             .id(model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue)
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
-            .frame(width: Layout.panelWidth, height: Layout.contentHeight)
+            .frame(width: Layout.panelWidth, height: Layout.contentHeight(tall: model.tallPanel))
         }
         .overlay(alignment: .bottom) {
             if let notice = model.notice {

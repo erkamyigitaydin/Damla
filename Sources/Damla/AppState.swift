@@ -76,6 +76,8 @@ final class AppState: ObservableObject {
     /// What Özet shows: the player, the output list, or the volume levels.
     enum HomePane { case player, outputs, levels, lyrics, sources }
     @Published var homePane: HomePane = .player
+    /// The lyrics stretch the open panel down to the tall height.
+    var tallPanel: Bool { selectedTab == .home && homePane == .lyrics }
     /// Scroll on the notch strip: vertical for volume, a horizontal swipe to skip tracks.
     @Published var notchGestures = UserDefaults.standard.object(forKey: "notchGestures") as? Bool ?? true {
         didSet { UserDefaults.standard.set(notchGestures, forKey: "notchGestures") }
