@@ -339,27 +339,6 @@ struct CompactRow: View {
     }
 }
 
-/// Four bars breathing with the music. Driven by a paused-capable timeline, so it costs nothing when stopped.
-struct Equalizer: View {
-    var playing: Bool
-    var color: Color = .white
-    private let speeds: [Double] = [7.1, 9.3, 6.2, 8.4]
-    private let offsets: [Double] = [0, 1.3, 2.1, 0.7]
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 14, paused: !playing)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            HStack(alignment: .center, spacing: 2.5) {
-                ForEach(0..<4, id: \.self) { i in
-                    Capsule().fill(color)
-                        .frame(width: 2.5, height: playing ? 4 + 10 * abs(sin(t * speeds[i] / 2 + offsets[i])) : 3)
-                }
-            }
-            .frame(height: 14)
-            .animation(.linear(duration: 0.07), value: t)
-        }
-    }
-}
-
 // MARK: - Agent mascot
 
 /// Damla's drop mascot acting out the session's phase, with the agent's app icon (Claude, Codex) as a badge
@@ -410,15 +389,7 @@ struct AgentStatusMark: View {
     private var tint: Color { phase == .waiting || phase == .failed ? Theme.amber : Theme.accent }
     var body: some View {
         if phase == .working {
-            TimelineView(.animation(minimumInterval: 1 / 12, paused: Theme.reduceMotion)) { context in
-                let t = context.date.timeIntervalSinceReferenceDate
-                HStack(spacing: 3) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Circle().fill(tint).frame(width: 4.5, height: 4.5)
-                            .opacity(0.35 + 0.65 * max(0, sin(t * 2.6 - Double(i) * 0.9)))
-                    }
-                }
-            }
+            ThinkingDots(color: tint)
         } else if phase == .waiting, let since = waitingSince {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(AgentText.duration(context.date.timeIntervalSince(since)))
