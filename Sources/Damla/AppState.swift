@@ -20,18 +20,6 @@ enum PanelTab: String, CaseIterable, Identifiable {
         case .mirror: return "person.crop.square"; case .shortcuts: return "bolt"; case .agents: return "terminal"
         }
     }
-    /// One line for the settings page that turns pages on and off.
-    var summary: String {
-        switch self {
-        case .home: return String(localized: "Şimdi çalan, ses ve odak sayacı")
-        case .files: return String(localized: "Sürükleyip bıraktığın dosyalar; kapalıyken sürükleme tepsisi de açılmaz")
-        case .clipboard: return String(localized: "Kopyaladıkların; geçmişi tutmayı Genel’den ayrıca kapatabilirsin")
-        case .focus: return String(localized: "Pomodoro sayacı")
-        case .mirror: return String(localized: "Görüşmeden önce kameraya bak; kamera yalnızca bu sayfa açıkken çalışır")
-        case .shortcuts: return String(localized: "Apple Kestirmeleri; sabitlediklerin tek dokunuşluk düğme olur")
-        case .agents: return String(localized: "Claude Code ve Codex oturumları; izin soruları kapalıyken de gelir")
-        }
-    }
     /// Pages the user keeps in the panel, in the fixed order; never empty. A page added in an update starts
     /// switched on: only pages the user has already seen in the settings can be off.
     static func loadEnabled(defaults: UserDefaults = .standard) -> Set<PanelTab> {

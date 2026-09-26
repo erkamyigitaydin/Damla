@@ -55,6 +55,8 @@ final class SettingsWindowController: NSWindowController {
 }
 
 // MARK: - Tabs
+// Every row says what it does in its title; a subtitle is kept only where the user must know something the
+// title cannot say (privacy, a permission, how to get out).
 
 private struct GeneralSettings: View {
     @ObservedObject var model: AppState
@@ -66,44 +68,31 @@ private struct GeneralSettings: View {
                 Toggle("İmleç çentiğe gelince aç", isOn: $model.automaticOpen)
                     .onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
                 Toggle("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                Toggle(isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) })) {
-                    Text("Pano geçmişini tut")
-                    Text("Kopyaladığın metin ve görseller Pano sekmesinde listelenir. Parola yöneticilerinden gelenler atlanır.")
-                }
-                Toggle(isOn: $model.screenshotsToShelf) {
-                    Text("Ekran görüntüleri rafa")
-                    Text("Yeni ekran görüntüleri kendiliğinden rafa eklenir; oradan sürükleyip bırakabilirsin.")
-                }
-            }
-            Section {
-                Picker(selection: $language) {
+                Picker("Dil", selection: $language) {
                     ForEach(AppLanguage.allCases) { Text($0.title).tag($0) }
-                } label: {
-                    Text("Dil")
-                    Text("Değişiklik Damla yeniden açılınca uygulanır.")
                 }
                 .onChange(of: language) { _, picked in AppLanguage.set(picked); restartNeeded = AppLanguage.pendingRestart }
                 if restartNeeded {
-                    LabeledContent {
-                        Button("Yeniden başlat") { AppLanguage.relaunch() }
-                    } label: { Text("Yeni dil için Damla’yı yeniden başlat") }
+                    LabeledContent("Yeni dil yeniden açılınca gelir") { Button("Yeniden başlat") { AppLanguage.relaunch() } }
                 }
             }
             MeetingSettings(model: model, calendar: model.calendar)
-            Section("Kısayol") {
-                LabeledContent("Paneli aç veya kapat") {
-                    Text("⌃ ⌥ Space").font(.system(.body, design: .rounded)).foregroundStyle(.secondary)
-                }
+            Section("Kısayollar") {
+                shortcut("Paneli aç veya kapat", "⌃ ⌥ Space")
+                shortcut("Onayda izin ver · reddet", "⌃ ⌥ ↩ · ⌃ ⌥ ⌫")
             }
             Section {
                 LabeledContent {
                     Button("Klavyeyi kilitle") { model.startCleaning() }
                 } label: {
                     Text("Temizlik modu")
-                    Text("Tüm klavyeler 60 saniye kilitlenir, fare çalışır. Çıkmak için Esc’yi 2 saniye basılı tut.")
+                    Text("60 saniye; çıkmak için Esc’yi 2 saniye basılı tut.")
                 }
             }
         }
+    }
+    private func shortcut(_ title: LocalizedStringKey, _ keys: String) -> some View {
+        LabeledContent(title) { Text(verbatim: keys).font(.system(.body, design: .rounded)).foregroundStyle(.secondary) }
     }
 }
 
@@ -111,31 +100,24 @@ private struct PanelSettings: View {
     @ObservedObject var model: AppState
     var body: some View {
         Form {
-            Section {
+            Section("Sayfalar") {
                 ForEach(PanelTab.allCases) { tab in
                     let on = model.enabledTabs.contains(tab)
                     Toggle(isOn: Binding(get: { on }, set: { model.setTab(tab, enabled: $0) })) {
-                        Label {
-                            Text(tab.title)
-                            Text(tab.summary)
-                        } icon: {
-                            Image(systemName: tab.icon)
-                        }
+                        Label(tab.title, systemImage: tab.icon)
                     }
-                    .disabled(on && model.enabledTabs.count == 1)
+                    .disabled(on && model.enabledTabs.count == 1)   // one page always stays
                 }
-            } header: {
-                Text("Sayfalar")
-            } footer: {
-                Text("Kapattığın sayfa panelin alt kapsülünden kalkar. En az bir sayfa açık kalır.")
             }
-            Section {
-                Toggle(isOn: $model.notchGestures) {
-                    Text("Kaydırarak sayfa değiştir")
-                    Text("Panel açıkken trackpad’de iki parmakla sola kaydırmak sonraki, sağa kaydırmak önceki sayfaya geçer.")
+            Section("Dosyalar ve Pano") {
+                Toggle("Ekran görüntüleri rafa düşsün", isOn: $model.screenshotsToShelf)
+                Toggle(isOn: Binding(get: { model.clipboardEnabled }, set: { model.toggleClipboard($0) })) {
+                    Text("Pano geçmişini tut")
+                    Text("Parola yöneticilerinden gelenler kaydedilmez.")
                 }
-            } header: {
-                Text("Hareketler")
+            }
+            Section("Hareketler") {
+                Toggle("Trackpad’de iki parmakla sayfa değiştir", isOn: $model.notchGestures)
             }
         }
     }
@@ -157,15 +139,15 @@ private struct DisplaySettings: View {
                     ForEach(ExternalStyle.allCases) { Text($0.title).tag($0) }
                 } label: {
                     Text("Çentiksiz ekranda")
-                    Text(model.externalStyle == .menuBar ? "Menü çubuğuna çentik biçiminde oturur." as LocalizedStringKey : "Menü çubuğunun hemen altında yüzen bir hap.")
+                    Text(model.externalStyle == .menuBar ? "Menü çubuğuna oturur." as LocalizedStringKey : "Menü çubuğunun altında yüzer.")
                 }
             }
             .onChange(of: model.displayMode) { _, _ in model.savePreferences() }
             .onChange(of: model.externalStyle) { _, _ in model.savePreferences() }
             Section {
                 Toggle(isOn: Binding(get: { model.hideSystemHUD }, set: { model.setHideSystemHUD($0) })) {
-                    Text("Ses ve parlaklık göstergesini Damla çizsin")
-                    Text("macOS’un ekran ortasındaki göstergesi yerine çentikte küçük bir gösterge çıkar. Erişilebilirlik izni ister.")
+                    Text("Ses ve parlaklık göstergesi çentikte")
+                    Text("Erişilebilirlik izni ister.")
                 }
                 if model.hideSystemHUD && !keys.active {
                     LabeledContent {
@@ -193,17 +175,13 @@ private struct MediaSettings: View {
         Form {
             Section {
                 LabeledContent("Kaynak") {
-                    Text(media.bridgeActive ? "Sistem · tüm oynatıcılar" : "Apple Music veya Spotify").foregroundStyle(.secondary)
+                    Text(media.bridgeActive ? "Tüm oynatıcılar" : "Apple Music veya Spotify").foregroundStyle(.secondary)
                 }
                 if !media.bridgeActive {
                     Picker("Oynatıcı", selection: Binding(get: { media.source }, set: { media.connect($0) })) {
                         ForEach(MusicSource.allCases) { Text($0.rawValue).tag($0) }
                     }
                     if media.connected { Button("Bağlantıyı kes") { media.disconnect() } }
-                }
-            } footer: {
-                if media.bridgeActive {
-                    Text("Müzik, Spotify, Safari, Chrome ve Şimdi Çalıyor’a bilgi veren her uygulama görünür. Birden fazlası çalıyorsa panelde ikonlarına dokunarak geçiş yapabilirsin.")
                 }
             }
             if media.bridgeActive {
@@ -212,22 +190,13 @@ private struct MediaSettings: View {
                         ForEach(HandoffMode.allCases) { Text($0.title).tag($0) }
                     } label: {
                         Text("Video başlayınca müzik")
-                        Text(media.handoffMode == .duck
-                             ? "Apple Music ve Spotify’ın sesi %20’ye iner; video durunca yavaşça eski seviyesine döner."
-                             : media.handoffMode == .pause
-                             ? "Apple Music ve Spotify duraklar; video durunca kaldığı yerden devam eder."
-                             : "Müziğe dokunulmaz.")
+                        Text(media.handoffMode == .duck ? "Ses kısılır, video bitince geri gelir."
+                             : media.handoffMode == .pause ? "Duraklar, video bitince kaldığı yerden devam eder." : "Müziğe dokunulmaz.")
                     }
-                } footer: {
-                    Text("İlk seferde macOS, Damla’nın Müzik veya Spotify’ı kontrol etmesi için izin ister.")
-                }
-                Section {
                     Toggle(isOn: $lyrics.enabled) {
                         Text("Şarkı sözleri")
-                        Text("Özet’te o an söylenen satır görünür; dokununca sözlerin tamamı akar.")
+                        Text("lrclib.net’e yalnızca şarkı adı, sanatçı, albüm ve süre gider.")
                     }
-                } footer: {
-                    Text("Sözler lrclib.net’ten gelir: çalan şarkının adı, sanatçısı, albümü ve süresi gönderilir, başka hiçbir şey gitmez. Bulunan sözler bu Mac’te saklanır. Tarayıcı videoları ve canlı yayınlar için sorgu yapılmaz.")
                 }
             }
         }
@@ -239,10 +208,10 @@ private struct MeetingSettings: View {
     @ObservedObject var model: AppState
     @ObservedObject var calendar: CalendarService
     var body: some View {
-        Section {
+        Section("Takvim ve görüşmeler") {
             Toggle(isOn: $calendar.enabled) {
                 Text("Sıradaki toplantı")
-                Text("Başlamasına 10 dakika kala çentikte geri sayım; Zoom, Meet, Teams, Webex veya FaceTime bağlantısı varsa tek tıkla katıl.")
+                Text("10 dakika kala geri sayım, bağlantısı varsa tek tıkla katıl. Takvim bu Mac’te kalır.")
             }
             if calendar.enabled && (calendar.access == .denied || calendar.access == .restricted) {
                 LabeledContent {
@@ -250,17 +219,10 @@ private struct MeetingSettings: View {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") { NSWorkspace.shared.open(url) }
                     }
                 } label: {
-                    Text("Takvim erişimi kapalı").foregroundStyle(.orange)
+                    Label("Takvim izni kapalı", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 }
             }
-            Toggle(isOn: $model.micInNotch) {
-                Text("Mikrofon kullanımdayken göster")
-                Text("Bir uygulama mikrofonu kullanırken çentikte görünür; dokununca tüm uygulamalar için sessize alır.")
-            }
-        } header: {
-            Text("Takvim ve görüşmeler")
-        } footer: {
-            Text("Takvim bu Mac’te okunur; hiçbir yere gönderilmez.")
+            Toggle("Kullanımdaki mikrofonu göster", isOn: $model.micInNotch)
         }
     }
 }
@@ -274,44 +236,40 @@ private struct AgentSettings: View {
         Form {
             Section {
                 Toggle(isOn: $agents.approvalsEnabled) {
-                    Text("İzinleri çentikten onayla")
-                    Text("Claude Code veya Codex bir komut veya dosya için izin isteyince çentik açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin.")
+                    Text("İzinleri çentikten yanıtla")
+                    Text("Sorunun sahibi uygulama öndeyse çentik sormaz.")
                 }
                 Picker("Bekleme süresi", selection: $agents.approvalWait) {
                     ForEach(AgentApprovals.waitChoices, id: \.self) { Text("\(Int($0)) sn").tag($0) }
                 }
                 .disabled(!agents.approvalsEnabled)
+                Toggle("Onay beklerken ses çal", isOn: $agents.soundEnabled)
+            } header: {
+                Text("Onaylar")
+            }
+            Section {
                 ForEach(HookInstaller.Provider.allCases.filter { HookInstaller.isAvailable($0) }, id: \.self) { provider in
                     let installed = approvalHooks.contains(provider)
                     let untrusted = installed && provider == .codex && codexTrusted == false
-                    LabeledContent(provider == .claude ? "Claude Code onay hook’u" : "Codex onay hook’u") {
+                    LabeledContent(provider == .claude ? "Claude Code" : "Codex") {
                         HStack {
-                            Text(untrusted ? "Codex’te /hooks ile güven onayı bekliyor" : installed ? "Kurulu" : "Kurulu değil")
+                            Text(untrusted ? "Codex’te /hooks ile güven ver" : installed ? "Bağlı" : "Bağlı değil")
                                 .foregroundStyle(installed && !untrusted ? Color.secondary : Color.orange)
-                            if !installed { Button("Kur") { installApprovalHook(provider) } }
+                            if !installed { Button("Bağla") { installApprovalHook(provider) } }
                         }
                     }
                 }
+                if let installError { Text(installError).foregroundStyle(.orange) }
+            } header: {
+                Text("Bağlantı")
             } footer: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Sorunun sahibi uygulama (Terminal, Claude, Codex…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır.")
-                    Text("Codex’te bu, terminaldeki Codex CLI’nin komut onaylarında çalışır; Codex çentik beklerken kendi sorusunu göstermez, terminale geçince soru hemen oraya döner. ChatGPT uygulamasının yetki sorusu yalnızca kendi penceresinden yanıtlanır; çentik onu “Onay bekliyor” olarak gösterir. Yeni hook’a Codex’te /hooks ile bir kez güven onayı vermen gerekir.")
-                    if let installError { Text(installError).foregroundStyle(.orange) }
-                }
+                Text("Codex’te onaylar terminaldeki Codex CLI’de çalışır; ChatGPT uygulamasının soruları kendi penceresinde yanıtlanır.")
             }
             .onAppear { approvalHooks = AgentSettings.checkApprovalHooks(); codexTrusted = HookInstaller.codexApprovalTrusted() }
-            Section {
-                Toggle(isOn: $agents.soundEnabled) {
-                    Text("Onay beklerken ses çal")
-                    Text("Claude Code veya Codex senden izin beklediğinde kısa bir ses çıkar.")
-                }
-            } footer: {
-                Text("Durumlar Claude Code ve Codex hook’larıyla gelir. Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
-            }
         }
     }
 
-    /// Adds the approval hook (with the status hooks) to the agent's settings; the installer keeps a backup.
+    /// Adds the status and approval hooks to the agent's settings; the installer keeps a backup.
     private func installApprovalHook(_ provider: HookInstaller.Provider) {
         do {
             try HookInstaller.install(provider, approvals: true)
@@ -345,10 +303,7 @@ private struct AboutSettings: View {
             }
             if updater.isConfigured {
                 Section {
-                    Toggle(isOn: $updater.automaticChecks) {
-                        Text("Güncellemeleri otomatik denetle")
-                        Text("Günde bir kez GitHub’daki sürüm listesine bakar; sunucu yok, veri gönderilmez.")
-                    }
+                    Toggle("Güncellemeleri otomatik denetle", isOn: $updater.automaticChecks)
                     LabeledContent {
                         Button(updater.availableVersion.map { "\($0) sürümünü yükle" } ?? "Şimdi denetle") { updater.checkForUpdates() }
                     } label: {
@@ -357,19 +312,8 @@ private struct AboutSettings: View {
                 }
             }
             Section {
-                LabeledContent {
-                    Button("Tanıtımı göster", action: showTour)
-                } label: {
-                    Text("İlk açılış rehberi")
-                    Text("İzinleri ve ajan bağlantısını adım adım yeniden kur.")
-                }
-            }
-            Section {
-                LabeledContent {
-                    Button("Çık") { NSApp.terminate(nil) }
-                } label: {
-                    Text("Damla’dan çık")
-                }
+                LabeledContent("İlk açılış rehberi") { Button("Tanıtımı göster", action: showTour) }
+                LabeledContent("Damla’dan çık") { Button("Çık") { NSApp.terminate(nil) } }
             }
         }
     }
