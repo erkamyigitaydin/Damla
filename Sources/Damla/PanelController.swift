@@ -598,6 +598,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for tab in PanelTab.allCases where !wanted.contains(tab) { model.setTab(tab, enabled: false) }
         case let body where body.hasPrefix("music:"): model.media.debugMusic(String(body.dropFirst(6)))
         case "render-media": MainActor.assumeIsolated { renderMedia() }
+        case "render-card": MainActor.assumeIsolated { renderCard() }
         case "approval-allow", "approval-deny":
             if let request = model.agents.approvals.first { model.agents.decide(request, command == "approval-allow" ? .allow : .deny) }
         case "media-sessions": NSLog("Damla media: %@", model.media.sessions.map { "\($0.bundleID) playing=\($0.playing) \($0.title)" }.joined(separator: " | "))
@@ -636,6 +637,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     /// Draws the media views off screen into /tmp (for checks while the real screen is busy or protected).
+    /// Debug: an Ayna print from a drawn test picture, run through the nostalgia look, to /tmp/damla-card.png.
+    @MainActor private func renderCard() {
+        let size = 720
+        let gradient = CIFilter(name: "CILinearGradient", parameters: [
+            "inputPoint0": CIVector(x: 0, y: 0), "inputPoint1": CIVector(x: CGFloat(size), y: CGFloat(size)),
+            "inputColor0": CIColor(red: 0.2, green: 0.45, blue: 0.8), "inputColor1": CIColor(red: 0.95, green: 0.75, blue: 0.45)])
+        guard let base = gradient?.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: size, height: size)),
+              let photo = MirrorAlbum.context.createCGImage(FilmLook.nostalgia.develop(base), from: CGRect(x: 0, y: 0, width: size, height: size)) else { return }
+        let renderer = ImageRenderer(content: PhotoCard(photo: NSImage(cgImage: photo, size: .zero), taken: Date(), width: PhotoCard.printWidth))
+        renderer.scale = 2
+        if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: "/tmp/damla-card.png"))
+        }
+    }
+
     @MainActor private func renderMedia() {
         let m = Layout.Metrics(notchWidth: 180, notchHeight: 32, hasNotch: true)
         let pairs: [(String, AnyView)] = [

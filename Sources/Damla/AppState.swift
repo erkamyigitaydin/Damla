@@ -90,7 +90,8 @@ final class AppState: ObservableObject {
     /// Lyrics mode: the panel grows down with the lyrics flowing under the player, and stays open when the pointer
     /// leaves. Left by the lyrics button or by closing the panel by hand; never restored on the next open.
     @Published var lyricsExpanded = false
-    var tallPanel: Bool { selectedTab == .home && homePane == .player && lyricsExpanded && media.hasTrack }
+    /// The panel stretches down for lyrics and for the Ayna camera; it also stays open when the pointer leaves.
+    var tallPanel: Bool { selectedTab == .mirror || (selectedTab == .home && homePane == .player && lyricsExpanded && media.hasTrack) }
     /// Scroll on the notch strip: vertical for volume, a horizontal swipe to skip tracks.
     @Published var notchGestures = UserDefaults.standard.object(forKey: "notchGestures") as? Bool ?? true {
         didSet { UserDefaults.standard.set(notchGestures, forKey: "notchGestures") }
