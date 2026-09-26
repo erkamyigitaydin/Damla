@@ -31,7 +31,8 @@ enum Theme {
     /// Opening gets a touch of bounce like the Dynamic Island; closing is quick and settled.
     static func motion(open: Bool) -> Animation {
         if reduceMotion { return .easeOut(duration: 0.15) }
-        return open ? .spring(duration: 0.5, bounce: 0.24) : .spring(duration: 0.36, bounce: 0.02)
+        // Closing settles into the notch with the faintest give instead of stopping dead.
+        return open ? .spring(duration: 0.5, bounce: 0.24) : .spring(duration: 0.4, bounce: 0.08)
     }
     static var basket: Animation { reduceMotion ? .easeOut(duration: 0.15) : .spring(duration: 0.42, bounce: 0.3) }
     static var quick: Animation { reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.3, bounce: 0.1) }
@@ -133,9 +134,12 @@ struct DamlaView: View {
             surface.frame(width: size.width, height: size.height)
             // Always present so its top padding animates with the shape: the pill rides down with the panel.
             TabPill(model: model)
-                .padding(.top, size.height + Layout.pillGap)
                 .opacity(open && !model.cleaning.active ? 1 : 0)
-                .scaleEffect(open ? 1 : 0.8, anchor: .top)
+                .scaleEffect(open ? 1 : 0.86, anchor: .top)
+                .blur(radius: open ? 0 : 4)
+                // On the way out the pill goes first and fast, so it never hangs under a shrinking panel.
+                .animation(open ? Theme.motion(open: true) : .easeIn(duration: Theme.reduceMotion ? 0.1 : 0.14), value: open)
+                .padding(.top, size.height + Layout.pillGap)
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -233,14 +237,19 @@ struct DamlaView: View {
                 .frame(width: Layout.panelWidth, height: Layout.headerHeight(metrics) + model.contentHeight)
                 .transition(AnyTransition.asymmetric(
                     insertion: AnyTransition(.blurReplace),
-                    removal: .opacity.animation(.easeOut(duration: 0.12))
+                    // Closing: the page draws back up into the notch rather than just vanishing.
+                    removal: Theme.reduceMotion ? .opacity.animation(.easeOut(duration: 0.12))
+                        : .modifier(active: Retreat(amount: 1), identity: Retreat(amount: 0)).animation(.easeIn(duration: 0.18))
                 ))
         case .hud:
             if let hud = model.hud { HUDRow(hud: hud, metrics: metrics).transition(.blurReplace) }
         case .drop:
             DropRow(metrics: metrics, targeted: dropping, count: model.files.count, dragged: model.dragURLs).transition(.blurReplace)
         case .closed:
-            CompactRow(model: model, media: media, metrics: metrics).transition(.blurReplace)
+            // The closed notch's activities come back once the panel has nearly folded away.
+            CompactRow(model: model, media: media, metrics: metrics)
+                .transition(.asymmetric(insertion: AnyTransition(.blurReplace).animation(.easeOut(duration: 0.24).delay(Theme.reduceMotion ? 0 : 0.16)),
+                                        removal: AnyTransition(.blurReplace)))
         }
     }
 }
@@ -625,6 +634,18 @@ struct ExpandedView: View {
         .foregroundStyle(.white)
         .animation(Theme.page, value: model.selectedTab)
         .animation(Theme.page, value: model.tour)
+    }
+}
+
+/// The open panel's content on its way back into the notch: a little smaller toward the top, up, out of focus.
+private struct Retreat: ViewModifier {
+    let amount: CGFloat
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(1 - 0.07 * amount, anchor: .top)
+            .offset(y: -12 * amount)
+            .blur(radius: 7 * amount)
+            .opacity(1 - amount)
     }
 }
 
