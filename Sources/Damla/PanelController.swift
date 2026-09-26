@@ -707,7 +707,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Only the card on screen can be answered, and only once it has been visible long enough to read.
         let now = Date()
         guard now >= approvalKeysArmed, model.expanded, model.selectedTab == .agents,
-              let request = model.agents.approvals.first(where: { $0.deadline > now }) else { return }
+              let request = model.agents.approvals.first(where: { $0.deadline > now }), request.questions == nil else { return }
         model.agents.decide(request, id == Self.approvalAllowKey ? .allow : .deny)
     }
     func applicationWillTerminate(_ notification: Notification) {

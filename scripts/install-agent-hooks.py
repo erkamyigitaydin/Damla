@@ -10,6 +10,7 @@ import tempfile
 
 MARKER = "Damla durumunu güncelle"
 APPROVAL_MARKER = "Damla onayı bekleniyor · çentikten yanıtla"
+QUESTION_MARKER = "Damla sorusu · çentikten yanıtla"
 APPROVAL_TIMEOUT = 150  # longer than the longest wait offered in Damla (120 s)
 COMMON = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "Stop", "SessionEnd"]
 
@@ -28,7 +29,8 @@ def merge(original, provider, binary, approvals=False):
             copy = dict(group)
             handlers = copy.get("hooks", [])
             ours = lambda h: ((h.get("statusMessage") == MARKER and "--agent-event" in h.get("command", ""))
-                              or (h.get("statusMessage") == APPROVAL_MARKER and "--agent-approval" in h.get("command", "")))
+                              or (h.get("statusMessage") == APPROVAL_MARKER and "--agent-approval" in h.get("command", ""))
+                              or (h.get("statusMessage") == QUESTION_MARKER and "--agent-question" in h.get("command", "")))
             copy["hooks"] = [h for h in handlers if not ours(h)]
             if copy["hooks"] or not handlers:
                 kept.append(copy)
@@ -46,6 +48,11 @@ def merge(original, provider, binary, approvals=False):
         hooks.setdefault("PermissionRequest", []).append({"hooks": [{
             "type": "command", "command": shlex.quote(str(binary)) + " --agent-approval " + provider,
             "timeout": APPROVAL_TIMEOUT, "statusMessage": APPROVAL_MARKER}]})
+        # Claude Code's multiple-choice questions are answered from the notch through PreToolUse.
+        if provider == "claude":
+            hooks.setdefault("PreToolUse", []).append({"matcher": "AskUserQuestion", "hooks": [{
+                "type": "command", "command": shlex.quote(str(binary)) + " --agent-question claude",
+                "timeout": APPROVAL_TIMEOUT, "statusMessage": QUESTION_MARKER}]})
     return data
 
 

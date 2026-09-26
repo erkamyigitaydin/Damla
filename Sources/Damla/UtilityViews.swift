@@ -142,7 +142,12 @@ struct AgentPanelView: View {
             let active = service.sessions.filter { $0.isActive(at: now) }
             let history = service.sessions.filter { !$0.isActive(at: now) }
             if let request = service.approvals.first(where: { $0.deadline > now }) {
-                ApprovalCard(request: request, waiting: service.approvals.count, now: now, service: service)
+                if let questions = request.questions {
+                    QuestionCard(request: request, questions: questions, waiting: service.approvals.count, now: now, service: service)
+                        .id(request.id)
+                } else {
+                    ApprovalCard(request: request, waiting: service.approvals.count, now: now, service: service)
+                }
             } else {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
@@ -236,8 +241,15 @@ struct ApprovalCard: View {
                         .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
                 }.buttonStyle(.plain).help("Soruyu orada yanıtla")
                 Spacer()
-                Text(verbatim: "⌃⌥⌫ · ⌃⌥↩").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
-                    .help("Klavyeden: ⌃⌥⌫ reddet, ⌃⌥↩ izin ver")
+                if let rule = request.always?.first {
+                    // Claude Code's own "don't ask again" suggestion, remembered where it proposed.
+                    Button("Hep izin ver") { service.decide(request, .allowAlways(0)) }
+                        .font(.system(size: 11, weight: .medium)).buttonStyle(PillStyle())
+                        .help(String(localized: "İzin ver ve bir daha sorma: \(rule)"))
+                } else {
+                    Text(verbatim: "⌃⌥⌫ · ⌃⌥↩").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
+                        .help("Klavyeden: ⌃⌥⌫ reddet, ⌃⌥↩ izin ver")
+                }
                 Button("Reddet") { service.decide(request, .deny) }
                     .font(.system(size: 11, weight: .medium)).buttonStyle(PillStyle())
                     .help("Reddet (⌃⌥⌫)")
@@ -259,6 +271,7 @@ struct ApprovalCard: View {
 
     static func title(for tool: String) -> String {
         switch tool {
+        case "AskUserQuestion": return String(localized: "bir şey soruyor")
         case "Bash": return String(localized: "komut çalıştırmak istiyor")
         case "Edit", "MultiEdit", "NotebookEdit", "apply_patch": return String(localized: "dosya düzenlemek istiyor")
         case "Write": return String(localized: "dosya yazmak istiyor")
@@ -267,6 +280,149 @@ struct ApprovalCard: View {
         case "WebSearch": return String(localized: "web’de aramak istiyor")
         default: return tool.hasPrefix("mcp__") ? String(localized: "\(tool.components(separatedBy: "__").dropFirst().first ?? "MCP") aracını kullanmak istiyor") : String(localized: "\(tool) kullanmak istiyor")
         }
+    }
+}
+
+/// Claude Code's multiple-choice question, answered from the notch. One single-choice question is answered by
+/// tapping an option; otherwise options are toggled and sent together. Anything else (typing a custom answer)
+/// happens in the terminal, which gets the question back as soon as the user switches to it.
+struct QuestionCard: View {
+    let request: ApprovalRequest
+    let questions: [QuestionPrompt]
+    let waiting: Int
+    let now: Date
+    @ObservedObject var service: AgentStatusService
+    @State private var chosen: [String: [String]] = [:]   // question → labels in tap order
+
+    private var instant: Bool { questions.count == 1 && !questions[0].multiSelect }
+    private var complete: Bool { questions.allSatisfy { !(chosen[$0.question] ?? []).isEmpty } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                if let icon = request.provider.icon { Image(nsImage: icon).resizable().frame(width: 16, height: 16) }
+                Text(request.project).font(.system(size: 11.5, weight: .semibold)).lineLimit(1)
+                Text(ApprovalCard.title(for: request.tool)).font(.system(size: 11)).foregroundStyle(Theme.amber).lineLimit(1)
+                Spacer(minLength: 4)
+                if waiting > 1 {
+                    Text("+\(waiting - 1)").font(.system(size: 9.5, weight: .semibold, design: .rounded)).foregroundStyle(Theme.dim)
+                        .padding(.horizontal, 5).padding(.vertical, 1).background(Theme.fill, in: Capsule())
+                }
+                Text("\(max(0, Int(request.deadline.timeIntervalSince(now).rounded()))) sn")
+                    .font(.system(size: 9.5, weight: .medium, design: .rounded)).monospacedDigit().foregroundStyle(Theme.faint)
+                    .help("Süre dolunca soru terminalde sorulur")
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(questions, id: \.question) { question in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(question.question).font(.system(size: 11.5, weight: .medium)).fixedSize(horizontal: false, vertical: true)
+                            FlowOptions(options: question.options, selected: chosen[question.question] ?? []) { label in
+                                pick(label, in: question)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 92)
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+                Button { activateHost() } label: {
+                    Label(String(localized: "Terminalde yanıtla"), systemImage: "arrow.up.forward.app")
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
+                }.buttonStyle(.plain).help("Kendi cevabını yazmak için soruyu terminale bırak")
+                Spacer()
+                if !instant {
+                    Button("Gönder") { send() }
+                        .font(.system(size: 11, weight: .semibold)).buttonStyle(PillStyle(accent: true))
+                        .disabled(!complete).opacity(complete ? 1 : 0.5)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+    }
+
+    private func pick(_ label: String, in question: QuestionPrompt) {
+        var labels = chosen[question.question] ?? []
+        if question.multiSelect {
+            if let index = labels.firstIndex(of: label) { labels.remove(at: index) } else { labels.append(label) }
+        } else {
+            labels = [label]
+        }
+        chosen[question.question] = labels
+        if instant { send() }
+    }
+
+    private func send() {
+        guard complete else { return }
+        // Multi-select answers join the labels with commas, in the order the options are listed.
+        var answers: [String: String] = [:]
+        for question in questions {
+            let picked = chosen[question.question] ?? []
+            answers[question.question] = question.options.map(\.label).filter(picked.contains).joined(separator: ", ")
+        }
+        service.decide(request, .answer(answers))
+    }
+
+    private func activateHost() {
+        // Withdrawing the request lets the hook step aside at once, so the question shows up in the terminal.
+        service.withdraw(request)
+        if let session = service.sessions.first(where: { $0.id == request.session }) { service.activate(session); return }
+        if let host = request.host { NSRunningApplication.runningApplications(withBundleIdentifier: host).first?.activate() }
+    }
+}
+
+/// Option pills that wrap onto as many lines as they need.
+private struct FlowOptions: View {
+    let options: [QuestionPrompt.Option]
+    let selected: [String]
+    let pick: (String) -> Void
+    var body: some View {
+        OptionFlowLayout(spacing: 5) {
+            ForEach(options, id: \.label) { option in
+                let on = selected.contains(option.label)
+                Button { pick(option.label) } label: {
+                    Text(option.label).font(.system(size: 10.5, weight: on ? .semibold : .medium)).lineLimit(1)
+                }
+                .buttonStyle(PillStyle(accent: on))
+                .help(option.description ?? option.label)
+            }
+        }
+    }
+}
+
+private struct OptionFlowLayout: SwiftUI.Layout {
+    var spacing: CGFloat
+    func sizeThatFits(proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
+        return CGSize(width: proposal.width ?? rows.map(\.width).max() ?? 0, height: height)
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: LayoutSubviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.items {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+    private func arrange(width: CGFloat, subviews: LayoutSubviews) -> [(items: [Int], width: CGFloat, height: CGFloat)] {
+        var rows: [(items: [Int], width: CGFloat, height: CGFloat)] = []
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if let last = rows.last, last.width + spacing + size.width <= width {
+                rows[rows.count - 1] = (last.items + [index], last.width + spacing + size.width, max(last.height, size.height))
+            } else {
+                rows.append(([index], size.width, size.height))
+            }
+        }
+        return rows
     }
 }
 

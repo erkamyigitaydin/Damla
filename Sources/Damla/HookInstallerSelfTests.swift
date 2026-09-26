@@ -18,11 +18,12 @@ func runHookInstallerSelfTests(_ check: (Bool, String) -> Void) {
     check(!text(merged).contains("--agent-approval") && !text(merged).contains("behavior"), "Approval hook only on request; no decision in settings")
     let codex = (try? HookInstaller.merge([:], provider: .codex, binary: binary, approvals: true)) ?? [:]
     let codexPlain = (try? HookInstaller.merge([:], provider: .codex, binary: binary, approvals: false)) ?? [:]
-    check(text(codex).contains("--agent-approval codex") && !text(codexPlain).contains("--agent-approval") && text(codex).contains("Interrupt"),
-          "Codex gets the approval hook only on request")
+    check(text(codex).contains("--agent-approval codex") && !text(codexPlain).contains("--agent-approval") && text(codex).contains("Interrupt")
+          && !text(codex).contains("--agent-question"), "Codex gets the approval hook only on request, and no question hook")
     let withApprovals = (try? HookInstaller.merge(merged, provider: .claude, binary: binary, approvals: true)) ?? [:]
     let removed = (try? HookInstaller.merge(withApprovals, provider: .claude, binary: binary, approvals: false)) ?? [:]
     check(text(withApprovals).contains("--agent-approval") && !text(removed).contains("--agent-approval")
+          && text(withApprovals).contains("--agent-question claude") && !text(removed).contains("--agent-question")
           && NSDictionary(dictionary: removed).isEqual(to: merged), "Approval hook can be taken out again")
     let trustHome = FileManager.default.temporaryDirectory.appendingPathComponent("Damla-trust-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: trustHome) }

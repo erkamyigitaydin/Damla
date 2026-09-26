@@ -35,9 +35,42 @@ func runApprovalSelfTests(_ check: (Bool, String) -> Void) {
     check(AgentApprovals.summary(tool: "apply_patch", input: ["command": patch]).summary == "~ Sources/a.swift\n+ b.md\n− old.txt",
           "Codex patches show one line per file")
     check(ApprovalCard.title(for: "apply_patch") == "dosya düzenlemek istiyor", "Codex patches read as file edits")
-    check(AgentApprovals.effectiveWait(120, provider: .codex, host: nil) == AgentApprovals.codexUnknownHostWait
+    check(AgentApprovals.effectiveWait(120, provider: .codex, host: nil) == AgentApprovals.silentUnknownHostWait
           && AgentApprovals.effectiveWait(120, provider: .codex, host: "com.apple.Terminal") == 120
-          && AgentApprovals.effectiveWait(120, provider: .claude, host: nil) == 120, "Codex keeps its silent prompt short when the host is unknown")
+          && AgentApprovals.effectiveWait(120, provider: .claude, host: nil, question: true) == AgentApprovals.silentUnknownHostWait
+          && AgentApprovals.effectiveWait(120, provider: .claude, host: nil) == 120, "Silent prompts stay short when the host is unknown")
+
+    // "Always allow": Claude Code's own suggestion is offered and echoed back unchanged.
+    let rule: [String: Any] = ["type": "addRules", "rules": [["toolName": "Bash", "ruleContent": "npm test:*"]], "behavior": "allow", "destination": "localSettings"]
+    let suggested: [String: Any] = ["hook_event_name": "PermissionRequest", "session_id": "s1", "tool_name": "Bash", "tool_input": ["command": "npm test"],
+                                    "permission_suggestions": [["type": "setMode", "mode": "bypassPermissions", "destination": "session"], rule]]
+    let suggestedData = try! JSONSerialization.data(withJSONObject: suggested)
+    check(AgentApprovals.alwaysEntries(suggested, provider: .claude).count == 1 && AgentApprovals.alwaysEntries(suggested, provider: .codex).isEmpty,
+          "Only allow rules and folders are offered, and never to Codex")
+    check(AgentApprovals.alwaysLabel(rule) == "Bash(npm test:*) · bu proje, yalnızca sende", "Always-allow names the rule and where it is kept")
+    let always = try? JSONSerialization.jsonObject(with: AgentApprovals.output(.allowAlways(0), input: suggestedData)) as? [String: Any]
+    let alwaysDecision = (always?["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any]
+    let echoed = (alwaysDecision?["updatedPermissions"] as? [[String: Any]])?.first
+    check(alwaysDecision?["behavior"] as? String == "allow" && echoed.map { NSDictionary(dictionary: $0).isEqual(to: rule) } == true,
+          "Always-allow echoes Claude's suggestion as updatedPermissions")
+    check(ApprovalDecision(fileText: ApprovalDecision.allowAlways(2).fileText) == .allowAlways(2)
+          && ApprovalDecision(fileText: ApprovalDecision.answer(["Hangi?": "A, B"]).fileText) == .answer(["Hangi?": "A, B"])
+          && ApprovalDecision(fileText: "always:-1") == nil && ApprovalDecision(fileText: "yes") == nil, "Decisions survive the file round trip")
+
+    // Questions: shown with their options, answered through PreToolUse with the original questions plus answers.
+    let askInput: [String: Any] = ["questions": [["question": "Hangi çatı?", "header": "Çatı", "options": [["label": "React"], ["label": "Vue", "description": "Daha hafif"]], "multiSelect": false]]]
+    check(AgentApprovals.questions(askInput)?.first?.options.map(\.label) == ["React", "Vue"]
+          && AgentApprovals.questions(["questions": [["question": "Boş?", "options": []]]]) == nil, "Questions need options the notch can show")
+    let ask = try! JSONSerialization.data(withJSONObject: ["hook_event_name": "PreToolUse", "session_id": "s1", "cwd": "/Users/x/Projem",
+                                                           "tool_name": "AskUserQuestion", "tool_input": askInput])
+    let answered = try? JSONSerialization.jsonObject(with: AgentApprovals.output(.answer(["Hangi çatı?": "Vue"]), input: ask)) as? [String: Any]
+    let pre = answered?["hookSpecificOutput"] as? [String: Any]
+    let updated = pre?["updatedInput"] as? [String: Any]
+    check(pre?["hookEventName"] as? String == "PreToolUse" && pre?["permissionDecision"] as? String == "allow"
+          && (updated?["answers"] as? [String: String]) == ["Hangi çatı?": "Vue"] && (updated?["questions"] as? [[String: Any]])?.count == 1,
+          "A question answer goes back as allow + updatedInput with the questions")
+    check(AgentApprovals.output(.allow, input: ask).isEmpty && AgentApprovals.output(.answer(["x": "y"])).isEmpty,
+          "Answers only answer questions, yes/no only answers permissions")
     check(ApprovalCard.title(for: "mcp__figma__use_figma") == "figma aracını kullanmak istiyor", "MCP tools are named by server")
 
     // What Claude Code reads.
@@ -74,6 +107,25 @@ func runApprovalSelfTests(_ check: (Bool, String) -> Void) {
     answer(.allow)
     check(AgentApprovals.handle(provider: .codex, input: event("apply_patch", ["command": patch]), host: nil, directory: approvals, sessions: sessions, environment: env) == .allow,
           "Codex requests are answered the same way")
+    AgentApprovals.heartbeat(directory: approvals)
+    final class Seen: @unchecked Sendable { var request: ApprovalRequest? }
+    let seen = Seen()
+    DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
+        if let request = AgentApprovals.pending(directory: approvals).first {
+            seen.request = request
+            AgentApprovals.decide(request.id, .answer(["Hangi çatı?": "React"]), directory: approvals)
+        }
+    }
+    check(AgentApprovals.handle(provider: .claude, input: ask, host: nil, directory: approvals, sessions: sessions, environment: env) == .answer(["Hangi çatı?": "React"]),
+          "A question answered in the notch reaches the hook")
+    check(seen.request?.questions?.first?.options.count == 2 && seen.request?.summary == "Hangi çatı?", "The notch gets the question and its options")
+    AgentApprovals.heartbeat(directory: approvals)
+    answer(.allow)
+    check(AgentApprovals.handle(provider: .claude, input: ask, host: nil, directory: approvals, sessions: sessions, environment: env) == nil,
+          "A plain yes cannot answer a question")
+    AgentApprovals.heartbeat(directory: approvals)
+    check(AgentApprovals.handle(provider: .codex, input: ask, host: nil, directory: approvals, sessions: sessions, environment: env) == nil
+          && requestFiles().isEmpty, "Only Claude Code's questions come to the notch")
     AgentApprovals.heartbeat(directory: approvals)
     let started = Date()
     check(AgentApprovals.handle(provider: .claude, input: event(), host: nil, directory: approvals, sessions: sessions, environment: env) == nil

@@ -376,6 +376,13 @@ final class AgentStatusService: ObservableObject {
         approvals.removeAll { $0.id == request.id }
         onRefresh?()
     }
+    /// Takes a request back from the notch: its hook sees the file gone and steps aside, so the agent asks in
+    /// its own window instead.
+    func withdraw(_ request: ApprovalRequest) {
+        try? FileManager.default.removeItem(at: AgentApprovals.directory.appendingPathComponent(request.id + ".json"))
+        approvals.removeAll { $0.id == request.id }
+        onRefresh?()
+    }
     func remove(_ session: AgentSession) {
         AgentEventStore.remove(id: session.id)
         sessions.removeAll { $0.id == session.id }

@@ -316,3 +316,13 @@
 "Reddet (⌃⌥⌫)" = "Deny (⌃⌥⌫)";
 "İzin ver (⌃⌥↩)" = "Allow (⌃⌥↩)";
 "Pil azaldı · %%%lld" = "Battery low · %lld%%";
+"Hep izin ver" = "Always allow";
+"İzin ver ve bir daha sorma: %@" = "Allow and don’t ask again: %@";
+"bir şey soruyor" = "is asking something";
+"Terminalde yanıtla" = "Answer in terminal";
+"Kendi cevabını yazmak için soruyu terminale bırak" = "Leave the question to the terminal to type your own answer";
+"Gönder" = "Send";
+"bu oturum" = "this session";
+"bu proje, yalnızca sende" = "this project, just for you";
+"bu proje" = "this project";
+"tüm projeler" = "all projects";

@@ -7,6 +7,7 @@ import Foundation
 enum HookInstaller {
     static let marker = "Damla durumunu güncelle"
     static let approvalMarker = "Damla onayı bekleniyor · çentikten yanıtla"
+    static let questionMarker = "Damla sorusu · çentikten yanıtla"
     static let approvalTimeout = 150
     static let common = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "Stop", "SessionEnd"]
 
@@ -25,7 +26,9 @@ enum HookInstaller {
     static func isInstalled(_ provider: Provider, approvals: Bool = false, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
         guard let data = try? Data(contentsOf: settingsURL(provider, home: home)) else { return false }
         let text = String(decoding: data, as: UTF8.self)
-        return text.contains(approvals ? "--agent-approval" : "--agent-event")
+        // Claude Code's approvals come with the question hook; an older install without it counts as missing.
+        guard approvals else { return text.contains("--agent-event") }
+        return text.contains("--agent-approval") && (provider != .claude || text.contains("--agent-question"))
     }
 
     /// Codex runs a hook only after the user trusted it with /hooks, which it records in config.toml under the
@@ -65,6 +68,7 @@ enum HookInstaller {
         func ours(_ handler: [String: Any]) -> Bool {
             let message = handler["statusMessage"] as? String, command = handler["command"] as? String ?? ""
             return (message == marker && command.contains("--agent-event")) || (message == approvalMarker && command.contains("--agent-approval"))
+                || (message == questionMarker && command.contains("--agent-question"))
         }
         for (event, value) in hooks {
             guard let groups = value as? [[String: Any]] else { throw Failure(description: String(localized: "Beklenmeyen hook biçimi: \(event)")) }
@@ -90,6 +94,13 @@ enum HookInstaller {
             let group: [String: Any] = ["hooks": [["type": "command", "command": command + " --agent-approval " + provider.rawValue,
                                                    "timeout": approvalTimeout, "statusMessage": approvalMarker]]]
             hooks["PermissionRequest"] = (hooks["PermissionRequest"] as? [[String: Any]] ?? []) + [group]
+            // Claude Code's multiple-choice questions are answered from the notch through PreToolUse.
+            if provider == .claude {
+                let question: [String: Any] = ["matcher": "AskUserQuestion",
+                                               "hooks": [["type": "command", "command": command + " --agent-question claude",
+                                                          "timeout": approvalTimeout, "statusMessage": questionMarker]]]
+                hooks["PreToolUse"] = (hooks["PreToolUse"] as? [[String: Any]] ?? []) + [question]
+            }
         }
         data["hooks"] = hooks
         return data

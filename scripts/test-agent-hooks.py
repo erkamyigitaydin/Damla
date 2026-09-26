@@ -47,6 +47,9 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(len(approval), 1)
         self.assertEqual(approval[0]["timeout"], installer.APPROVAL_TIMEOUT)
         self.assertNotIn("async", approval[0])
+        question = [g for g in with_approvals["hooks"]["PreToolUse"] if g.get("matcher") == "AskUserQuestion"]
+        self.assertEqual([h["command"] for g in question for h in g["hooks"]], ["/tmp/Damla --agent-question claude"])
+        self.assertNotIn("--agent-question", json.dumps(installer.merge({}, "codex", Path("/tmp/Damla"), True)))
         # The static hook entry never carries a decision; decisions only come from a click at run time.
         self.assertNotIn("behavior", json.dumps(with_approvals))
         self.assertEqual(with_approvals, installer.merge(with_approvals, "claude", Path("/tmp/Damla"), True))

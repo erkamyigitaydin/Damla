@@ -14,9 +14,10 @@ if let index = CommandLine.arguments.firstIndex(of: "--agent-event") {
     exit(0)
 }
 
-if let index = CommandLine.arguments.firstIndex(of: "--agent-approval") {
+if let index = CommandLine.arguments.firstIndex(where: { $0 == "--agent-approval" || $0 == "--agent-question" }) {
     // Installed only on request (the tour, Settings → Agents, or install-agent-hooks.py --approvals). Prints a
     // decision only when the user made one in Damla; otherwise nothing, and the agent shows its own prompt.
+    // --agent-question is the PreToolUse hook for Claude Code's multiple-choice questions.
     if CommandLine.arguments.indices.contains(index + 1),
        let provider = AgentProvider(rawValue: CommandLine.arguments[index + 1]) {
         var data = Data()
@@ -25,7 +26,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--agent-approval") {
             if data.count > 2 * 1024 * 1024 { exit(0) }
         }
         if let decision = AgentApprovals.handle(provider: provider, input: data, host: ProcessAncestry.hostBundleID()) {
-            FileHandle.standardOutput.write(AgentApprovals.output(decision))
+            FileHandle.standardOutput.write(AgentApprovals.output(decision, input: data, provider: provider))
         }
     }
     exit(0)
