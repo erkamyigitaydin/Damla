@@ -574,6 +574,9 @@ struct ExpandedView: View {
                 .onTapGesture { model.pinnedOpen = false; model.expanded = false }
                 .help("Kapat")
             Group {
+                if let step = model.tour {
+                    TourView(step: step, model: model, keys: model.keys)
+                } else {
                 switch model.selectedTab {
                 case .home:
                     switch model.homePane {
@@ -589,9 +592,10 @@ struct ExpandedView: View {
                 case .shortcuts: ShortcutsView(shortcuts: model.shortcuts)
                 case .agents: AgentPanelView(service: model.agents, servers: model.devServers)
                 }
+                }
             }
             .transition(.blurReplace)
-            .id(model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue)
+            .id(model.tour.map { "tour-\($0.rawValue)" } ?? (model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue))
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
             .frame(width: Layout.panelWidth, height: model.contentHeight)
         }

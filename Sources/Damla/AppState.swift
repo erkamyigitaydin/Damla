@@ -367,7 +367,36 @@ final class AppState: ObservableObject {
     func setTab(_ tab: PanelTab, enabled: Bool) {
         if enabled { enabledTabs.insert(tab) } else if enabledTabs.count > 1 { enabledTabs.remove(tab) }
     }
+    /// The tour told inside the notch; nil when it is not running.
+    @Published private(set) var tour: TourStep?
+    private var pinnedBeforeTour = false
+
+    func startTour(at step: TourStep = .welcome) {
+        if tour == nil { pinnedBeforeTour = pinnedOpen }
+        homePane = .player; lyricsExpanded = false
+        showTourStep(step)
+        pinnedOpen = true; expanded = true
+        presentPanel?()
+    }
+    func advanceTour() {
+        guard let tour else { return }
+        if let next = TourStep(rawValue: tour.rawValue + 1) { showTourStep(next) } else { endTour() }
+    }
+    /// Finished or skipped: it will not open by itself again (the menu and Ayarlar → Hakkında still offer it).
+    func endTour() {
+        guard tour != nil else { return }
+        tour = nil
+        UserDefaults.standard.set(true, forKey: TourStep.doneKey)
+        pinnedOpen = pinnedBeforeTour
+    }
+    private func showTourStep(_ step: TourStep) {
+        tour = step
+        // The pill points at the page the step is about, when that page is switched on.
+        if enabledTabs.contains(step.tab) { selectedTab = step.tab } else if let first = visibleTabs.first { selectedTab = first }
+    }
+
     func select(_ tab: PanelTab) {
+        endTour()   // picking a page from the pill means the user has taken over
         selectedTab = tab
         if tab == .clipboard { requestKeyFocus?() }
     }

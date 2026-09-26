@@ -92,7 +92,7 @@ Start dragging a file anywhere and the notch opens into a drop zone. Park files 
 - **Keep it open:** the pin button.
 - **Settings:** the gear button, the menu bar icon or **⌘,**.
 
-A short tour on first launch asks for the few permissions Damla can use. Every one of them is optional:
+On first launch a short tour plays right inside the notch, one feature at a time, and asks for the few permissions Damla can use where they come up. Every one of them is optional:
 
 | Permission | What it unlocks |
 |---|---|
@@ -104,7 +104,7 @@ A short tour on first launch asks for the few permissions Damla can use. Every o
 
 ### Connecting your agents
 
-Open the tour from the menu bar (**Tour…**) and go to the **Agents** step. Click **Connect** next to Claude Code or Codex, and leave the notch approvals switch on if you want to answer their permission prompts from the notch. You can add the approval hook later too, in **Settings → Agents**.
+Open the tour from the menu bar (**Tour…**) and, at the **Agents** step, click **Connect Claude Code** or **Connect Codex**. Or connect them any time in **Settings → Agents**.
 
 Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. For Claude Code it also sets a status line (model, context and five-hour use); if you already have one, yours keeps running and Damla only reads the data passing through. In Codex, approve the new hooks once with `/hooks`. While the notch is asking, Codex holds back its own prompt; switch to the session's app and the prompt shows up there right away. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
 
@@ -131,7 +131,7 @@ zsh build.sh                                  # builds and signs ../Damla.app, t
 - **Code map:** `Layout.swift` is the single source of truth for shapes and window sizes. `PanelController.swift` runs one window per display. `MediaSessionStore` keeps the media logic free of AppKit so it can be tested.
 - **Localization:** keys are the Turkish source strings; the English text lives in `Resources/en.lproj/Localizable.strings`.
 - **Automation:** launched with `--debug`, the app listens for `app.local.damla.debug` distributed notifications (`open`, `tab-agents`, `media-showcase`, `files:<paths>`…). With `DAMLA_SUPPORT_DIR` set, a debug run keeps its data in that folder. The screenshots above were made this way with demo data.
-- **Hooks from the command line:** `python3 scripts/install-agent-hooks.py --binary <path to Damla binary> [--approvals] --apply` does what the tour's Agents step does (without `--apply` it only prints the plan). Tests: `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-agent-hooks.py`.
+- **Hooks from the command line:** `python3 scripts/install-agent-hooks.py --binary <path to Damla binary> [--approvals] --apply` does what connecting in Damla does (without `--apply` it only prints the plan). Tests: `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-agent-hooks.py`.
 - **Releasing:**
   1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` and commit.
   2. Write the release notes to `dist/notes-<version>.md`.

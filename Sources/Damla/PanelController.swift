@@ -521,7 +521,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var approvalKeysArmed = Date.distantFuture
     private var observers = Set<AnyCancellable>()
     private lazy var settings = SettingsWindowController(model: model)
-    private lazy var onboarding = OnboardingWindowController(model: model)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -529,9 +528,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         manager = PanelManager(model: model)
         model.presentSettings = { [weak self] in self?.settings.present() }
         model.presentPanel = { [weak self] in self?.manager.show() }
-        model.presentOnboarding = { [weak self] in self?.onboarding.present() }
-        if OnboardingWindowController.shouldShowOnLaunch {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.onboarding.present() }
+        model.presentOnboarding = { [weak self] in self?.model.startTour() }
+        if TourStep.shouldShowOnLaunch {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.model.startTour() }
         }
         model.start()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -586,8 +585,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "tab-shortcuts": model.select(.shortcuts)
         case "share": model.select(.files); model.shareFile()
         case "settings": model.openSettings()
-        case "onboarding": onboarding.present()
-        case let step where step.hasPrefix("onboarding-"): onboarding.present(page: Int(step.dropFirst(11)))
+        case "onboarding": model.startTour()
+        case let step where step.hasPrefix("onboarding-"): model.startTour(at: Int(step.dropFirst(11)).flatMap(TourStep.init(rawValue:)) ?? .welcome)
         case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
         case "media-demo": model.media.injectDemoSessions()
         case "media-showcase": model.media.injectShowcase()
@@ -680,7 +679,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func showPanel() { manager.show() }
     @objc func showSettings() { model.openSettings() }
-    @objc func showOnboarding() { onboarding.present() }
+    @objc func showOnboarding() { model.startTour() }
     @objc func startCleaning() { manager.show(); model.startCleaning() }
     @objc func checkForUpdates() { model.updater.checkForUpdates() }
     @objc func quit() { NSApp.terminate(nil) }
