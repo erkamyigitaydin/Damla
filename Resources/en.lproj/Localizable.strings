@@ -379,3 +379,12 @@
 "Bu dosyayla yapılamadı." = "Couldn’t do that with this file.";
 "Ekran görüntüleri rafa" = "Screenshots to the shelf";
 "Yeni ekran görüntüleri kendiliğinden rafa eklenir; oradan sürükleyip bırakabilirsin." = "New screenshots land on the shelf by themselves, ready to drag anywhere.";
+"Kestirmeler" = "Shortcuts";
+"Apple Kestirmeleri; sabitlediklerin tek dokunuşluk düğme olur" = "Apple Shortcuts; the ones you pin become one-tap buttons";
+"Bitti" = "Done";
+"Çalışmadı" = "Didn’t run";
+"Çalıştır: %@" = "Run: %@";
+"Sık kullandıklarını sabitle; burada tek dokunuşluk düğme olurlar." = "Pin the ones you use most; they become one-tap buttons here.";
+"Tüm kestirmeler" = "All shortcuts";
+"Kestirme bulunamadı. Kestirmeler uygulamasında oluşturduklarının hepsi burada görünür." = "No shortcuts found. Everything you make in the Shortcuts app shows up here.";
+"Üste sabitle" = "Pin to top";

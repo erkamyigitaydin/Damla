@@ -66,12 +66,18 @@ When Claude Code or the Codex CLI asks for permission, the question drops out of
   <img src="docs/screenshots/files.png" width="550" alt="The file shelf holding images and a PDF">
 </p>
 
-Start dragging a file anywhere and the notch opens into a drop zone. Park files there, preview them with **Space** (Quick Look), drag them out into another app, or AirDrop them. Damla only remembers where your files are; it never moves or copies them.
+Start dragging a file anywhere and the notch opens into a drop zone. Park files there, preview them with **Space** (Quick Look), drag them out into another app, or AirDrop them. New screenshots land on the shelf by themselves. Right-click an image to save it as PNG, JPEG or HEIC, shrink it or compress it, or merge the PDFs on the shelf into one; the result is a new file next to the original. Damla only remembers where your files are; it never moves or changes them.
 
 ### And more
 
 - **Sound, your way.** Switch outputs, see your AirPods' battery (each bud and the case) when they connect and right in the output list, and set the volume of each app separately.
 - **Swipe between pages.** With the panel open, swipe left or right with two fingers on the trackpad.
+- **Your next meeting** counts down in the notch from ten minutes before, and one click joins the Zoom, Meet, Teams, Webex or FaceTime call (off until you turn it on).
+- **Microphone in use?** The notch shows it during calls, and a tap mutes it for every app at once.
+- **Mirror** shows your camera before a call. The camera runs only while that page is open.
+- **Shortcuts** from the Shortcuts app, pinned as one-tap buttons.
+- **Low battery warnings** for your mouse, keyboard, trackpad and AirPods.
+- **Local servers** on the Agents page: every dev server and database running on your Mac, one click to open or stop.
 - **Beautiful volume and brightness indicators** that replace the system ones.
 - **Clipboard history** with search and pinning (off until you turn it on).
 - **Focus timer** for 25/45/50 minute sessions, with the countdown right in the notch.
@@ -93,6 +99,8 @@ A short tour on first launch asks for the few permissions Damla can use. Every o
 | Automation (Music, Spotify) | Controlling Apple Music and Spotify in the background, and their volume |
 | Accessibility | Damla's own volume/brightness indicators and Cleaning mode |
 | System audio recording | Per-app volume in the mixer. Nothing is recorded or sent anywhere |
+| Calendars | Your next meeting in the notch, once you turn it on |
+| Camera | The Mirror page, only while it's open |
 
 ### Connecting your agents
 

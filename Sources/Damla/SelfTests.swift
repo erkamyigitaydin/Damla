@@ -215,7 +215,7 @@ func runSelfTests() -> Int32 {
     tabDefaults.set(["Özet", "Odak"], forKey: "enabledTabs")
     let upgraded = PanelTab.loadEnabled(defaults: tabDefaults)
     tabDefaults.set(PanelTab.allCases.map(\.rawValue), forKey: "knownTabs")
-    check(upgraded == [.home, .focus, .mirror] && PanelTab.loadEnabled(defaults: tabDefaults) == [.home, .focus],
+    check(upgraded == [.home, .focus, .mirror, .shortcuts] && PanelTab.loadEnabled(defaults: tabDefaults) == [.home, .focus],
           "A page added in an update starts on; one the user turned off stays off")
     let shelfFolder = FileManager.default.temporaryDirectory.appendingPathComponent("Damla-shelf-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: shelfFolder, withIntermediateDirectories: true)

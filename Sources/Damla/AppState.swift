@@ -5,18 +5,19 @@ import ServiceManagement
 import UniformTypeIdentifiers
 
 enum PanelTab: String, CaseIterable, Identifiable {
-    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", mirror = "Ayna", agents = "Agent’lar"   // raw values are stored settings
+    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", mirror = "Ayna", shortcuts = "Kestirmeler", agents = "Agent’lar"   // raw values are stored settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .home: return String(localized: "Özet"); case .files: return String(localized: "Dosyalar"); case .clipboard: return String(localized: "Pano")
-        case .focus: return String(localized: "Odak"); case .mirror: return String(localized: "Ayna"); case .agents: return String(localized: "Agent’lar")
+        case .focus: return String(localized: "Odak"); case .mirror: return String(localized: "Ayna")
+        case .shortcuts: return String(localized: "Kestirmeler"); case .agents: return String(localized: "Agent’lar")
         }
     }
     var icon: String {
         switch self {
         case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"
-        case .mirror: return "person.crop.square"; case .agents: return "terminal"
+        case .mirror: return "person.crop.square"; case .shortcuts: return "bolt"; case .agents: return "terminal"
         }
     }
     /// One line for the settings page that turns pages on and off.
@@ -27,6 +28,7 @@ enum PanelTab: String, CaseIterable, Identifiable {
         case .clipboard: return String(localized: "Kopyaladıkların; geçmişi tutmayı Genel’den ayrıca kapatabilirsin")
         case .focus: return String(localized: "Pomodoro sayacı")
         case .mirror: return String(localized: "Görüşmeden önce kameraya bak; kamera yalnızca bu sayfa açıkken çalışır")
+        case .shortcuts: return String(localized: "Apple Kestirmeleri; sabitlediklerin tek dokunuşluk düğme olur")
         case .agents: return String(localized: "Claude Code ve Codex oturumları; izin soruları kapalıyken de gelir")
         }
     }
@@ -36,7 +38,7 @@ enum PanelTab: String, CaseIterable, Identifiable {
         guard let saved = defaults.array(forKey: "enabledTabs") as? [String] else { return Set(allCases) }
         // Settings saved before "knownTabs" existed knew every page except the ones added since.
         let known = (defaults.array(forKey: "knownTabs") as? [String]).map { Set($0.compactMap(PanelTab.init(rawValue:))) }
-            ?? Set(allCases).subtracting([.mirror])
+            ?? Set(allCases).subtracting([.mirror, .shortcuts])
         let tabs = Set(saved.compactMap(PanelTab.init(rawValue:))).union(Set(allCases).subtracting(known))
         return tabs.isEmpty ? Set(allCases) : tabs
     }
@@ -114,6 +116,7 @@ final class AppState: ObservableObject {
     let devServers = DevServerMonitor()
     let calendar = CalendarService()
     let screenshots = ScreenshotWatcher()
+    let shortcuts = ShortcutsService()
     @Published var screenshotsToShelf = UserDefaults.standard.object(forKey: "screenshotsToShelf") as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(screenshotsToShelf, forKey: "screenshotsToShelf")
@@ -197,6 +200,9 @@ final class AppState: ObservableObject {
             self.showDeviceHUD("camera.viewfinder", String(localized: "Ekran görüntüsü rafta"), detail: urls.count > 1 ? "\(urls.count)" : "")
         }
         if screenshotsToShelf && enabledTabs.contains(.files) { screenshots.start() }
+        shortcuts.onFinish = { [weak self] name, ok in
+            self?.showDeviceHUD(ok ? "bolt.fill" : "exclamationmark.triangle.fill", name, detail: ok ? String(localized: "Bitti") : String(localized: "Çalışmadı"))
+        }
         agents.onUsageWarning = { [weak self] percent, resets in
             self?.showDeviceHUD("gauge.with.dots.needle.67percent", String(localized: "Claude kullanımı %\(percent)"),
                                 detail: String(localized: "\(resets.formatted(date: .omitted, time: .shortened)) sıfırlanır"))

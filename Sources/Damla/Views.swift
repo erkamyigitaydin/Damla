@@ -586,6 +586,7 @@ struct ExpandedView: View {
                 case .clipboard: ClipboardView(model: model)
                 case .focus: FocusView(model: model)
                 case .mirror: MirrorView()
+                case .shortcuts: ShortcutsView(shortcuts: model.shortcuts)
                 case .agents: AgentPanelView(service: model.agents, servers: model.devServers)
                 }
             }
