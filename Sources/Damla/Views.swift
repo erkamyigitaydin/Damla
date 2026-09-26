@@ -1244,15 +1244,32 @@ struct FocusView: View {
     @State private var editing = false
     @State private var typed = ""
     @FocusState private var fieldFocused: Bool
+    // Turning the dial: the minutes under the finger, and where the drag has got to.
+    @State private var dialMinutes: Int?
+    @State private var dialBase = 0
+    @State private var dialAngle: Double?
+    @State private var dialTurned: Double = 0
+    @State private var dialHover = false
+
+    /// A fresh timer is set by turning the ring like a dial; a running or paused one shows its progress.
+    private var dialMode: Bool { !model.session.running && !model.session.hasStarted && !editing }
+    private var setMinutes: Int { dialMinutes ?? Int(model.session.duration / 60) }
+
     var body: some View {
         let running = model.session.running
         HStack(spacing: 26) {
             ZStack {
-                Circle().stroke(.white.opacity(0.1), lineWidth: 4)
-                Circle().trim(from: 0, to: model.session.progress(at: model.now))
-                    .stroke(running ? Theme.accent : .white.opacity(0.7), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .rotationEffect(.degrees(-90)).animation(.linear(duration: 0.5), value: model.now)
-                    .shadow(color: Theme.accent.opacity(running ? 0.5 : 0), radius: 6)
+                Circle().stroke(.white.opacity(dialMode && setMinutes >= 60 ? 0.22 : 0.1), lineWidth: 4)
+                if dialMode {
+                    FocusDial(minutes: setMinutes, active: dialMinutes != nil || dialHover)
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                } else {
+                    Circle().trim(from: 0, to: model.session.progress(at: model.now))
+                        .stroke(running ? Theme.accent : .white.opacity(0.7), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .rotationEffect(.degrees(-90)).animation(.linear(duration: 0.5), value: model.now)
+                        .shadow(color: Theme.accent.opacity(running ? 0.5 : 0), radius: 6)
+                        .transition(.opacity)
+                }
                 VStack(spacing: 4) {
                     Image(systemName: model.session.phase == .focus ? "brain.head.profile" : "cup.and.saucer").font(.system(size: 12)).foregroundStyle(Theme.dim)
                     if editing {
@@ -1271,14 +1288,20 @@ struct FocusView: View {
                             Text("dk").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.dim)
                         }
                     } else {
-                        Text(model.timeLabel).font(.system(size: 30, weight: .light, design: .rounded)).monospacedDigit().tracking(-1)
+                        Text(dialMinutes.map { String(format: "%02d:00", $0) } ?? model.timeLabel)
+                            .font(.system(size: 30, weight: .light, design: .rounded)).monospacedDigit().tracking(-1)
                             .contentTransition(.numericText())
+                            .animation(.snappy(duration: 0.18), value: setMinutes)
                             .onTapGesture { startEditing() }
-                            .help(running ? "" : String(localized: "Tıkla: süreyi yaz · kaydır: dakika dakika ayarla"))
+                            .help(running ? "" : String(localized: "Halkayı çevir, tıklayıp yaz ya da kaydır"))
                     }
                 }
             }
             .frame(width: 128, height: 128)
+            .contentShape(Circle().inset(by: -10))
+            .gesture(dialGesture, including: dialMode ? .all : .subviews)
+            .onHover { inside in withAnimation(.easeOut(duration: 0.2)) { dialHover = inside } }
+            .animation(.spring(duration: 0.45, bounce: 0.25), value: dialMode)
             .overlay(ScrollCatcher { steps in model.adjustFocus(by: steps) }.allowsHitTesting(!running && !editing))
             .onChange(of: fieldFocused) { _, focused in if !focused && editing { commit() } }
             VStack(spacing: 16) {
@@ -1306,6 +1329,39 @@ struct FocusView: View {
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Dragging around the ring: 6° a minute, one turn is an hour, several turns up to four hours. The drag counts
+    /// how far the finger turned, so the handle never jumps to where it was grabbed. Near the centre it is left
+    /// to the time (tap to type).
+    private var dialGesture: some Gesture {
+        DragGesture(minimumDistance: 1, coordinateSpace: .local)
+            .onChanged { value in
+                let center = CGPoint(x: 64, y: 64)
+                let dx = value.location.x - center.x, dy = value.location.y - center.y
+                let start = hypot(value.startLocation.x - center.x, value.startLocation.y - center.y)
+                guard dialMode, start > 36 else { return }
+                let angle = atan2(dx, -dy) * 180 / .pi
+                if dialAngle == nil {
+                    dialBase = Int(model.session.duration / 60); dialTurned = 0; dialAngle = angle
+                    withAnimation(.spring(duration: 0.25)) { dialMinutes = dialBase }
+                    return
+                }
+                var delta = angle - (dialAngle ?? angle)
+                if delta > 180 { delta -= 360 } else if delta < -180 { delta += 360 }
+                dialAngle = angle
+                dialTurned += delta
+                let minutes = min(max(dialBase + Int((dialTurned / 6).rounded()), AppState.focusMinutes.lowerBound), AppState.focusMinutes.upperBound)
+                if minutes != dialMinutes {
+                    dialMinutes = minutes
+                    NSHapticFeedbackManager.defaultPerformer.perform(minutes % 5 == 0 ? .levelChange : .alignment, performanceTime: .now)
+                }
+            }
+            .onEnded { _ in
+                if let minutes = dialMinutes { model.setFocus(minutes: minutes) }
+                withAnimation(.spring(duration: 0.3)) { dialMinutes = nil }
+                dialAngle = nil
+            }
+    }
+
     private func startEditing() {
         guard !model.session.running else { return }
         typed = String(Int(model.session.duration / 60))
@@ -1316,6 +1372,45 @@ struct FocusView: View {
     private func commit() {
         if let minutes = Int(typed), minutes > 0 { model.setFocus(minutes: minutes, phase: model.session.phase) }
         editing = false
+    }
+}
+
+/// The dial around a fresh timer: sixty ticks (every fifth longer), those up to the set minute lit, and a handle
+/// on the ring at the set minute. One turn is an hour; the handle keeps going round for longer sessions.
+struct FocusDial: View {
+    let minutes: Int
+    let active: Bool
+    private var lap: Int { minutes % 60 == 0 && minutes > 0 ? 60 : minutes % 60 }
+    var body: some View {
+        ZStack {
+            Canvas { context, size in
+                let center = CGPoint(x: size.width / 2, y: size.height / 2)
+                for tick in 0..<60 {
+                    let angle = Double(tick) / 60 * 2 * .pi
+                    let long = tick % 5 == 0
+                    let outer = size.width / 2 - 9, inner = outer - (long ? 7 : 3.5)
+                    var path = Path()
+                    path.move(to: CGPoint(x: center.x + sin(angle) * inner, y: center.y - cos(angle) * inner))
+                    path.addLine(to: CGPoint(x: center.x + sin(angle) * outer, y: center.y - cos(angle) * outer))
+                    let lit = tick < lap
+                    let color = lit ? Theme.accent.opacity(active ? 1 : 0.75) : Color.white.opacity(active ? 0.35 : 0.16)
+                    context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: long ? 1.6 : 1, lineCap: .round))
+                }
+            }
+            Circle().trim(from: 0, to: CGFloat(lap) / 60)
+                .stroke(Theme.accent.opacity(0.85), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            // The handle rides the ring.
+            Circle().fill(.white)
+                .frame(width: 14, height: 14)
+                .shadow(color: Theme.accent.opacity(0.8), radius: active ? 7 : 3)
+                .scaleEffect(active ? 1.25 : 1)
+                .offset(y: -64)
+                // Total minutes, not the lap: past the hour the handle keeps turning forward instead of unwinding.
+                .rotationEffect(.degrees(Double(minutes) / 60 * 360))
+                .animation(.spring(duration: 0.22, bounce: 0.2), value: minutes)
+        }
+        .animation(.easeOut(duration: 0.2), value: active)
     }
 }
 
