@@ -517,6 +517,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
+    private var approvalKeys: [EventHotKeyRef] = []
+    private var approvalKeysArmed = Date.distantFuture
+    private var observers = Set<AnyCancellable>()
     private lazy var settings = SettingsWindowController(model: model)
     private lazy var onboarding = OnboardingWindowController(model: model)
 
@@ -665,15 +668,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func quit() { NSApp.terminate(nil) }
     private func registerShortcut() {
         var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, context in
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, context in
             guard let context else { return OSStatus(eventNotHandledErr) }
             let delegate = Unmanaged<AppDelegate>.fromOpaque(context).takeUnretainedValue()
-            DispatchQueue.main.async { delegate.manager.toggle() }
+            var key = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil,
+                              MemoryLayout<EventHotKeyID>.size, nil, &key)
+            DispatchQueue.main.async { delegate.hotKeyPressed(key.id) }
             return noErr
         }, 1, &event, Unmanaged.passUnretained(self).toOpaque(), &eventHandler)
         let identifier = EventHotKeyID(signature: 0x444D4C41, id: 1)
         let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), identifier, GetApplicationEventTarget(), 0, &hotKey)
         if status != noErr { model.showNotice(String(localized: "Kısayol kullanılıyor. Menüdeki damladan açabilirsin.")) }
+        // ⌃⌥↩ allows and ⌃⌥⌫ denies the shown permission prompt. They are only registered while a prompt waits,
+        // so other apps keep these keys the rest of the time.
+        model.agents.$approvals.map(\.isEmpty).removeDuplicates().receive(on: RunLoop.main)
+            .sink { [weak self] empty in self?.setApprovalKeys(!empty) }.store(in: &observers)
+    }
+
+    private static let approvalAllowKey: UInt32 = 2, approvalDenyKey: UInt32 = 3
+    /// Keys become live a moment after the card appears: a prompt that pops up mid-typing is never answered unseen.
+    static let approvalKeyDelay: TimeInterval = 0.6
+
+    private func setApprovalKeys(_ on: Bool) {
+        for key in approvalKeys { UnregisterEventHotKey(key) }
+        approvalKeys = []
+        approvalKeysArmed = on ? Date().addingTimeInterval(Self.approvalKeyDelay) : .distantFuture
+        guard on else { return }
+        for (id, code) in [(Self.approvalAllowKey, kVK_Return), (Self.approvalDenyKey, kVK_Delete)] {
+            var ref: EventHotKeyRef?
+            if RegisterEventHotKey(UInt32(code), UInt32(controlKey | optionKey), EventHotKeyID(signature: 0x444D4C41, id: id),
+                                   GetApplicationEventTarget(), 0, &ref) == noErr, let ref { approvalKeys.append(ref) }
+        }
+    }
+
+    private func hotKeyPressed(_ id: UInt32) {
+        guard id == Self.approvalAllowKey || id == Self.approvalDenyKey else { manager.toggle(); return }
+        // Only the card on screen can be answered, and only once it has been visible long enough to read.
+        let now = Date()
+        guard now >= approvalKeysArmed, model.expanded, model.selectedTab == .agents,
+              let request = model.agents.approvals.first(where: { $0.deadline > now }) else { return }
+        model.agents.decide(request, id == Self.approvalAllowKey ? .allow : .deny)
     }
     func applicationWillTerminate(_ notification: Notification) {
         model.media.restoreDucked()   // never leave the music quiet after a ducked handoff
@@ -682,9 +717,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.cleaning.stop()
         model.keys.stop()
         model.agents.stop()
+        model.deviceBatteries.stop()
         model.saveSession()
         model.media.bridge.stop()
         if let hotKey { UnregisterEventHotKey(hotKey) }
+        for key in approvalKeys { UnregisterEventHotKey(key) }
         if let eventHandler { RemoveEventHandler(eventHandler) }
     }
 }

@@ -108,6 +108,7 @@ enum AudioOutputs {
 enum BluetoothBattery {
     struct Levels: Equatable {
         var left: Int?, right: Int?, `case`: Int?, main: Int?
+        var kind: String? = nil   // system_profiler's device_minorType: "Mouse", "Keyboard", "Headphones"…
         var isEmpty: Bool { left == nil && right == nil && self.case == nil && main == nil }
         /// "S %80 · Sa %75 · K %60", or "%70" for a single-battery device.
         var summary: String {
@@ -156,7 +157,8 @@ enum BluetoothBattery {
                         (info[key] as? String).flatMap { Int($0.trimmingCharacters(in: CharacterSet(charactersIn: "% "))) }
                     }
                     let levels = Levels(left: percent("device_batteryLevelLeft"), right: percent("device_batteryLevelRight"),
-                                        case: percent("device_batteryLevelCase"), main: percent("device_batteryLevelMain"))
+                                        case: percent("device_batteryLevelCase"), main: percent("device_batteryLevelMain"),
+                                        kind: info["device_minorType"] as? String)
                     if !levels.isEmpty { result[name] = levels }
                 }
             }

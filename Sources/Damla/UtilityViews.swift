@@ -236,10 +236,14 @@ struct ApprovalCard: View {
                         .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
                 }.buttonStyle(.plain).help("Soruyu orada yanıtla")
                 Spacer()
+                Text(verbatim: "⌃⌥⌫ · ⌃⌥↩").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
+                    .help("Klavyeden: ⌃⌥⌫ reddet, ⌃⌥↩ izin ver")
                 Button("Reddet") { service.decide(request, .deny) }
                     .font(.system(size: 11, weight: .medium)).buttonStyle(PillStyle())
+                    .help("Reddet (⌃⌥⌫)")
                 Button("İzin ver") { service.decide(request, .allow) }
                     .font(.system(size: 11, weight: .semibold)).buttonStyle(PillStyle(accent: true))
+                    .help("İzin ver (⌃⌥↩)")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

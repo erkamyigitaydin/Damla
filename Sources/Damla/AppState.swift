@@ -101,6 +101,7 @@ final class AppState: ObservableObject {
     let appVolumes = AppVolumeController()
     let lyrics = LyricsService()
     let monitor = SystemMonitor()
+    let deviceBatteries = DeviceBatteryWatcher()
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
     let updater = UpdateService()
@@ -152,6 +153,11 @@ final class AppState: ObservableObject {
             }
         }
         monitor.onDeviceBattery = { [weak self] icon, title, detail in self?.showDeviceHUD(icon, title, detail: detail) }
+        deviceBatteries.onLow = { [weak self] name, icon, level in
+            self?.showDeviceHUD(icon, AudioOutput.shortName(name, transport: kAudioDeviceTransportTypeBluetooth),
+                                detail: String(localized: "Pil azaldı · %\(level)"))
+        }
+        deviceBatteries.start()
         appVolumes.start()
         // The accent follows the cover; every view reads it, so a new colour redraws the panel.
         media.$accent.removeDuplicates().sink { [weak self] cover in

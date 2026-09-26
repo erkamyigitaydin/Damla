@@ -169,6 +169,13 @@ func runSelfTests() -> Int32 {
     check(BluetoothBattery.parse(Data(profile.utf8), name: "iPhone") == nil && BluetoothBattery.parse(Data(profile.utf8), name: "MX Keys Mini") == nil,
           "No battery line for disconnected or battery-less devices")
     check(BluetoothBattery.parseAll(Data(profile.utf8)).keys.sorted() == ["Erkam’ın AirPods Pro"], "Outputs list reads every connected battery at once")
+    var lowBattery: [String] = []
+    let watcher = DeviceBatteryWatcher()
+    watcher.onLow = { name, _, level in lowBattery.append("\(name) \(level)") }
+    let mouse = { (level: Int) in ["Magic Mouse": BluetoothBattery.Levels(left: nil, right: nil, case: nil, main: level, kind: "Mouse")] }
+    for level in [40, 9, 8, 4, 3, 60, 7] { watcher.evaluate(mouse(level)) }
+    check(lowBattery == ["Magic Mouse 9", "Magic Mouse 4", "Magic Mouse 7"], "Low battery warns at 10 % and 5 %, again only after charging")
+    check(DeviceBatteryWatcher.icon(for: mouse(5)["Magic Mouse"]!, name: "Magic Mouse") == "magicmouse", "Low battery shows the device's own icon")
     check(buds?.lowest == 60 && BluetoothBattery.Levels(left: nil, right: nil, case: nil, main: 15).lowest == 15, "Lowest level drives the low-battery tint")
     runMediaSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }

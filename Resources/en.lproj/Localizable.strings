@@ -312,3 +312,7 @@
 "Yeniden başlat" = "Relaunch";
 "Yeni dil için Damla’yı yeniden başlat" = "Relaunch Damla for the new language";
 "Yetki için onay bekliyor" = "Waiting for permission approval";
+"Klavyeden: ⌃⌥⌫ reddet, ⌃⌥↩ izin ver" = "From the keyboard: ⌃⌥⌫ deny, ⌃⌥↩ allow";
+"Reddet (⌃⌥⌫)" = "Deny (⌃⌥⌫)";
+"İzin ver (⌃⌥↩)" = "Allow (⌃⌥↩)";
+"Pil azaldı · %%%lld" = "Battery low · %lld%%";
