@@ -596,6 +596,10 @@ struct ExpandedView: View {
                 }
                 }
             }
+            // Follows the fingers during a swipe, dimming a little as it goes.
+            .offset(x: model.swipeOffset)
+            .opacity(1 - min(abs(model.swipeOffset) / 320, 0.45))
+            .blur(radius: min(abs(model.swipeOffset) / 45, 3))
             .transition(.page(model.pageDirection))
             .id(model.tour.map { "tour-\($0.rawValue)" } ?? (model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue))
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)

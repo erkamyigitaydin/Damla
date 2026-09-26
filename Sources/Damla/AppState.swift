@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 import CoreAudio
 import ServiceManagement
 import UniformTypeIdentifiers
@@ -432,8 +433,37 @@ final class AppState: ObservableObject {
             showNotice(String(localized: "Bu mikrofonun sessize alma anahtarı yok."))
         }
     }
-    /// The neighbouring page for a swipe; the first and last pages do not wrap around.
+    /// How far the page follows a swipe right now (0 at rest).
+    @Published private(set) var swipeOffset: CGFloat = 0
+
+    /// Whether a swipe that way has a page to go to (in the tour: a step).
+    func canTurnPage(forward: Bool) -> Bool {
+        if let tour { return forward || tour.rawValue > 0 }
+        guard let index = visibleTabs.firstIndex(of: selectedTab) else { return false }
+        return visibleTabs.indices.contains(index + (forward ? 1 : -1))
+    }
+    /// The page moves with the fingers; with nothing on that side it only gives a little.
+    func dragPage(_ travel: CGFloat) {
+        swipeOffset = canTurnPage(forward: travel < 0) ? travel : PanelSwipeGesture.rubberBand(travel)
+    }
+    /// Fingers lifted: turn the page, or spring back into place.
+    func releasePage(_ action: PanelSwipeGesture.Action?) {
+        if let action, canTurnPage(forward: action == .next) {
+            // The page that leaves keeps where it was dragged to; the new one starts centred.
+            var instant = Transaction(); instant.disablesAnimations = true
+            withTransaction(instant) { swipeOffset = 0 }
+            turnPage(forward: action == .next)
+        } else {
+            withAnimation(.spring(duration: 0.42, bounce: 0.28)) { swipeOffset = 0 }
+        }
+    }
+    /// The neighbouring page for a swipe; the first and last pages do not wrap around. In the tour it moves
+    /// between steps instead.
     func turnPage(forward: Bool) {
+        if let tour {
+            if forward { advanceTour() } else if let previous = TourStep(rawValue: tour.rawValue - 1) { showTourStep(previous) }
+            return
+        }
         let tabs = visibleTabs
         guard let index = tabs.firstIndex(of: selectedTab) else { return }
         let target = index + (forward ? 1 : -1)

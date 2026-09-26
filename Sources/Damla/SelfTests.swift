@@ -173,17 +173,24 @@ func runSelfTests() -> Int32 {
           && AudioOutput.shortName("MacBook Pro Hoparlörü", transport: kAudioDeviceTransportTypeBuiltIn) == "Hoparlör", "Output names fit the capsule")
     var gesture = PanelSwipeGesture()
     check(gesture.feed(up: 0, right: -30, precise: false, began: false, ended: false, momentum: false) == .pass, "Mouse wheels scroll the page, never swipe")
-    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
-    let scroll = (0..<8).map { _ in gesture.feed(up: 10, right: -8, precise: true, began: false, ended: false, momentum: false) }
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false, time: 0)
+    let scroll = (1...8).map { gesture.feed(up: 10, right: -8, precise: true, began: false, ended: false, momentum: false, time: Double($0) * 0.016) }
     check(scroll.allSatisfy { $0 == .pass }, "A vertical start stays a scroll even if it drifts sideways")
-    _ = gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false)
-    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
-    let swipe = (0..<6).map { _ in gesture.feed(up: 1, right: -20, precise: true, began: false, ended: false, momentum: false) }
-    check(swipe.compactMap(\.action) == [.next] && swipe.dropFirst().allSatisfy(\.consume), "Left swipe turns to the next page exactly once")
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false, time: 0.2)
+    // A slow drag: the page follows, and past 70 pt it turns on release.
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false, time: 1)
+    let drag = (1...8).map { gesture.feed(up: 0, right: -10, precise: true, began: false, ended: false, momentum: false, time: 1 + Double($0) * 0.05) }
+    check(drag.last == PanelSwipeGesture.Result(consume: true, event: .drag(-80)), "The page follows the fingers")
+    check(gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false, time: 1.5).event == .release(.next), "Far enough turns to the next page")
+    // A short pull that stops: springs back.
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false, time: 2)
+    _ = (1...4).map { gesture.feed(up: 0, right: 8, precise: true, began: false, ended: false, momentum: false, time: 2 + Double($0) * 0.05) }
+    check(gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false, time: 2.6).event == .release(nil), "A short pull springs back")
+    check(PanelSwipeGesture.decision(travel: 25, velocity: 900) == .previous && PanelSwipeGesture.decision(travel: 25, velocity: -900) == nil,
+          "A quick flick turns the page, against its own travel it does not")
+    check(abs(PanelSwipeGesture.rubberBand(-400)) < 44 && PanelSwipeGesture.rubberBand(-400) < 0 && PanelSwipeGesture.rubberBand(10) < 10,
+          "With no page there the swipe only gives a little")
     check(gesture.feed(up: 0, right: -40, precise: true, began: false, ended: false, momentum: true) == .pass, "Momentum never turns a page")
-    _ = gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false)
-    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
-    check((0..<4).compactMap { _ in gesture.feed(up: 0, right: 20, precise: true, began: false, ended: false, momentum: false).action } == [.previous], "Right swipe goes back")
     let profile = #"{"SPBluetoothDataType":[{"device_connected":[{"Erkam’ın AirPods Pro":{"device_batteryLevelLeft":"80%","device_batteryLevelRight":"75 %","device_batteryLevelCase":"60%"}},{"MX Keys Mini":{"device_minorType":"Keyboard"}}],"device_not_connected":[{"iPhone":{}}]}]}"#
     let buds = BluetoothBattery.parse(Data(profile.utf8), name: "Erkam’ın AirPods Pro")
     check(buds?.summary == "S %80 · Sa %75 · K %60", "AirPods battery reads each bud and the case")

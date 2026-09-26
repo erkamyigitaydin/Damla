@@ -225,8 +225,12 @@ final class PanelController {
         let result = swipeGesture.feed(up: finger.up, right: finger.right, precise: event.hasPreciseScrollingDeltas,
                                        began: event.phase.contains(.began) || event.phase.contains(.mayBegin),
                                        ended: event.phase.contains(.ended) || event.phase.contains(.cancelled),
-                                       momentum: !event.momentumPhase.isEmpty)
-        if let action = result.action { model.turnPage(forward: action == .next) }
+                                       momentum: !event.momentumPhase.isEmpty, time: event.timestamp)
+        switch result.event {
+        case .drag(let travel): model.dragPage(travel)
+        case .release(let action): model.releasePage(action)
+        case nil: break
+        }
         return result.consume
     }
 
