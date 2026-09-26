@@ -401,3 +401,6 @@
 "Film görünümü: %@ · değiştir" = "Film look: %@ · change";
 "3 saniye geri sayım · kapat" = "3-second countdown · turn off";
 "Hemen çeker · geri sayımı aç" = "Shoots right away · turn the countdown on";
+"Ana Sahne" = "Center Stage";
+"Ana Sahne açık: kamera seni kadrajda tutar · kapat" = "Center Stage on: the camera keeps you in frame · turn off";
+"Ana Sahne kapalı · aç" = "Center Stage off · turn on";

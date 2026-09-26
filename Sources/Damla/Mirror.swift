@@ -62,6 +62,20 @@ final class MirrorCamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSa
     @Published private(set) var state: State = .starting
     /// A countdown or a print is under way: the panel stays open until the card has landed.
     @Published var busy = false
+    /// The camera can keep you in frame as you move (Center Stage, "Ana Sahne").
+    @Published private(set) var centerStageSupported = false
+    @Published private(set) var centerStage = UserDefaults.standard.object(forKey: "mirrorCenterStage") as? Bool ?? true
+
+    /// Turns Center Stage on or off for Damla. Cooperative control keeps the Control Center switch working too.
+    func setCenterStage(_ on: Bool) {
+        centerStage = on
+        UserDefaults.standard.set(on, forKey: "mirrorCenterStage")
+        queue.async { Self.applyCenterStage(on) }
+    }
+    private static func applyCenterStage(_ on: Bool) {
+        AVCaptureDevice.centerStageControlMode = .cooperative
+        AVCaptureDevice.isCenterStageEnabled = on
+    }
     let session = AVCaptureSession()
     private let queue = DispatchQueue(label: "app.local.damla.mirror")
     private var configured = false
@@ -111,6 +125,10 @@ final class MirrorCamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSa
             }
             // The page may have closed while access was being asked.
             guard self.wanted else { return }
+            let device = (self.session.inputs.first as? AVCaptureDeviceInput)?.device
+            let supported = device?.activeFormat.isCenterStageSupported ?? false
+            if supported { Self.applyCenterStage(self.centerStage) }
+            DispatchQueue.main.async { self.centerStageSupported = supported }
             self.session.startRunning()
             DispatchQueue.main.async { self.state = .running }
         }
@@ -287,6 +305,21 @@ struct MirrorView: View {
                             Text(look.title).font(.system(size: 9.5, weight: .semibold)).foregroundStyle(.white.opacity(0.9))
                                 .padding(.horizontal, 7).padding(.vertical, 3).background(.black.opacity(0.35), in: Capsule())
                                 .padding(9).transition(.opacity)
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if showControls && camera.centerStageSupported {
+                            Button { camera.setCenterStage(!camera.centerStage) } label: {
+                                Label("Ana Sahne", systemImage: camera.centerStage ? "person.and.background.dotted" : "person.crop.rectangle")
+                                    .font(.system(size: 9.5, weight: .semibold))
+                                    .foregroundStyle(camera.centerStage ? Color.black : .white.opacity(0.9))
+                                    .padding(.horizontal, 7).padding(.vertical, 3)
+                                    .background(camera.centerStage ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(Color.black.opacity(0.35)), in: Capsule())
+                                    .contentShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(9).transition(.opacity)
+                            .help(camera.centerStage ? "Ana Sahne açık: kamera seni kadrajda tutar · kapat" : "Ana Sahne kapalı · aç")
                         }
                     }
                     .overlay(alignment: .bottomTrailing) {
