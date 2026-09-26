@@ -1,2 +1,3 @@
 "NSAudioCaptureUsageDescription" = "Damla captures an app's audio so the mixer can turn that app down on its own. Nothing is recorded or sent anywhere.";
 "NSCalendarsFullAccessUsageDescription" = "Damla reads your calendar to show your next meeting in the notch and let you join it in one click. Your calendar never leaves this Mac.";
+"NSCameraUsageDescription" = "Damla uses the camera only while the Mirror pane is open, to show you yourself. Nothing is recorded.";

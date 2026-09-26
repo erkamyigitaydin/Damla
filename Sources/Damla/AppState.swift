@@ -5,16 +5,19 @@ import ServiceManagement
 import UniformTypeIdentifiers
 
 enum PanelTab: String, CaseIterable, Identifiable {
-    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", agents = "Agent’lar"   // raw values are stored settings
+    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", mirror = "Ayna", agents = "Agent’lar"   // raw values are stored settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .home: return String(localized: "Özet"); case .files: return String(localized: "Dosyalar"); case .clipboard: return String(localized: "Pano")
-        case .focus: return String(localized: "Odak"); case .agents: return String(localized: "Agent’lar")
+        case .focus: return String(localized: "Odak"); case .mirror: return String(localized: "Ayna"); case .agents: return String(localized: "Agent’lar")
         }
     }
     var icon: String {
-        switch self { case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"; case .agents: return "terminal" }
+        switch self {
+        case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"
+        case .mirror: return "person.crop.square"; case .agents: return "terminal"
+        }
     }
     /// One line for the settings page that turns pages on and off.
     var summary: String {
@@ -23,13 +26,18 @@ enum PanelTab: String, CaseIterable, Identifiable {
         case .files: return String(localized: "Sürükleyip bıraktığın dosyalar; kapalıyken sürükleme tepsisi de açılmaz")
         case .clipboard: return String(localized: "Kopyaladıkların; geçmişi tutmayı Genel’den ayrıca kapatabilirsin")
         case .focus: return String(localized: "Pomodoro sayacı")
+        case .mirror: return String(localized: "Görüşmeden önce kameraya bak; kamera yalnızca bu sayfa açıkken çalışır")
         case .agents: return String(localized: "Claude Code ve Codex oturumları; izin soruları kapalıyken de gelir")
         }
     }
-    /// Pages the user keeps in the panel, in the fixed order; never empty.
-    static func loadEnabled() -> Set<PanelTab> {
-        guard let saved = UserDefaults.standard.array(forKey: "enabledTabs") as? [String] else { return Set(allCases) }
-        let tabs = Set(saved.compactMap(PanelTab.init(rawValue:)))
+    /// Pages the user keeps in the panel, in the fixed order; never empty. A page added in an update starts
+    /// switched on: only pages the user has already seen in the settings can be off.
+    static func loadEnabled(defaults: UserDefaults = .standard) -> Set<PanelTab> {
+        guard let saved = defaults.array(forKey: "enabledTabs") as? [String] else { return Set(allCases) }
+        // Settings saved before "knownTabs" existed knew every page except the ones added since.
+        let known = (defaults.array(forKey: "knownTabs") as? [String]).map { Set($0.compactMap(PanelTab.init(rawValue:))) }
+            ?? Set(allCases).subtracting([.mirror])
+        let tabs = Set(saved.compactMap(PanelTab.init(rawValue:))).union(Set(allCases).subtracting(known))
         return tabs.isEmpty ? Set(allCases) : tabs
     }
 }
@@ -54,6 +62,7 @@ final class AppState: ObservableObject {
     @Published private(set) var enabledTabs = PanelTab.loadEnabled() {
         didSet {
             UserDefaults.standard.set(PanelTab.allCases.filter(enabledTabs.contains).map(\.rawValue), forKey: "enabledTabs")
+            UserDefaults.standard.set(PanelTab.allCases.map(\.rawValue), forKey: "knownTabs")
             if !enabledTabs.contains(selectedTab), let first = visibleTabs.first { selectedTab = first }
         }
     }
@@ -252,7 +261,11 @@ final class AppState: ObservableObject {
         $expanded.removeDuplicates().sink { [weak self] expanded in
             guard let self else { return }
             self.media.wantsFrequentUpdates = expanded
-            if !expanded { self.homePane = .player; self.lyricsExpanded = false }
+            if !expanded {
+                self.homePane = .player; self.lyricsExpanded = false
+                // Never reopen on the mirror: hovering the notch must not switch the camera on.
+                if self.selectedTab == .mirror { self.selectedTab = self.visibleTabs.first ?? .home }
+            }
             if expanded { self.now = Date(); if !self.media.bridgeActive { self.media.refresh() } }
         }.store(in: &cancellables)
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in

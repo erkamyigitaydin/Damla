@@ -363,3 +363,7 @@
 "Bir uygulama mikrofonu kullanırken çentikte görünür; dokununca tüm uygulamalar için sessize alır." = "Appears in the notch while an app uses the microphone; a tap mutes it for every app.";
 "Takvim ve görüşmeler" = "Calendar and calls";
 "Takvim bu Mac’te okunur; hiçbir yere gönderilmez." = "Your calendar is read on this Mac and never sent anywhere.";
+"Ayna" = "Mirror";
+"Kamera izni kapalı" = "Camera access is off";
+"Kamera bulunamadı" = "No camera found";
+"Görüşmeden önce kameraya bak; kamera yalnızca bu sayfa açıkken çalışır" = "Check yourself before a call; the camera runs only while this page is open";

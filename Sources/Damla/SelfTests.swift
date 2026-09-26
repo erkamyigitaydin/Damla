@@ -209,6 +209,12 @@ func runSelfTests() -> Int32 {
     check(picked?.id == "next", "Next meeting skips all-day events and ones running for over five minutes")
     check(picked.map { CalendarService.countdown($0, at: clock) } == "4 dk" && picked.map { CalendarService().isSoon($0, at: clock) } == true
           && picked.map { CalendarService().isSoon($0, at: clock.addingTimeInterval(-700)) } == false, "The countdown starts ten minutes before")
+    let tabDefaults = UserDefaults(suiteName: "Damla-tabs-\(UUID().uuidString)")!
+    tabDefaults.set(["Özet", "Odak"], forKey: "enabledTabs")
+    let upgraded = PanelTab.loadEnabled(defaults: tabDefaults)
+    tabDefaults.set(PanelTab.allCases.map(\.rawValue), forKey: "knownTabs")
+    check(upgraded == [.home, .focus, .mirror] && PanelTab.loadEnabled(defaults: tabDefaults) == [.home, .focus],
+          "A page added in an update starts on; one the user turned off stays off")
     var lowBattery: [String] = []
     let watcher = DeviceBatteryWatcher()
     watcher.onLow = { name, _, level in lowBattery.append("\(name) \(level)") }

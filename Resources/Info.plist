@@ -33,6 +33,8 @@
 	<string>Damla, seçtiğin müzik uygulamasındaki parçayı göstermek ve oynatmayı kontrol etmek için erişim ister.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Damla, sıradaki toplantını çentikte göstermek ve bağlantısına tek tıkla katılmanı sağlamak için takvimini okur. Takvim bu Mac’ten çıkmaz.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Damla, Ayna’da görüntünü göstermek için kamerayı yalnızca o bölme açıkken kullanır. Hiçbir şey kaydedilmez.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Damla, uygulamaların sesini mikserde ayrı ayrı kısabilmek için uygulama sesini yakalar. Ses kaydedilmez ve hiçbir yere gönderilmez.</string>
 	<key>NSHighResolutionCapable</key>
