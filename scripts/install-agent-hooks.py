@@ -53,7 +53,27 @@ def merge(original, provider, binary, approvals=False):
             hooks.setdefault("PreToolUse", []).append({"matcher": "AskUserQuestion", "hooks": [{
                 "type": "command", "command": shlex.quote(str(binary)) + " --agent-question claude",
                 "timeout": APPROVAL_TIMEOUT, "statusMessage": QUESTION_MARKER}]})
+    if provider == "claude":
+        data["statusLine"] = status_line(data.get("statusLine"), shlex.quote(str(binary)))
     return data
+
+
+def status_line(existing, command):
+    """Damla records context and rate-limit use from Claude Code's status line and prints a short line.
+    A status line the user already had keeps running after --then, with its other settings untouched."""
+    line = dict(existing) if isinstance(existing, dict) else {}
+    current = line.get("command", "") if isinstance(line.get("command"), str) else ""
+    original = None
+    marker = " --agent-status claude"
+    if marker in current:
+        rest = current.split(marker, 1)[1]
+        if " --then " in rest:
+            original = shlex.split(rest.split(" --then ", 1)[1])[0]
+    elif current and line.get("type", "command") == "command":
+        original = current
+    line["type"] = "command"
+    line["command"] = command + marker + ((" --then " + shlex.quote(original)) if original else "")
+    return line
 
 
 def atomic_write(path, data):

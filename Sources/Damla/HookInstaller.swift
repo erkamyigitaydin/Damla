@@ -103,7 +103,34 @@ enum HookInstaller {
             }
         }
         data["hooks"] = hooks
+        if provider == .claude { data["statusLine"] = statusLine(data["statusLine"], command: command) }
         return data
+    }
+
+    /// Claude Code's status line carries context and rate-limit use, which no hook sees. Damla's command records
+    /// them and prints a short line; a status line the user already had keeps running after `--then`, with its
+    /// own settings (padding, refreshInterval) left as they were.
+    static func statusLine(_ existing: Any?, command: String) -> [String: Any] {
+        var line = existing as? [String: Any] ?? [:]
+        let current = line["command"] as? String ?? ""
+        var original: String?
+        if let range = current.range(of: " --agent-status claude") {
+            // Ours already: keep whatever it wraps, point it at this binary.
+            if let then = current.range(of: " --then ", range: range.upperBound..<current.endIndex) {
+                original = shellUnquote(String(current[then.upperBound...]))
+            }
+        } else if !current.isEmpty, line["type"] as? String ?? "command" == "command" {
+            original = current
+        }
+        line["type"] = "command"
+        line["command"] = command + " --agent-status claude" + (original.map { " --then " + shellQuote($0) } ?? "")
+        return line
+    }
+
+    /// Reverses `shellQuote` for the one argument Damla wrote itself.
+    static func shellUnquote(_ value: String) -> String {
+        guard value.hasPrefix("'"), value.hasSuffix("'"), value.count >= 2 else { return value }
+        return String(value.dropFirst().dropLast()).replacingOccurrences(of: "'\"'\"'", with: "'")
     }
 
     /// Writes the merged settings. Returns false when they were already up to date.

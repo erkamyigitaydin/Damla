@@ -85,6 +85,50 @@ enum AgentText {
     }
 }
 
+/// How full a session's context window is; amber from 80 %, when Claude Code will soon compact it.
+struct ContextBadge: View {
+    let percent: Int
+    let model: String?
+    var body: some View {
+        let high = percent >= 80
+        HStack(spacing: 3) {
+            Image(systemName: "text.line.first.and.arrowtriangle.forward").font(.system(size: 8.5, weight: .semibold))
+            Text("%\(percent)").font(.system(size: 9.5, weight: .semibold, design: .rounded)).monospacedDigit()
+        }
+        .foregroundStyle(high ? Theme.amber : Theme.dim)
+        .padding(.horizontal, 5).padding(.vertical, 2)
+        .background(high ? Theme.amber.opacity(0.14) : Theme.fill, in: Capsule())
+        .help(model.map { String(localized: "\($0) · bağlamın %\(percent) dolu") } ?? String(localized: "Bağlamın %\(percent) dolu"))
+    }
+}
+
+/// The Claude account's five-hour and weekly use, from the status line; each bar tells when it resets.
+struct UsageStrip: View {
+    let usage: AgentUsage
+    var body: some View {
+        HStack(spacing: 12) {
+            if let window = usage.fiveHour { bar(String(localized: "5 saat"), window) }
+            if let window = usage.sevenDay { bar(String(localized: "7 gün"), window) }
+        }
+    }
+    private func bar(_ title: String, _ window: AgentUsage.Window) -> some View {
+        let tint = window.percent >= 95 ? Color(red: 1, green: 0.47, blue: 0.47) : window.percent >= 80 ? Theme.amber : Theme.agent
+        return HStack(spacing: 6) {
+            Text(title).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.dim)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.fill)
+                    Capsule().fill(tint).frame(width: max(3, proxy.size.width * window.percent / 100))
+                }
+            }
+            .frame(height: 4)
+            Text("%\(Int(window.percent.rounded()))").font(.system(size: 9.5, weight: .semibold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(window.percent >= 80 ? tint : Theme.dim)
+        }
+        .help(String(localized: "\(title) kullanımı · \(window.resetsAt.formatted(date: .omitted, time: .shortened)) sıfırlanır"))
+    }
+}
+
 /// The session that matters right now, large: the mascot acting it out, the project, what it is doing and for
 /// how long, and a trail of the tools it used this turn (oldest faintest). A tap brings its app forward.
 struct HeroAgentCard: View {
@@ -103,6 +147,7 @@ struct HeroAgentCard: View {
                         Text(session.project).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                         Text(session.provider.title).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.faint)
                         Spacer(minLength: 4)
+                        if let context = session.context { ContextBadge(percent: context, model: session.model) }
                         Text(session.updated, style: .relative).font(.system(size: 9, design: .rounded)).foregroundStyle(Theme.faint)
                     }
                     Text(activity.text).font(.system(size: 12, weight: .medium)).lineLimit(1)
@@ -157,6 +202,7 @@ struct AgentPanelView: View {
                     IconButton(icon: service.soundEnabled ? "bell.fill" : "bell.slash", label: service.soundEnabled ? "Onay beklerken ses: açık" : "Onay beklerken ses: kapalı",
                                tint: service.soundEnabled ? Theme.accent : .white, size: 22) { service.soundEnabled.toggle() }
                 }
+                if let usage = service.usage?.current(at: now) { UsageStrip(usage: usage) }
                 if service.sessions.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         Label("Henüz durum gelmedi", systemImage: "antenna.radiowaves.left.and.right")
@@ -447,6 +493,8 @@ struct AgentRow: View {
                 Spacer(minLength: 4)
                 if hovering {
                     IconButton(icon: "xmark", label: "Listeden kaldır", size: 18) { service.remove(session) }
+                } else if let context = session.context, session.isActive(at: now) {
+                    ContextBadge(percent: context, model: session.model)
                 } else {
                     Text(session.updated, style: .relative).font(.system(size: 9, design: .rounded)).foregroundStyle(Theme.faint)
                 }

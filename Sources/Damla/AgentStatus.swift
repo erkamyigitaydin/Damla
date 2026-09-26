@@ -94,6 +94,8 @@ struct AgentSession: Codable, Identifiable, Equatable {
     var waitingSince: Date? = nil
     var host: String? = nil          // bundle id of the app hosting the session: Terminal, Claude, VS Code, ChatGPT…
     var recentTools: [String]? = nil // names of the last few tools this turn (no arguments), newest last
+    var context: Int? = nil          // % of the context window in use, from Claude Code's status line
+    var model: String? = nil         // the model's display name, from the status line
 
     func effectivePhase(at now: Date) -> AgentPhase {
         if (phase == .working || phase == .waiting), now.timeIntervalSince(updated) > 30 * 60 { return .stale }
@@ -235,6 +237,43 @@ enum AgentEventStore {
         try body()
     }
 
+    /// Claude Code's status line input: the session's context use and model go into its record (only if the
+    /// hooks already created it), the account's rate limits into usage.json. Returns the line to print.
+    @discardableResult
+    static func receiveStatus(provider: AgentProvider, input: Data, directory: URL = directory, now: Date = Date()) -> String {
+        guard input.count <= 2 * 1024 * 1024,
+              let event = try? JSONSerialization.jsonObject(with: input) as? [String: Any] else { return "" }
+        let model = ((event["model"] as? [String: Any])?["display_name"] as? String).map { AgentApprovals.clean($0, limit: 40) }
+        let context = ((event["context_window"] as? [String: Any])?["used_percentage"] as? NSNumber).map { Int($0.doubleValue.rounded()) }
+        let usage = AgentUsage(event["rate_limits"] as? [String: Any], now: now)
+        if let session = event["session_id"] as? String, !session.isEmpty, session.count <= 512 {
+            let id = AgentSession.identifier(provider: provider, session: session)
+            let file = directory.appendingPathComponent(id + ".json")
+            try? withLock(id + ".lock", in: directory) {
+                guard var value = (try? Data(contentsOf: file)).flatMap({ try? JSONDecoder().decode(AgentSession.self, from: $0) }),
+                      value.context != context || value.model != model else { return }
+                value.context = context; value.model = model
+                try JSONEncoder().encode(value).write(to: file, options: .atomic)
+            }
+        }
+        if let usage {
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try? withLock("usage.lock", in: directory) {
+                try JSONEncoder().encode(usage).write(to: directory.appendingPathComponent(AgentUsage.fileName), options: .atomic)
+            }
+        }
+        var parts = [model, context.map { String(localized: "bağlam %\($0)") }].compactMap { $0 }
+        if let window = usage?.fiveHour { parts.append(String(localized: "5 sa %\(Int(window.percent.rounded()))")) }
+        return parts.joined(separator: " · ")
+    }
+
+    static func readUsage(directory: URL = directory, now: Date = Date()) -> AgentUsage? {
+        let file = directory.appendingPathComponent(AgentUsage.fileName)
+        guard let data = try? Data(contentsOf: file), data.count < 4096,
+              let usage = try? JSONDecoder().decode(AgentUsage.self, from: data) else { return nil }
+        return usage.current(at: now)
+    }
+
     /// Hook entry point runs before NSApplication. It is silent and never makes an approval decision.
     static func receive(provider: AgentProvider, input: Data, directory: URL = directory, now: Date = Date(), host: String? = nil) throws {
         guard input.count <= 2 * 1024 * 1024,
@@ -283,11 +322,11 @@ enum AgentEventStore {
     static func read(directory: URL = directory, now: Date = Date()) -> [AgentSession] {
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey], options: [.skipsHiddenFiles])) ?? []
         // Records and their lock files from sessions older than a week are garbage.
-        for url in files where url.lastPathComponent != "stats.json" && url.lastPathComponent != "stats.lock" {
+        for url in files where url.lastPathComponent != "stats.json" && url.lastPathComponent != "stats.lock" && url.lastPathComponent != AgentUsage.fileName {
             if let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
                now.timeIntervalSince(modified) > 7 * 24 * 3600 { try? FileManager.default.removeItem(at: url) }
         }
-        return files.filter { $0.pathExtension == "json" && $0.lastPathComponent != "stats.json" }.compactMap { url -> (URL, Date)? in
+        return files.filter { $0.pathExtension == "json" && $0.lastPathComponent != "stats.json" && $0.lastPathComponent != AgentUsage.fileName }.compactMap { url -> (URL, Date)? in
             guard let attrs = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
                   let modified = attrs.contentModificationDate, now.timeIntervalSince(modified) < 24 * 3600,
                   (attrs.fileSize ?? Int.max) < 32_768 else { return nil }
@@ -307,9 +346,44 @@ enum AgentEventStore {
     }
 }
 
+/// The Claude account's rate limits, as the status line last reported them (Pro and Max only).
+struct AgentUsage: Codable, Equatable {
+    static let fileName = "usage.json"
+    struct Window: Codable, Equatable {
+        var percent: Double
+        var resetsAt: Date
+    }
+    var fiveHour: Window?
+    var sevenDay: Window?
+    var updated: Date
+
+    init?(_ limits: [String: Any]?, now: Date) {
+        func window(_ key: String) -> Window? {
+            guard let raw = limits?[key] as? [String: Any], let percent = (raw["used_percentage"] as? NSNumber)?.doubleValue,
+                  let resets = (raw["resets_at"] as? NSNumber)?.doubleValue else { return nil }
+            return Window(percent: min(max(percent, 0), 100), resetsAt: Date(timeIntervalSince1970: resets))
+        }
+        fiveHour = window("five_hour"); sevenDay = window("seven_day"); updated = now
+        if fiveHour == nil && sevenDay == nil { return nil }
+    }
+    /// Drops windows that have already reset: their percentage no longer means anything.
+    func current(at now: Date) -> AgentUsage? {
+        var copy = self
+        if let window = copy.fiveHour, window.resetsAt <= now { copy.fiveHour = nil }
+        if let window = copy.sevenDay, window.resetsAt <= now { copy.sevenDay = nil }
+        return copy.fiveHour == nil && copy.sevenDay == nil ? nil : copy
+    }
+    /// The notch warns once per window when the five-hour use passes these.
+    static let warnAt: [Double] = [80, 95]
+}
+
 final class AgentStatusService: ObservableObject {
     @Published private(set) var sessions: [AgentSession] = []
     @Published private(set) var todayTurns = 0
+    @Published private(set) var usage: AgentUsage?
+    /// Five-hour use passed 80 % or 95 %: (percent, resets at).
+    var onUsageWarning: ((Int, Date) -> Void)?
+    private var usageWarned: (resetsAt: Date, threshold: Double)?
     /// Permission prompts waiting for an answer from the notch, oldest first.
     @Published private(set) var approvals: [ApprovalRequest] = []
     @Published var approvalsEnabled = AgentApprovals.enabled {
@@ -335,6 +409,7 @@ final class AgentStatusService: ObservableObject {
         timer.setEventHandler { [weak self] in
             let records = AgentEventStore.read()
             let turns = AgentEventStore.todayTurns()
+            let usage = AgentEventStore.readUsage()
             // Hooks wait for the notch only while this heartbeat is fresh; with the setting off they never do.
             if AgentApprovals.enabled { AgentApprovals.heartbeat() }
             let approvals = AgentApprovals.enabled ? AgentApprovals.pending() : []
@@ -352,12 +427,24 @@ final class AgentStatusService: ObservableObject {
                 self.loaded = true
                 if records != self.sessions { self.sessions = records }
                 if turns != self.todayTurns { self.todayTurns = turns }
+                if usage != self.usage { self.usage = usage; self.checkUsage(usage) }
                 self.onRefresh?()
             }
         }
         self.timer = timer; timer.resume()
     }
     func stop() { timer?.cancel(); timer = nil }
+
+    /// Warns once per window and threshold. What was already true when Damla started is not news.
+    func checkUsage(_ usage: AgentUsage?) {
+        defer { loadedUsage = true }
+        guard let window = usage?.fiveHour,
+              let threshold = AgentUsage.warnAt.last(where: { window.percent >= $0 }) else { return }
+        if let warned = usageWarned, warned.resetsAt == window.resetsAt, warned.threshold >= threshold { return }
+        usageWarned = (window.resetsAt, threshold)
+        if loadedUsage { onUsageWarning?(Int(window.percent.rounded()), window.resetsAt) }
+    }
+    private var loadedUsage = false
 
     /// Brings the app that hosts the session to the front; falls back to the provider's app.
     func activate(_ session: AgentSession) {

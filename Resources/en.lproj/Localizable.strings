@@ -326,3 +326,13 @@
 "bu proje, yalnızca sende" = "this project, just for you";
 "bu proje" = "this project";
 "tüm projeler" = "all projects";
+"%@ · bağlamın %%%lld dolu" = "%@ · context %lld%% full";
+"Bağlamın %%%lld dolu" = "Context %lld%% full";
+"5 saat" = "5 hours";
+"7 gün" = "7 days";
+"%@ kullanımı · %@ sıfırlanır" = "%@ usage · resets at %@";
+"Claude kullanımı %%%lld" = "Claude usage %lld%%";
+"%@ sıfırlanır" = "resets at %@";
+"bağlam %%%lld" = "context %lld%%";
+"5 sa %%%lld" = "5h %lld%%";
+"%%%lld" = "%lld%%";

@@ -158,6 +158,10 @@ final class AppState: ObservableObject {
                                 detail: String(localized: "Pil azaldı · %\(level)"))
         }
         deviceBatteries.start()
+        agents.onUsageWarning = { [weak self] percent, resets in
+            self?.showDeviceHUD("gauge.with.dots.needle.67percent", String(localized: "Claude kullanımı %\(percent)"),
+                                detail: String(localized: "\(resets.formatted(date: .omitted, time: .shortened)) sıfırlanır"))
+        }
         appVolumes.start()
         // The accent follows the cover; every view reads it, so a new colour redraws the panel.
         media.$accent.removeDuplicates().sink { [weak self] cover in

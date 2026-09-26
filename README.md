@@ -50,7 +50,7 @@ Apple Music, Spotify, Podcasts, YouTube in the browser: if it's playing, Damla s
   <img src="docs/screenshots/agents.png" width="550" alt="The agents page showing one Claude Code session waiting for approval and one working">
 </p>
 
-Running Claude Code or Codex in the background? Damla shows every session: which project is working, which one needs you, and how long it's been waiting. A little droplet mascot lives in the notch and reacts: it bounces while an agent works, waves when one needs you, and smiles when it's done. Click a session to bring the app it runs in (Terminal, your editor or the Claude app) to the front.
+Running Claude Code or Codex in the background? Damla shows every session: which project is working, which one needs you, and how long it's been waiting. A little droplet mascot lives in the notch and reacts: it bounces while an agent works, waves when one needs you, and smiles when it's done. Click a session to bring the app it runs in (Terminal, your editor or the Claude app) to the front. For Claude Code you also see how full each session's context is and, on Pro and Max plans, how much of your five-hour and weekly limits you've used, with a heads-up in the notch at 80 % and 95 %.
 
 ### Approve commands without switching apps
 
@@ -58,7 +58,7 @@ Running Claude Code or Codex in the background? Damla shows every session: which
   <img src="docs/screenshots/approval.png" width="550" alt="A Claude Code permission request shown in the notch with Allow and Deny buttons">
 </p>
 
-When Claude Code or the Codex CLI asks for permission, the question drops out of the notch with the exact command (or, for a Codex patch, the files it touches). Hit **Allow** or **Deny** and keep working. If you're already looking at the terminal, Damla stays out of the way. The ChatGPT app's own permission requests can only be answered in its window; Damla shows them as waiting so you don't miss them.
+When Claude Code or the Codex CLI asks for permission, the question drops out of the notch with the exact command (or, for a Codex patch, the files it touches). Hit **Allow** or **Deny** (or ⌃⌥↩ / ⌃⌥⌫), or **Always allow** to save the rule Claude Code suggests. When Claude Code asks you to pick between options, you can answer that from the notch too. If you're already looking at the terminal, Damla stays out of the way. The ChatGPT app's own permission requests can only be answered in its window; Damla shows them as waiting so you don't miss them.
 
 ### A shelf for your files
 
@@ -98,7 +98,7 @@ A short tour on first launch asks for the few permissions Damla can use. Every o
 
 Open the tour from the menu bar (**Tour…**) and go to the **Agents** step. Click **Connect** next to Claude Code or Codex, and leave the notch approvals switch on if you want to answer their permission prompts from the notch. You can add the approval hook later too, in **Settings → Agents**.
 
-Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. In Codex, approve the new hooks once with `/hooks`. While the notch is asking, Codex holds back its own prompt; switch to the session's app and the prompt shows up there right away. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
+Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. For Claude Code it also sets a status line (model, context and five-hour use); if you already have one, yours keeps running and Damla only reads the data passing through. In Codex, approve the new hooks once with `/hooks`. While the notch is asking, Codex holds back its own prompt; switch to the session's app and the prompt shows up there right away. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
 
 ## Privacy
 

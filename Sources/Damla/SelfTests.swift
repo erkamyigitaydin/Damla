@@ -142,6 +142,25 @@ func runSelfTests() -> Int32 {
         let missing: [String: Any] = ["hook_event_name": "Stop"]
         try AgentEventStore.receive(provider: .codex, input: JSONSerialization.data(withJSONObject: missing), directory: isolated)
         check(AgentEventStore.read(directory: isolated).count == 2, "Malformed event cannot create phantom session")
+        let status: [String: Any] = ["session_id": "../../unsafe-session", "model": ["display_name": "Opus"],
+                                     "context_window": ["used_percentage": 61.6],
+                                     "rate_limits": ["five_hour": ["used_percentage": 23.5, "resets_at": Date().timeIntervalSince1970 + 3600],
+                                                     "seven_day": ["used_percentage": 41.2, "resets_at": Date().timeIntervalSince1970 - 10]]]
+        let line = AgentEventStore.receiveStatus(provider: .claude, input: try JSONSerialization.data(withJSONObject: status), directory: isolated)
+        let withContext = AgentEventStore.read(directory: isolated).first { $0.id == records[0].id }
+        check(line == "Opus · bağlam %62 · 5 sa %24" && withContext?.context == 62 && withContext?.model == "Opus", "Status line records context and prints a short line")
+        let usage = AgentEventStore.readUsage(directory: isolated)
+        check(usage?.fiveHour?.percent == 23.5 && usage?.sevenDay == nil, "Rate limits are kept until their window resets")
+        check(AgentEventStore.read(directory: isolated).count == 2, "Usage file is not mistaken for a session")
+        _ = AgentEventStore.receiveStatus(provider: .claude, input: try JSONSerialization.data(withJSONObject: ["session_id": "unknown"]), directory: isolated)
+        check(AgentEventStore.read(directory: isolated).count == 2, "Status line never creates a session by itself")
+        let watcher = AgentStatusService()
+        var warnings: [Int] = []
+        watcher.onUsageWarning = { percent, _ in warnings.append(percent) }
+        let reset = Date().addingTimeInterval(3600)
+        func limits(_ percent: Double) -> AgentUsage? { AgentUsage(["five_hour": ["used_percentage": percent, "resets_at": reset.timeIntervalSince1970]], now: Date()) }
+        for percent in [50.0, 81, 85, 96, 97] { watcher.checkUsage(limits(percent)) }
+        check(warnings == [81, 96], "Five-hour use warns once at 80 % and once at 95 %")
         AgentEventStore.remove(id: records[0].id, directory: isolated)
         check(AgentEventStore.read(directory: isolated).count == 1, "Removed session leaves the store")
     } catch { failures.append("Agent fixture: \(error)") }

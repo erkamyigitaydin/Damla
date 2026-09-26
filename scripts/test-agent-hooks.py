@@ -40,6 +40,17 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual([h["command"] for g in codex for h in g["hooks"] if "--agent-approval" in h["command"]],
                          ["/tmp/Damla --agent-approval codex"])
 
+    def test_status_line_wraps_the_users_own(self):
+        fresh = installer.merge({}, "claude", Path("/tmp/Damla"))
+        self.assertEqual(fresh["statusLine"], {"type": "command", "command": "/tmp/Damla --agent-status claude"})
+        mine = {"statusLine": {"type": "command", "command": "~/bin/line.sh --short", "padding": 2}}
+        wrapped = installer.merge(mine, "claude", Path("/tmp/Damla"))
+        self.assertEqual(wrapped["statusLine"]["padding"], 2)
+        self.assertEqual(wrapped["statusLine"]["command"], "/tmp/Damla --agent-status claude --then '~/bin/line.sh --short'")
+        moved = installer.merge(wrapped, "claude", Path("/Applications/Damla"))
+        self.assertEqual(moved["statusLine"]["command"], "/Applications/Damla --agent-status claude --then '~/bin/line.sh --short'")
+        self.assertNotIn("statusLine", installer.merge({}, "codex", Path("/tmp/Damla")))
+
     def test_approval_hook_is_opt_in_and_removable(self):
         with_approvals = installer.merge({}, "claude", Path("/tmp/Damla"), True)
         groups = with_approvals["hooks"]["PermissionRequest"]

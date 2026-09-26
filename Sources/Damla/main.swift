@@ -14,6 +14,34 @@ if let index = CommandLine.arguments.firstIndex(of: "--agent-event") {
     exit(0)
 }
 
+if let index = CommandLine.arguments.firstIndex(of: "--agent-status") {
+    // Claude Code's status line: records context and rate-limit use, then prints a short line. When the user
+    // had a status line of their own, it runs after `--then` with the same input and its output is printed instead.
+    var data = Data()
+    while let chunk = try? FileHandle.standardInput.read(upToCount: 65_536), !chunk.isEmpty {
+        data.append(chunk)
+        if data.count > 2 * 1024 * 1024 { exit(0) }
+    }
+    let arguments = CommandLine.arguments
+    let provider = arguments.indices.contains(index + 1) ? AgentProvider(rawValue: arguments[index + 1]) ?? .claude : .claude
+    let line = AgentEventStore.receiveStatus(provider: provider, input: data)
+    if let then = arguments.firstIndex(of: "--then"), arguments.indices.contains(then + 1) {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", arguments[then + 1]]
+        let input = Pipe()
+        task.standardInput = input
+        if (try? task.run()) != nil {
+            input.fileHandleForWriting.write(data)
+            try? input.fileHandleForWriting.close()
+            task.waitUntilExit()
+            exit(task.terminationStatus)
+        }
+    }
+    print(line)
+    exit(0)
+}
+
 if let index = CommandLine.arguments.firstIndex(where: { $0 == "--agent-approval" || $0 == "--agent-question" }) {
     // Installed only on request (the tour, Settings → Agents, or install-agent-hooks.py --approvals). Prints a
     // decision only when the user made one in Damla; otherwise nothing, and the agent shows its own prompt.

@@ -14,6 +14,13 @@ func runHookInstallerSelfTests(_ check: (Bool, String) -> Void) {
           "Installer quotes paths like shlex")
     let again = try? HookInstaller.merge(merged, provider: .claude, binary: binary, approvals: false)
     check(again.map { NSDictionary(dictionary: $0).isEqual(to: merged) } == true, "Installer is idempotent")
+    check((merged["statusLine"] as? [String: Any])?["command"] as? String == "'/tmp/Project With Spaces/Damla' --agent-status claude",
+          "Claude Code gets Damla's status line")
+    let mine = HookInstaller.statusLine(["type": "command", "command": "~/bin/line.sh --short", "padding": 2], command: "/A/Damla")
+    let moved = HookInstaller.statusLine(mine, command: "/B/Damla")
+    check(mine["padding"] as? Int == 2 && mine["command"] as? String == "/A/Damla --agent-status claude --then '~/bin/line.sh --short'"
+          && moved["command"] as? String == "/B/Damla --agent-status claude --then '~/bin/line.sh --short'"
+          && HookInstaller.shellUnquote(HookInstaller.shellQuote("it's")) == "it's", "A status line of the user's own keeps running, wrapped")
     let text = { (object: [String: Any]) in String(decoding: (try? JSONSerialization.data(withJSONObject: object)) ?? Data(), as: UTF8.self) }
     check(!text(merged).contains("--agent-approval") && !text(merged).contains("behavior"), "Approval hook only on request; no decision in settings")
     let codex = (try? HookInstaller.merge([:], provider: .codex, binary: binary, approvals: true)) ?? [:]
