@@ -114,11 +114,11 @@ struct DamlaView: View {
     @State private var glassVisible = false
     init(model: AppState, screen: ScreenMetrics) { self.model = model; media = model.media; self.screen = screen }
 
-    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics; var tall: Bool }
+    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics; var content: CGFloat }
     private var state: NotchState { model.state(for: screen.id) }
     private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
-    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots, tall: model.tallPanel) }
+    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots, content: model.contentHeight) }
     private var shape: NotchShape {
         let bottom: CGFloat = open ? 26 : state == .drop ? 24 : 13
         return metrics.hasNotch
@@ -137,7 +137,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics, tall: model.tallPanel))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics, content: model.contentHeight))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -228,7 +228,7 @@ struct DamlaView: View {
                         .padding(.top, Layout.headerHeight(metrics))
                 } else { ExpandedView(model: model, metrics: metrics) }
             }
-                .frame(width: Layout.panelWidth, height: Layout.headerHeight(metrics) + Layout.contentHeight(tall: model.tallPanel))
+                .frame(width: Layout.panelWidth, height: Layout.headerHeight(metrics) + model.contentHeight)
                 .transition(AnyTransition.asymmetric(
                     insertion: AnyTransition(.blurReplace),
                     removal: .opacity.animation(.easeOut(duration: 0.12))
@@ -593,7 +593,7 @@ struct ExpandedView: View {
             .transition(.blurReplace)
             .id(model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue)
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
-            .frame(width: Layout.panelWidth, height: Layout.contentHeight(tall: model.tallPanel))
+            .frame(width: Layout.panelWidth, height: model.contentHeight)
         }
         .overlay(alignment: .bottom) {
             if let notice = model.notice {

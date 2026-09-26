@@ -26,7 +26,7 @@ enum FilmLook: String, CaseIterable {
         case .nostalgia:
             // Faded instant-film colour, pulled back a little so faces keep their warmth.
             return [CIFilter(name: "CIPhotoEffectInstant"),
-                    CIFilter(name: "CIColorControls", parameters: [kCIInputContrastKey: 1.12, kCIInputSaturationKey: 1.25, kCIInputBrightnessKey: 0.0]),
+                    CIFilter(name: "CIColorControls", parameters: [kCIInputContrastKey: 1.08, kCIInputSaturationKey: 1.25, kCIInputBrightnessKey: -0.05]),
                     CIFilter(name: "CITemperatureAndTint", parameters: ["inputNeutral": CIVector(x: 6500, y: 0), "inputTargetNeutral": CIVector(x: 5600, y: 0)]),
                     CIFilter(name: "CIVignette", parameters: [kCIInputIntensityKey: 0.6, kCIInputRadiusKey: 1.6])].compactMap { $0 }
         case .mono: return [CIFilter(name: "CIPhotoEffectTonal"), CIFilter(name: "CIVignette", parameters: [kCIInputIntensityKey: 0.5, kCIInputRadiusKey: 1.8])].compactMap { $0 }
@@ -56,8 +56,12 @@ enum FilmLook: String, CaseIterable {
 /// The camera behind the Ayna page. It runs only while the page is on screen and keeps the newest frame so
 /// the shutter can take it without a separate photo pipeline.
 final class MirrorCamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    /// One camera for the app: its session is set up once, so opening the page again only has to start it.
+    static let shared = MirrorCamera()
     enum State { case starting, running, denied, unavailable }
     @Published private(set) var state: State = .starting
+    /// A countdown or a print is under way: the panel stays open until the card has landed.
+    @Published var busy = false
     let session = AVCaptureSession()
     private let queue = DispatchQueue(label: "app.local.damla.mirror")
     private var configured = false
@@ -249,26 +253,24 @@ struct PhotoCard: View {
 /// Ayna: an instant camera in the notch. A 3-2-1 countdown, a flash, and the card prints out of the notch,
 /// developing from white as it drops onto the pile. The camera runs only while this page is on screen.
 struct MirrorView: View {
-    @StateObject private var camera = MirrorCamera()
+    @ObservedObject private var camera = MirrorCamera.shared
     @StateObject private var album = MirrorAlbum()
     @AppStorage("mirrorLook") private var lookName = FilmLook.nostalgia.rawValue
     @AppStorage("mirrorTimer") private var useTimer = true
     @State private var countdown: Int?
     @State private var flash = false
+    @State private var hovering = false
 
     private var look: FilmLook { FilmLook(rawValue: lookName) ?? .nostalgia }
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            VStack(spacing: 12) {
-                viewfinder.frame(width: 214, height: 214)
-                controls.frame(width: 214)
-            }
+            viewfinder.frame(width: 214, height: 214)
             pile.frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear { camera.start(); album.load() }
-        .onDisappear { camera.stop(); countdown = nil }
+        .onDisappear { camera.stop(); countdown = nil; camera.busy = false }
     }
 
     // Viewfinder
@@ -280,6 +282,13 @@ struct MirrorView: View {
             case .running:
                 CameraPreview(session: camera.session, filters: look.previewFilters())
                     .overlay(FilmGrain().opacity(look == .natural ? 0 : 0.5).blendMode(.overlay).allowsHitTesting(false))
+                    .overlay(alignment: .topLeading) {
+                        if showControls {
+                            Text(look.title).font(.system(size: 9.5, weight: .semibold)).foregroundStyle(.white.opacity(0.9))
+                                .padding(.horizontal, 7).padding(.vertical, 3).background(.black.opacity(0.35), in: Capsule())
+                                .padding(9).transition(.opacity)
+                        }
+                    }
                     .overlay(alignment: .bottomTrailing) {
                         TimelineView(.everyMinute) { context in
                             Text(verbatim: PhotoCard.stamp(context.date))
@@ -308,19 +317,34 @@ struct MirrorView: View {
                     .contentTransition(.numericText(countsDown: true))
                     .transition(.scale.combined(with: .opacity))
             }
+            if showControls {
+                // The shutter row appears over the picture only while the pointer is on it and nothing is being shot.
+                VStack(spacing: 0) {
+                    Spacer()
+                    controls.padding(.horizontal, 12).padding(.bottom, 12).padding(.top, 28)
+                        .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
+                }
+                .transition(.opacity)
+            }
             Color.white.opacity(flash ? 0.95 : 0).allowsHitTesting(false)
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onHover { inside in withAnimation(.easeOut(duration: 0.18)) { hovering = inside } }
+        .animation(.easeOut(duration: 0.18), value: countdown == nil)
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 1))
     }
+
+    private var showControls: Bool { hovering && camera.state == .running && countdown == nil && !camera.busy }
 
     private var controls: some View {
         HStack {
             Button { withAnimation(Theme.quick) { lookName = look.next.rawValue } } label: {
-                Label(look.title, systemImage: look.icon).font(.system(size: 10.5, weight: .medium)).lineLimit(1)
+                Image(systemName: look.icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 34, height: 34).contentShape(Circle())
             }
-            .buttonStyle(PillStyle())
-            .help("Film görünümünü değiştir")
+            .buttonStyle(GlassCircleStyle())
+            .help(String(localized: "Film görünümü: \(look.title) · değiştir"))
             Spacer(minLength: 6)
             Button(action: shoot) {
                 ZStack {
@@ -335,10 +359,12 @@ struct MirrorView: View {
             .help(useTimer ? "3 saniye sonra çek" : "Çek")
             Spacer(minLength: 6)
             Button { useTimer.toggle() } label: {
-                Label(useTimer ? "3 sn" : "Hemen", systemImage: useTimer ? "timer" : "bolt.fill").font(.system(size: 10.5, weight: .medium))
+                Image(systemName: useTimer ? "3.circle" : "bolt.fill").font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(useTimer ? Theme.accent : .white).contentTransition(.symbolEffect(.replace))
+                    .frame(width: 34, height: 34).contentShape(Circle())
             }
-            .buttonStyle(PillStyle(accent: useTimer))
-            .help("Geri sayım")
+            .buttonStyle(GlassCircleStyle())
+            .help(useTimer ? "3 saniye geri sayım · kapat" : "Hemen çeker · geri sayımı aç")
         }
     }
 
@@ -362,7 +388,7 @@ struct MirrorView: View {
                         .transition(.printOut)
                 }
             }
-            .frame(height: 200, alignment: .top)
+            .frame(height: 178, alignment: .top)
             Spacer(minLength: 0)
             Button { NSWorkspace.shared.open(MirrorAlbum.folder) } label: {
                 Label(album.total == 0 ? String(localized: "Klasör") : String(localized: "\(album.total) fotoğraf"), systemImage: "folder")
@@ -382,12 +408,13 @@ struct MirrorView: View {
     // Shooting
 
     private func shoot() {
-        guard camera.state == .running, countdown == nil else { return }
+        guard camera.state == .running, countdown == nil, !camera.busy else { return }
+        camera.busy = true
         if useTimer { tick(3) } else { take() }
     }
 
     private func tick(_ value: Int) {
-        guard camera.state == .running else { countdown = nil; return }
+        guard camera.state == .running else { countdown = nil; camera.busy = false; return }
         if value == 0 { withAnimation(.easeOut(duration: 0.15)) { countdown = nil }; take(); return }
         withAnimation(.spring(duration: 0.3, bounce: 0.4)) { countdown = value }
         NSSound(named: "Tink")?.play()
@@ -395,7 +422,7 @@ struct MirrorView: View {
     }
 
     private func take() {
-        guard let photo = camera.snapshot(look: look) else { return }
+        guard let photo = camera.snapshot(look: look) else { camera.busy = false; return }
         MirrorView.shutter?.stop(); MirrorView.shutter?.play()
         flash = true
         withAnimation(.easeOut(duration: 0.45)) { flash = false }
@@ -404,6 +431,8 @@ struct MirrorView: View {
             withAnimation(.spring(duration: 1.1, bounce: 0.22)) {
                 _ = album.print(photo, taken: Date())
             }
+            // Let the card land before the panel may fold away.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { camera.busy = false }
         }
     }
 

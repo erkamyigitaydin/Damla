@@ -31,6 +31,7 @@ enum Layout {
     static let panelWidth: CGFloat = 404
     static let contentHeight: CGFloat = 188
     static let tallContentHeight: CGFloat = 380   // the lyrics stretch the panel down
+    static let mirrorContentHeight: CGFloat = 242 // the Ayna camera: the viewfinder and the pile of prints
     static func contentHeight(tall: Bool) -> CGFloat { tall ? tallContentHeight : contentHeight }
     static let pillHeight: CGFloat = 36
     static let pillGap: CGFloat = 8
@@ -51,7 +52,7 @@ enum Layout {
     /// Width of one side of the closed notch for the given number of live activities (0, 1 or 2).
     static func compactSide(slots: Int) -> CGFloat { slots >= 2 ? compactSideSplit : compactSide }
 
-    static func shapeSize(_ state: NotchState, _ m: Metrics, compactSlots: Int, tall: Bool = false) -> CGSize {
+    static func shapeSize(_ state: NotchState, _ m: Metrics, compactSlots: Int, content: CGFloat = contentHeight) -> CGSize {
         switch state {
         case .closed:
             let extra: CGFloat = compactSlots > 0 ? compactSide(slots: compactSlots) * 2 : (m.hasNotch ? 12 : notchlessIdleWidth)
@@ -62,7 +63,7 @@ enum Layout {
             // Basket: a wider, slightly taller target that appears while a file is being dragged anywhere.
             return CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m) + dropBandHeight)
         case .expanded:
-            return CGSize(width: panelWidth, height: headerHeight(m) + contentHeight(tall: tall))
+            return CGSize(width: panelWidth, height: headerHeight(m) + content)
         }
     }
 
@@ -74,8 +75,8 @@ enum Layout {
     }
 
     /// Screen-space rect of everything currently drawn (shape plus the tab pill when open).
-    static func visibleRect(_ state: NotchState, _ m: Metrics, compactSlots: Int, midX: CGFloat, top: CGFloat, tall: Bool = false) -> CGRect {
-        var size = shapeSize(state, m, compactSlots: compactSlots, tall: tall)
+    static func visibleRect(_ state: NotchState, _ m: Metrics, compactSlots: Int, midX: CGFloat, top: CGFloat, content: CGFloat = contentHeight) -> CGRect {
+        var size = shapeSize(state, m, compactSlots: compactSlots, content: content)
         if state == .expanded { size.height += pillGap + pillHeight }
         return CGRect(x: midX - size.width / 2, y: top - size.height, width: size.width, height: size.height)
     }

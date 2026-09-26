@@ -232,7 +232,7 @@ final class PanelController {
 
     func visibleRect() -> NSRect {
         guard let screen else { return .zero }
-        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY, tall: model.tallPanel)
+        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY, content: model.contentHeight)
     }
 
     private func trackHover() {
@@ -260,7 +260,7 @@ final class PanelController {
             let editing = panel.isKeyWindow && model.selectedTab == .clipboard
             // Lyrics are read from a distance while the song plays: they stay open until closed by hand
             // (the X, a click on the notch, ⌃⌥Space).
-            if model.expanded && isActive && !model.pinnedOpen && !editing && !model.tallPanel && NSEvent.pressedMouseButtons == 0
+            if model.expanded && isActive && !model.pinnedOpen && !editing && !model.tallPanel && !MirrorCamera.shared.busy && NSEvent.pressedMouseButtons == 0
                 && now.timeIntervalSince(exitedAt!) > 0.28 {
                 model.expanded = false
             }
