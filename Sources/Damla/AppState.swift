@@ -113,6 +113,13 @@ final class AppState: ObservableObject {
     let deviceBatteries = DeviceBatteryWatcher()
     let devServers = DevServerMonitor()
     let calendar = CalendarService()
+    let screenshots = ScreenshotWatcher()
+    @Published var screenshotsToShelf = UserDefaults.standard.object(forKey: "screenshotsToShelf") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(screenshotsToShelf, forKey: "screenshotsToShelf")
+            if screenshotsToShelf && enabledTabs.contains(.files) { screenshots.start() } else { screenshots.stop() }
+        }
+    }
     let microphone = MicrophoneMonitor()
     @Published var micInNotch = UserDefaults.standard.object(forKey: "micInNotch") as? Bool ?? true {
         didSet { UserDefaults.standard.set(micInNotch, forKey: "micInNotch") }
@@ -184,6 +191,12 @@ final class AppState: ObservableObject {
         }
         calendar.start()
         microphone.start()
+        screenshots.onNew = { [weak self] urls in
+            guard let self, self.screenshotsToShelf, self.enabledTabs.contains(.files) else { return }
+            self.addFiles(urls, open: false)
+            self.showDeviceHUD("camera.viewfinder", String(localized: "Ekran görüntüsü rafta"), detail: urls.count > 1 ? "\(urls.count)" : "")
+        }
+        if screenshotsToShelf && enabledTabs.contains(.files) { screenshots.start() }
         agents.onUsageWarning = { [weak self] percent, resets in
             self?.showDeviceHUD("gauge.with.dots.needle.67percent", String(localized: "Claude kullanımı %\(percent)"),
                                 detail: String(localized: "\(resets.formatted(date: .omitted, time: .shortened)) sıfırlanır"))
@@ -429,7 +442,8 @@ final class AppState: ObservableObject {
     }
     func removeClip(_ entry: ClipEntry) { clips.removeAll { $0.id == entry.id }; saveClips() }
     private func saveClips() { DiskStore.save(clips, name: "clipboard.json") }
-    func addFiles(_ urls: [URL]) {
+    /// Puts files on the shelf. `open` shows the shelf; screenshots and conversions arrive quietly instead.
+    func addFiles(_ urls: [URL], open: Bool = true) {
         var added = 0
         for url in urls where url.isFileURL {
             let url = url.standardizedFileURL
@@ -438,8 +452,22 @@ final class AppState: ObservableObject {
             files.insert(ShelfItem(url: url), at: 0); added += 1
         }
         DiskStore.save(files, name: "shelf.json")
+        guard open else { return }
         selectedTab = .files; expanded = true
         if added > 0 { showNotice(String(localized: "\(added) öğe rafa eklendi")) }
+    }
+
+    func runShelfAction(_ action: ShelfAction, on item: ShelfItem) {
+        action.run(on: item.url, shelf: files.map(\.url)) { [weak self] result in
+            guard let self else { return }
+            if let result {
+                self.addFiles([result], open: false)
+                self.selectedFile = self.files.first?.id
+                self.showNotice(String(localized: "Hazır: \(result.lastPathComponent)"))
+            } else {
+                self.showNotice(String(localized: "Bu dosyayla yapılamadı."))
+            }
+        }
     }
     func removeFile(_ item: ShelfItem) {
         files.removeAll { $0.id == item.id }; DiskStore.save(files, name: "shelf.json")

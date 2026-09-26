@@ -70,6 +70,10 @@ private struct GeneralSettings: View {
                     Text("Pano geçmişini tut")
                     Text("Kopyaladığın metin ve görseller Pano sekmesinde listelenir. Parola yöneticilerinden gelenler atlanır.")
                 }
+                Toggle(isOn: $model.screenshotsToShelf) {
+                    Text("Ekran görüntüleri rafa")
+                    Text("Yeni ekran görüntüleri kendiliğinden rafa eklenir; oradan sürükleyip bırakabilirsin.")
+                }
             }
             Section {
                 Picker(selection: $language) {

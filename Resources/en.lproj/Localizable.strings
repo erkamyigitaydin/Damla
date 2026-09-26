@@ -367,3 +367,15 @@
 "Kamera izni kapalı" = "Camera access is off";
 "Kamera bulunamadı" = "No camera found";
 "Görüşmeden önce kameraya bak; kamera yalnızca bu sayfa açıkken çalışır" = "Check yourself before a call; the camera runs only while this page is open";
+"%@ olarak kaydet" = "Save as %@";
+"Yarı boyuta küçült" = "Shrink to half size";
+"Sıkıştır (JPEG)" = "Compress (JPEG)";
+"Raftaki PDF’leri birleştir" = "Merge PDFs on the shelf";
+"küçük" = "small";
+"sıkıştırılmış" = "compressed";
+"birleştirilmiş" = "merged";
+"Ekran görüntüsü rafta" = "Screenshot on the shelf";
+"Hazır: %@" = "Ready: %@";
+"Bu dosyayla yapılamadı." = "Couldn’t do that with this file.";
+"Ekran görüntüleri rafa" = "Screenshots to the shelf";
+"Yeni ekran görüntüleri kendiliğinden rafa eklenir; oradan sürükleyip bırakabilirsin." = "New screenshots land on the shelf by themselves, ready to drag anywhere.";

@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import PDFKit
 import CoreAudio
 
 func runSelfTests() -> Int32 {
@@ -215,6 +217,30 @@ func runSelfTests() -> Int32 {
     tabDefaults.set(PanelTab.allCases.map(\.rawValue), forKey: "knownTabs")
     check(upgraded == [.home, .focus, .mirror] && PanelTab.loadEnabled(defaults: tabDefaults) == [.home, .focus],
           "A page added in an update starts on; one the user turned off stays off")
+    let shelfFolder = FileManager.default.temporaryDirectory.appendingPathComponent("Damla-shelf-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: shelfFolder, withIntermediateDirectories: true)
+    let png = shelfFolder.appendingPathComponent("foto.png")
+    let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 200, pixelsHigh: 100, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                  isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+    try? bitmap?.representation(using: .png, properties: [:])?.write(to: png)
+    let jpeg = ShelfAction.writeImage(png, as: .jpeg, suffix: nil, scale: 1, quality: 0.9)
+    let half = ShelfAction.writeImage(png, as: .png, suffix: "küçük", scale: 0.5, quality: 0.9)
+    let halfWidth = half.flatMap { NSImageRep(contentsOf: $0)?.pixelsWide }
+    check(jpeg?.lastPathComponent == "foto.jpeg" && half?.lastPathComponent == "foto-küçük.png" && halfWidth == 100
+          && FileManager.default.fileExists(atPath: png.path), "Image conversions write new files beside the original")
+    check(ShelfAction.destination(for: png, suffix: nil, ext: "jpeg")?.lastPathComponent == "foto 2.jpeg", "Conversions never overwrite a file")
+    check(ShelfAction.available(for: png, shelf: [png]).contains(.convert(.jpeg)) && !ShelfAction.available(for: png, shelf: [png]).contains(.convert(.png)),
+          "Images are offered the other formats")
+    let pdfs = (1...2).map { shelfFolder.appendingPathComponent("belge\($0).pdf") }
+    for pdf in pdfs {
+        let document = PDFDocument()
+        if let image = NSImage(contentsOf: png), let page = PDFPage(image: image) { document.insert(page, at: 0) }
+        document.write(to: pdf)
+    }
+    let merged = ShelfAction.merge(pdfs, near: pdfs[0])
+    check(merged.flatMap { PDFDocument(url: $0)?.pageCount } == 2 && ShelfAction.available(for: pdfs[0], shelf: pdfs) == [.mergePDFs]
+          && ShelfAction.available(for: pdfs[0], shelf: [pdfs[0]]).isEmpty, "PDFs on the shelf merge into one")
+    try? FileManager.default.removeItem(at: shelfFolder)
     var lowBattery: [String] = []
     let watcher = DeviceBatteryWatcher()
     watcher.onLow = { name, _, level in lowBattery.append("\(name) \(level)") }

@@ -1053,6 +1053,13 @@ struct FileTile: View {
             Button("Önizle") { model.quickLook(item) }
             Button("Paylaş…") { model.shareFile(item) }
             Button("Finder’da göster") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
+            let actions = ShelfAction.available(for: item.url, shelf: model.files.map(\.url))
+            if !actions.isEmpty {
+                Divider()
+                ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
+                    Button(action.title) { model.runShelfAction(action, on: item) }
+                }
+            }
             Divider()
             Button("Raftan kaldır") { model.removeFile(item) }
         }
