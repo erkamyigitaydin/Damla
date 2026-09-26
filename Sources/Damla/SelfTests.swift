@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import PDFKit
 import CoreAudio
+import ApplicationServices
 
 func runSelfTests() -> Int32 {
     var failures: [String] = []
@@ -251,6 +252,14 @@ func runSelfTests() -> Int32 {
     var focusClock = FocusSession()
     focusClock.reset(minutes: 37)
     check(focusClock.duration == 37 * 60 && focusClock.remaining() == 37 * 60, "Any focus length can be set")
+    let axSelf = AXUIElementCreateApplication(getpid())
+    func statusItem(_ x: CGFloat) -> MenuBarItems.Item {
+        MenuBarItems.Item(title: "\(Int(x))", frame: CGRect(x: x, y: 458, width: 24, height: 33), element: axSelf, app: .current)
+    }
+    let notchRect = CGRect(x: 3223, y: 458, width: 185, height: 32), barRect = CGRect(x: 2560, y: 458, width: 1512, height: 32)
+    let hiddenNow = MenuBarOverflow.hidden([statusItem(3300), statusItem(3536), statusItem(3700), statusItem(1200)], notch: notchRect, bar: barRect,
+                                           menus: [CGRect(x: 3495, y: 458, width: 50, height: 33)])
+    check(hiddenNow.map(\.title) == ["3300", "3536"], "Behind the notch or under the app's menus is hidden; clear space and other screens are not")
     var lowBattery: [String] = []
     let watcher = DeviceBatteryWatcher()
     watcher.onLow = { name, _, level in lowBattery.append("\(name) \(level)") }

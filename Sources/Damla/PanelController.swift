@@ -515,10 +515,12 @@ final class PanelManager {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var model: AppState!
     var manager: PanelManager!
     private var statusItem: NSStatusItem!
+    private let overflow = MenuBarOverflow()
+    private static let overflowTag = 7001
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private var approvalKeys: [EventHotKeyRef] = []
@@ -548,7 +550,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
         menu.addItem(withTitle: String(localized: "Damla’dan çık"), action: #selector(quit), keyEquivalent: "q")
         for item in menu.items { item.target = self }
+        menu.delegate = self
         statusItem.menu = menu
+        overflow.onChange = { [weak self] count in self?.setDropletBadge(count > 0) }
+        overflow.start()
         registerShortcut()
         if UserDefaults.standard.integer(forKey: "lastSeenBuild") < 3 {
             UserDefaults.standard.set(true, forKey: "hasLaunched")
@@ -602,6 +607,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case let body where body.hasPrefix("music:"): model.media.debugMusic(String(body.dropFirst(6)))
         case "render-media": MainActor.assumeIsolated { renderMedia() }
         case "render-card": MainActor.assumeIsolated { renderCard() }
+        case "menubar-dump": overflow.dump()
         case "approval-allow", "approval-deny":
             if let request = model.agents.approvals.first { model.agents.decide(request, command == "approval-allow" ? .allow : .deny) }
         case "media-sessions": NSLog("Damla media: %@", model.media.sessions.map { "\($0.bundleID) playing=\($0.playing) \($0.title)" }.joined(separator: " | "))
@@ -682,6 +688,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         manager.show(); return true
     }
     @objc func showPanel() { manager.show() }
+
+    // MARK: Status items hidden by the notch
+
+    /// The drop in the menu bar gets a dot while some status items cannot be seen.
+    private func setDropletBadge(_ on: Bool) {
+        guard let symbol = NSImage(systemSymbolName: "drop", accessibilityDescription: "Damla") else { return }
+        guard on else { statusItem.button?.image = symbol; return }
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { rect in
+            let s = symbol.size
+            symbol.draw(in: NSRect(x: (rect.width - s.width) / 2 - 1, y: (rect.height - s.height) / 2, width: s.width, height: s.height))
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: NSRect(x: rect.width - 6, y: rect.height - 7, width: 5, height: 5)).fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = String(localized: "Damla · notch’un altında kalan simgeler var")
+        statusItem.button?.image = image
+    }
+
+    /// The top of the drop's menu lists what the notch hides; picking one opens that item's own menu.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        for item in menu.items where item.tag == Self.overflowTag { menu.removeItem(item) }
+        overflow.refresh(rescan: false)
+        var section: [NSMenuItem] = []
+        if MenuBarOverflow.notchBand() != nil && !AXIsProcessTrusted() {
+            let ask = NSMenuItem(title: String(localized: "Notch’un altında kalan simgeleri göster…"), action: #selector(askAccessibility), keyEquivalent: "")
+            ask.target = self
+            section.append(ask)
+        } else if !overflow.hidden.isEmpty {
+            let header = NSMenuItem(title: String(localized: "Notch’un altında kalanlar"), action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            section.append(header)
+            for (index, hidden) in overflow.hidden.enumerated() {
+                let name = hidden.app.localizedName ?? ""
+                let title = hidden.title.isEmpty || hidden.title == name ? name : hidden.title
+                let item = NSMenuItem(title: title, action: #selector(openHidden(_:)), keyEquivalent: "")
+                item.target = self
+                item.tag = Self.overflowTag
+                item.representedObject = index
+                if let icon = hidden.app.icon?.copy() as? NSImage { icon.size = NSSize(width: 16, height: 16); item.image = icon }
+                if title != name { item.toolTip = name }
+                section.append(item)
+            }
+        }
+        guard !section.isEmpty else { return }
+        section.append(.separator())
+        for (offset, item) in section.enumerated() {
+            item.tag = Self.overflowTag
+            menu.insertItem(item, at: offset)
+        }
+    }
+
+    @objc private func openHidden(_ sender: NSMenuItem) {
+        guard let index = sender.representedObject as? Int, overflow.hidden.indices.contains(index) else { return }
+        let item = overflow.hidden[index]
+        // After this menu has closed, or the item's own menu would open and close with it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MenuBarOverflow.open(item) }
+    }
+
+    @objc private func askAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if !AXIsProcessTrustedWithOptions(options) { MediaKeyInterceptor.openAccessibilitySettings() }
+    }
     @objc func showSettings() { model.openSettings() }
     @objc func showOnboarding() { model.startTour() }
     @objc func startCleaning() { manager.show(); model.startCleaning() }
