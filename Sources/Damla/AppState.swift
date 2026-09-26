@@ -85,6 +85,9 @@ final class AppState: ObservableObject {
         didSet { UserDefaults.standard.set(notchGestures, forKey: "notchGestures") }
     }
     @Published var currentOutput: AudioDeviceID?
+    /// Battery of the connected Bluetooth outputs (AirPods: each bud and the case), keyed by device name.
+    @Published private(set) var outputBatteries: [String: BluetoothBattery.Levels] = [:]
+    private var readingBatteries = false
     @Published var hud: HUDItem?
     @Published var notice: String?
     @Published var files: [ShelfItem] = DiskStore.load([ShelfItem].self, name: "shelf.json") ?? []
@@ -137,7 +140,11 @@ final class AppState: ObservableObject {
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
         monitor.onOutputs = { [weak self] outputs, current in
             guard let self else { return }
-            if self.outputs != outputs { self.outputs = outputs }
+            if self.outputs != outputs {
+                let connected = outputs.contains { $0.isBluetooth && !self.outputs.contains($0) }
+                self.outputs = outputs
+                if connected { self.refreshOutputBatteries() }
+            }
             if self.currentOutput != current {
                 let switched = self.currentOutput != nil
                 self.currentOutput = current
@@ -307,6 +314,28 @@ final class AppState: ObservableObject {
     func select(_ tab: PanelTab) {
         selectedTab = tab
         if tab == .clipboard { requestKeyFocus?() }
+    }
+    /// Reads the Bluetooth outputs' batteries again; one system_profiler run covers every device.
+    func refreshOutputBatteries() {
+        guard !readingBatteries, outputs.contains(where: \.isBluetooth) else { return }
+        readingBatteries = true
+        BluetoothBattery.read { [weak self] levels in
+            guard let self else { return }
+            self.readingBatteries = false
+            if self.outputBatteries != levels { self.outputBatteries = levels }
+        }
+    }
+    /// The current output's battery, when it is a Bluetooth device that reports one.
+    var currentOutputBattery: BluetoothBattery.Levels? {
+        outputs.first { $0.id == currentOutput && $0.isBluetooth }.flatMap { outputBatteries[$0.name] }
+    }
+    /// The neighbouring page for a swipe; the first and last pages do not wrap around.
+    func turnPage(forward: Bool) {
+        let tabs = visibleTabs
+        guard let index = tabs.firstIndex(of: selectedTab) else { return }
+        let target = index + (forward ? 1 : -1)
+        guard tabs.indices.contains(target) else { return }
+        select(tabs[target])
     }
     func toggleClipboard(_ enabled: Bool) {
         clipboardEnabled = enabled; pasteboardCount = NSPasteboard.general.changeCount

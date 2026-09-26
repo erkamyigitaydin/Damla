@@ -126,8 +126,8 @@ private struct PanelSettings: View {
             }
             Section {
                 Toggle(isOn: $model.notchGestures) {
-                    Text("Çentikte kaydırma")
-                    Text("Çentiğin üzerinde yukarı/aşağı kaydırınca ses değişir; trackpad’de sola kaydırmak sonraki, sağa kaydırmak önceki parçaya geçer.")
+                    Text("Kaydırarak sayfa değiştir")
+                    Text("Panel açıkken trackpad’de iki parmakla sola kaydırmak sonraki, sağa kaydırmak önceki sayfaya geçer.")
                 }
             } header: {
                 Text("Hareketler")
@@ -232,6 +232,7 @@ private struct MediaSettings: View {
 private struct AgentSettings: View {
     @ObservedObject var agents: AgentStatusService
     @State private var approvalHookInstalled = AgentSettings.checkApprovalHook()
+    @State private var installError: String?
     var body: some View {
         Form {
             Section {
@@ -244,15 +245,17 @@ private struct AgentSettings: View {
                 }
                 .disabled(!agents.approvalsEnabled)
                 LabeledContent("Onay hook’u") {
-                    Text(approvalHookInstalled ? "Kurulu" : "Kurulu değil").foregroundStyle(approvalHookInstalled ? Color.secondary : Color.orange)
+                    HStack {
+                        Text(approvalHookInstalled ? "Kurulu" : "Kurulu değil").foregroundStyle(approvalHookInstalled ? Color.secondary : Color.orange)
+                        if !approvalHookInstalled && HookInstaller.isAvailable(.claude) {
+                            Button("Kur") { installApprovalHook() }
+                        }
+                    }
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sorunun sahibi uygulama (Terminal, Claude…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır.")
-                    if !approvalHookInstalled {
-                        Text("Kurmak için: python3 scripts/install-agent-hooks.py --binary <Damla.app/Contents/MacOS/Damla> --approvals --apply")
-                            .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                    }
+                    if let installError { Text(installError).foregroundStyle(.orange) }
                 }
             }
             .onAppear { approvalHookInstalled = AgentSettings.checkApprovalHook() }
@@ -265,6 +268,17 @@ private struct AgentSettings: View {
                 Text("Durumlar Claude Code ve Codex hook’larıyla gelir. Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
             }
         }
+    }
+
+    /// Adds the approval hook (with the status hooks) to ~/.claude/settings.json; the installer keeps a backup.
+    private func installApprovalHook() {
+        do {
+            try HookInstaller.install(.claude, approvals: true)
+            installError = nil
+        } catch {
+            installError = String(localized: "Kurulamadı: \(String(describing: error))")
+        }
+        approvalHookInstalled = AgentSettings.checkApprovalHook()
     }
 
     /// True when ~/.claude/settings.json runs Damla's approval hook.

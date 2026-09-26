@@ -109,6 +109,9 @@ struct OutputsView: View {
                                     .foregroundStyle(chosen ? Theme.accent : Theme.dim)
                                 Text(output.name).font(.system(size: 11.5, weight: chosen ? .semibold : .medium)).lineLimit(1)
                                 Spacer(minLength: 6)
+                                if output.isBluetooth, let battery = model.outputBatteries[output.name] {
+                                    BatteryLabel(levels: battery)
+                                }
                                 if chosen { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.accent) }
                             }
                             .padding(.horizontal, 10).frame(height: 32)
@@ -121,6 +124,22 @@ struct OutputsView: View {
             }
             .scrollIndicators(.hidden)
         }
+        .onAppear { model.refreshOutputBatteries() }
+    }
+}
+
+/// "S %80 · Sa %75 · K %60" beside a Bluetooth output; turns orange when a bud or the case is nearly empty.
+struct BatteryLabel: View {
+    let levels: BluetoothBattery.Levels
+    var body: some View {
+        let low = (levels.lowest ?? 100) <= 20
+        HStack(spacing: 4) {
+            Image(systemName: low ? "battery.25percent" : "battery.75percent").font(.system(size: 10, weight: .medium))
+            Text(levels.summary).font(.system(size: 10.5, weight: .medium, design: .rounded)).monospacedDigit()
+        }
+        .foregroundStyle(low ? Color.orange : Theme.dim)
+        .lineLimit(1).fixedSize()
+        .accessibilityElement(children: .combine)
     }
 }
 

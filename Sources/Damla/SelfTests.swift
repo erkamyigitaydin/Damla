@@ -146,23 +146,26 @@ func runSelfTests() -> Int32 {
           && AudioOutput.icon(name: "DELL U2723QE", transport: kAudioDeviceTransportTypeDisplayPort) == "display", "Output icons follow the device")
     check(AudioOutput.shortName("Erkam’ın AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth) == "AirPods Pro"
           && AudioOutput.shortName("MacBook Pro Hoparlörü", transport: kAudioDeviceTransportTypeBuiltIn) == "Hoparlör", "Output names fit the capsule")
-    var gesture = NotchScrollGesture()
-    check(gesture.feed(up: 1, right: 0, precise: false, began: false, ended: false, momentum: false) == [.volume(1)], "Wheel click is one volume step")
+    var gesture = PanelSwipeGesture()
+    check(gesture.feed(up: 0, right: -30, precise: false, began: false, ended: false, momentum: false) == .pass, "Mouse wheels scroll the page, never swipe")
     _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
-    let travel = (0..<5).flatMap { _ in gesture.feed(up: 7, right: 1, precise: true, began: false, ended: false, momentum: false) }
-    check(travel == [.volume(1), .volume(1)], "Trackpad travel maps to volume steps")
-    check(gesture.feed(up: 50, right: 0, precise: true, began: false, ended: false, momentum: true).isEmpty, "Momentum never changes the volume")
-    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
-    let swipe = (0..<6).flatMap { _ in gesture.feed(up: 1, right: -20, precise: true, began: false, ended: false, momentum: false) }
-    check(swipe == [.next], "Left swipe skips forward exactly once")
+    let scroll = (0..<8).map { _ in gesture.feed(up: 10, right: -8, precise: true, began: false, ended: false, momentum: false) }
+    check(scroll.allSatisfy { $0 == .pass }, "A vertical start stays a scroll even if it drifts sideways")
     _ = gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false)
     _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
-    check((0..<4).flatMap { _ in gesture.feed(up: 0, right: 20, precise: true, began: false, ended: false, momentum: false) } == [.previous], "Right swipe goes back")
+    let swipe = (0..<6).map { _ in gesture.feed(up: 1, right: -20, precise: true, began: false, ended: false, momentum: false) }
+    check(swipe.compactMap(\.action) == [.next] && swipe.dropFirst().allSatisfy(\.consume), "Left swipe turns to the next page exactly once")
+    check(gesture.feed(up: 0, right: -40, precise: true, began: false, ended: false, momentum: true) == .pass, "Momentum never turns a page")
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: false, ended: true, momentum: false)
+    _ = gesture.feed(up: 0, right: 0, precise: true, began: true, ended: false, momentum: false)
+    check((0..<4).compactMap { _ in gesture.feed(up: 0, right: 20, precise: true, began: false, ended: false, momentum: false).action } == [.previous], "Right swipe goes back")
     let profile = #"{"SPBluetoothDataType":[{"device_connected":[{"Erkam’ın AirPods Pro":{"device_batteryLevelLeft":"80%","device_batteryLevelRight":"75 %","device_batteryLevelCase":"60%"}},{"MX Keys Mini":{"device_minorType":"Keyboard"}}],"device_not_connected":[{"iPhone":{}}]}]}"#
     let buds = BluetoothBattery.parse(Data(profile.utf8), name: "Erkam’ın AirPods Pro")
     check(buds?.summary == "S %80 · Sa %75 · K %60", "AirPods battery reads each bud and the case")
     check(BluetoothBattery.parse(Data(profile.utf8), name: "iPhone") == nil && BluetoothBattery.parse(Data(profile.utf8), name: "MX Keys Mini") == nil,
           "No battery line for disconnected or battery-less devices")
+    check(BluetoothBattery.parseAll(Data(profile.utf8)).keys.sorted() == ["Erkam’ın AirPods Pro"], "Outputs list reads every connected battery at once")
+    check(buds?.lowest == 60 && BluetoothBattery.Levels(left: nil, right: nil, case: nil, main: 15).lowest == 15, "Lowest level drives the low-battery tint")
     runMediaSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
     runLyricsSelfTests { condition, name in check(condition, name) }

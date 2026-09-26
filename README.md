@@ -50,7 +50,7 @@ Apple Music, Spotify, Podcasts, YouTube in the browser: if it's playing, Damla s
   <img src="docs/screenshots/agents.png" width="550" alt="The agents page showing one Claude Code session waiting for approval and one working">
 </p>
 
-Running Claude Code or Codex in the background? Damla shows every session: which project is working, which one needs you, and how long it's been waiting. A little droplet mascot lives in the notch and reacts: it bounces while an agent works, waves when one needs you, and smiles when it's done. Click a session to jump straight to its terminal or editor.
+Running Claude Code or Codex in the background? Damla shows every session: which project is working, which one needs you, and how long it's been waiting. A little droplet mascot lives in the notch and reacts: it bounces while an agent works, waves when one needs you, and smiles when it's done. Click a session to bring the app it runs in (Terminal, your editor or the Claude app) to the front.
 
 ### Approve commands without switching apps
 
@@ -70,7 +70,8 @@ Start dragging a file anywhere and the notch opens into a drop zone. Park files 
 
 ### And more
 
-- **Sound, your way.** Switch outputs, see your AirPods' battery when they connect, and set the volume of each app separately. Scroll on the notch to change the volume, swipe to skip tracks.
+- **Sound, your way.** Switch outputs, see your AirPods' battery (each bud and the case) when they connect and right in the output list, and set the volume of each app separately.
+- **Swipe between pages.** With the panel open, swipe left or right with two fingers on the trackpad.
 - **Beautiful volume and brightness indicators** that replace the system ones.
 - **Clipboard history** with search and pinning (off until you turn it on).
 - **Focus timer** for 25/45/50 minute sessions, with the countdown right in the notch.
@@ -95,14 +96,9 @@ A short tour on first launch asks for the few permissions Damla can use. Every o
 
 ### Connecting your agents
 
-Use the Agents step of the first-launch tour (menu bar → **Tour…**), or run the installer from this repository:
+Open the tour from the menu bar (**Tour…**) and go to the **Agents** step. Click **Connect** next to Claude Code or Codex, and leave the notch approvals switch on if you want to answer Claude Code's permission prompts from the notch. You can add the approval hook later too, in **Settings → Agents**.
 
-```sh
-# Shows the plan first; --apply installs it. Add --approvals to answer Claude Code's prompts from the notch.
-python3 scripts/install-agent-hooks.py --binary /Applications/Damla.app/Contents/MacOS/Damla --apply
-```
-
-The installer keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. In Codex, approve the new hooks once with `/hooks`. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
+Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. In Codex, approve the new hooks once with `/hooks`. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
 
 ## Privacy
 
@@ -127,7 +123,7 @@ zsh build.sh                                  # builds and signs ../Damla.app, t
 - **Code map:** `Layout.swift` is the single source of truth for shapes and window sizes. `PanelController.swift` runs one window per display. `MediaSessionStore` keeps the media logic free of AppKit so it can be tested.
 - **Localization:** keys are the Turkish source strings; the English text lives in `Resources/en.lproj/Localizable.strings`.
 - **Automation:** launched with `--debug`, the app listens for `app.local.damla.debug` distributed notifications (`open`, `tab-agents`, `media-showcase`, `files:<paths>`…). With `DAMLA_SUPPORT_DIR` set, a debug run keeps its data in that folder. The screenshots above were made this way with demo data.
-- **Hook tests:** `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-agent-hooks.py`.
+- **Hooks from the command line:** `python3 scripts/install-agent-hooks.py --binary <path to Damla binary> [--approvals] --apply` does what the tour's Agents step does (without `--apply` it only prints the plan). Tests: `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-agent-hooks.py`.
 - **Releasing:**
   1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` and commit.
   2. Write the release notes to `dist/notes-<version>.md`.

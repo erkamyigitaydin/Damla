@@ -155,7 +155,7 @@
 "Kopyalanan görsel" = "Copied image";
 "Kopyalandı · ⌘V ile yapıştır" = "Copied · paste with ⌘V";
 "Kullanıcı Damla'dan reddetti." = "The user denied this in Damla.";
-"Kurmak için: python3 scripts/install-agent-hooks.py --binary <Damla.app/Contents/MacOS/Damla> --approvals --apply" = "To install: python3 scripts/install-agent-hooks.py --binary <Damla.app/Contents/MacOS/Damla> --approvals --apply";
+"Kur" = "Install";
 "Kurulamadı: %@" = "Couldn’t install: %@";
 "Kurulu" = "Installed";
 "Kurulu değil" = "Not installed";
@@ -220,12 +220,12 @@
 "Ses çalan uygulamalar burada görünür; her birinin sesini ayrı ayarlayabilirsin." = "Apps playing sound show up here; set each one’s volume separately.";
 "Ses çıkışı" = "Sound output";
 "Ses çıkışı: %@ · değiştir" = "Sound output: %@ · change";
+"Ses çıkışı: %@ (%@) · değiştir" = "Sound output: %@ (%@) · change";
 "Sesini kıs" = "Turn it down";
 "Seçili dosyayı paylaş" = "Share the selected file";
 "Sistem" = "System";
 "Sistem · tüm oynatıcılar" = "System · all players";
 "Sonraki" = "Next";
-"Sonraki parça" = "Next track";
 "Sorunun sahibi uygulama (Terminal, Claude…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır." = "If the app asking (Terminal, Claude…) is in front, the notch doesn’t ask; if time runs out or you answer in the terminal, the prompt stays there.";
 "Soruyu orada yanıtla" = "Answer the prompt there";
 "Sözler" = "Lyrics";
@@ -275,12 +275,11 @@
 "Çalışıyor" = "Working";
 "Çentikli" = "Notched";
 "Çentiksiz ekranda" = "On screens without a notch";
-"Çentikte kaydırma" = "Scroll on the notch";
-"Çentiğin üzerinde yukarı/aşağı kaydırınca ses değişir; trackpad’de sola kaydırmak sonraki, sağa kaydırmak önceki parçaya geçer." = "Scroll up or down on the notch to change the volume; on a trackpad, swipe left for the next track and right for the previous one.";
+"Kaydırarak sayfa değiştir" = "Swipe between pages";
+"Panel açıkken trackpad’de iki parmakla sola kaydırmak sonraki, sağa kaydırmak önceki sayfaya geçer." = "With the panel open, swipe left with two fingers on the trackpad for the next page and right for the previous one.";
 "Çık" = "Quit";
 "Çıkış seçimi ve her uygulama için ayrı ses seviyesi" = "Pick the output and set each app’s volume";
 "Önceki" = "Previous";
-"Önceki parça" = "Previous track";
 "Önizle" = "Preview";
 "Önizle (Boşluk)" = "Preview (Space)";
 "Özet" = "Home";

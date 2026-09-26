@@ -115,40 +115,52 @@ enum BluetoothBattery {
             return [left.map { String(localized: "S %\($0)") }, right.map { String(localized: "Sa %\($0)") },
                     self.case.map { String(localized: "K %\($0)") }].compactMap { $0 }.joined(separator: " · ")
         }
+        /// The lowest level shown, to warn about a bud or case that is about to run out.
+        var lowest: Int? { (main != nil && left == nil && right == nil ? [main] : [left, right, self.case]).compactMap { $0 }.min() }
     }
 
-    /// Runs off the main thread (system_profiler takes about a second) and answers on the main thread.
-    static func levels(for name: String, completion: @escaping (Levels?) -> Void) {
+    /// Every connected device's levels, keyed by its name. Runs off the main thread (system_profiler takes
+    /// about a second) and answers on the main thread.
+    static func read(completion: @escaping ([String: Levels]) -> Void) {
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
             task.arguments = ["SPBluetoothDataType", "-json"]
             let pipe = Pipe()
             task.standardOutput = pipe; task.standardError = FileHandle.nullDevice
-            var result: Levels?
+            var result: [String: Levels] = [:]
             if (try? task.run()) != nil {
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 task.waitUntilExit()
-                result = parse(data, name: name)
+                result = parseAll(data)
             }
             DispatchQueue.main.async { completion(result) }
         }
     }
 
-    static func parse(_ data: Data, name: String) -> Levels? {
+    static func levels(for name: String, completion: @escaping (Levels?) -> Void) {
+        read { completion($0[name]) }
+    }
+
+    static func parse(_ data: Data, name: String) -> Levels? { parseAll(data)[name] }
+
+    static func parseAll(_ data: Data) -> [String: Levels] {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let controllers = root["SPBluetoothDataType"] as? [[String: Any]] else { return nil }
+              let controllers = root["SPBluetoothDataType"] as? [[String: Any]] else { return [:] }
+        var result: [String: Levels] = [:]
         for controller in controllers {
             for entry in controller["device_connected"] as? [[String: Any]] ?? [] {
-                guard let info = entry[name] as? [String: Any] else { continue }
-                func percent(_ key: String) -> Int? {
-                    (info[key] as? String).flatMap { Int($0.trimmingCharacters(in: CharacterSet(charactersIn: "% "))) }
+                for (name, value) in entry {
+                    guard let info = value as? [String: Any] else { continue }
+                    func percent(_ key: String) -> Int? {
+                        (info[key] as? String).flatMap { Int($0.trimmingCharacters(in: CharacterSet(charactersIn: "% "))) }
+                    }
+                    let levels = Levels(left: percent("device_batteryLevelLeft"), right: percent("device_batteryLevelRight"),
+                                        case: percent("device_batteryLevelCase"), main: percent("device_batteryLevelMain"))
+                    if !levels.isEmpty { result[name] = levels }
                 }
-                let levels = Levels(left: percent("device_batteryLevelLeft"), right: percent("device_batteryLevelRight"),
-                                    case: percent("device_batteryLevelCase"), main: percent("device_batteryLevelMain"))
-                return levels.isEmpty ? nil : levels
             }
         }
-        return nil
+        return result
     }
 }

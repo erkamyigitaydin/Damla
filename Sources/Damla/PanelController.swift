@@ -41,7 +41,7 @@ final class PanelController {
     private var cancellables = Set<AnyCancellable>()
     private var hoverTimer: Timer?
     private var mouseMonitors: [Any] = []
-    private var scrollGesture = NotchScrollGesture()
+    private var swipeGesture = PanelSwipeGesture()
     private var enteredAt: Date?
     private var exitedAt: Date?
     private var suppressHoverUntil = Date.distantPast
@@ -115,11 +115,11 @@ final class PanelController {
             self?.updateMousePassthrough()
             return event
         }) { mouseMonitors.append(monitor) }
-        // Scrolling on the notch strip itself (not the panel content below it) changes volume or skips a track.
+        // A horizontal swipe anywhere on the open panel turns the page; vertical scrolling stays with the content.
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] event in
-            guard let self, event.window === self.panel, self.model.notchGestures, self.inNotchStrip(NSEvent.mouseLocation) else { return event }
-            self.handleScroll(event)
-            return nil
+            guard let self, event.window === self.panel, self.model.notchGestures, self.state == .expanded,
+                  !self.model.cleaning.active else { return event }
+            return self.handleScroll(event) ? nil : event
         }) { mouseMonitors.append(monitor) }
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.trackHover() }
         if let hoverTimer { RunLoop.main.add(hoverTimer, forMode: .common) }
@@ -219,26 +219,15 @@ final class PanelController {
         updateMousePassthrough()
     }
 
-    /// The top band of the visible shape, as tall as the menu bar / physical notch.
-    private func inNotchStrip(_ point: NSPoint) -> Bool {
-        let visible = visibleRect()
-        let height = Layout.closedHeight(screenInfo.metrics)
-        return NSRect(x: visible.minX, y: visible.maxY - height, width: visible.width, height: height).contains(point)
-    }
-
-    private func handleScroll(_ event: NSEvent) {
-        let finger = NotchScrollGesture.finger(event)
-        let actions = scrollGesture.feed(up: finger.up, right: finger.right, precise: event.hasPreciseScrollingDeltas,
-                                         began: event.phase.contains(.began) || event.phase.contains(.mayBegin),
-                                         ended: event.phase.contains(.ended) || event.phase.contains(.cancelled),
-                                         momentum: !event.momentumPhase.isEmpty)
-        for action in actions {
-            switch action {
-            case .volume(let steps): model.monitor.adjustVolume(by: Float(steps) / 16, feedback: false)
-            case .next: model.media.command("next track"); model.showHUD("forward.fill", String(localized: "Sonraki parça"), 1)
-            case .previous: model.media.command("previous track"); model.showHUD("backward.fill", String(localized: "Önceki parça"), 1)
-            }
-        }
+    /// Returns true when the event belongs to a page swipe and must not reach the content.
+    private func handleScroll(_ event: NSEvent) -> Bool {
+        let finger = PanelSwipeGesture.finger(event)
+        let result = swipeGesture.feed(up: finger.up, right: finger.right, precise: event.hasPreciseScrollingDeltas,
+                                       began: event.phase.contains(.began) || event.phase.contains(.mayBegin),
+                                       ended: event.phase.contains(.ended) || event.phase.contains(.cancelled),
+                                       momentum: !event.momentumPhase.isEmpty)
+        if let action = result.action { model.turnPage(forward: action == .next) }
+        return result.consume
     }
 
     func visibleRect() -> NSRect {

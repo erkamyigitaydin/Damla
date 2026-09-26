@@ -710,7 +710,7 @@ struct HomeView: View {
                             .frame(width: 28, height: 28).contentShape(Circle())
                     }
                     .buttonStyle(GlassCircleStyle())
-                    .help("Ses çıkışı: \(model.outputs.first { $0.id == model.currentOutput }?.name ?? "—") · değiştir")
+                    .help(outputHelp)
                     if let volume = model.volume {
                         Button { withAnimation(Theme.quick) { model.homePane = .levels } } label: {
                             HStack(spacing: 4) {
@@ -798,6 +798,11 @@ struct HomeView: View {
                 Image(systemName: media.source == .spotify ? "circle.hexagongrid.fill" : "music.note").font(.system(size: 10, weight: .semibold))
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help(media.source.rawValue)
         }
+    }
+    private var outputHelp: String {
+        let name = model.outputs.first { $0.id == model.currentOutput }?.name ?? "—"
+        guard let battery = model.currentOutputBattery else { return String(localized: "Ses çıkışı: \(name) · değiştir") }
+        return String(localized: "Ses çıkışı: \(name) (\(battery.summary)) · değiştir")
     }
     private var outputIcon: String {
         model.outputs.first(where: { $0.id == model.currentOutput })?.icon ?? "hifispeaker"
