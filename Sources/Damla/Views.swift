@@ -666,6 +666,8 @@ struct HomeView: View {
     @ObservedObject var media: MediaService
     @ObservedObject var lyrics: LyricsService
     @State private var appeared = false
+    /// Cover size; the sound controls below share its column.
+    static let art: CGFloat = 100
     private var tint: Color { media.accent.map { Color(nsColor: $0) } ?? .white }
     private func entrance(_ order: Double) -> Animation {
         Theme.reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.55, bounce: 0.22).delay(0.04 + order * 0.05)
@@ -673,12 +675,13 @@ struct HomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                Artwork(image: media.artwork, placeholder: media.hasTrack ? "music.note" : "waveform", size: 88)
+                Artwork(image: media.artwork, placeholder: media.hasTrack ? "music.note" : "waveform", size: Self.art)
                     .scaleEffect(appeared ? 1 : 0.72, anchor: .bottomLeading).opacity(appeared ? 1 : 0)
                     .animation(entrance(0), value: appeared)
                 VStack(alignment: .leading, spacing: 3) {
                     if media.hasTrack {
-                        HStack(alignment: .firstTextBaseline) {
+                        // Centred, so the heart and the equalizer sit level with the title.
+                        HStack(alignment: .center, spacing: 8) {
                             Text(media.title).font(.system(size: 15, weight: .semibold)).tracking(-0.2).lineLimit(1)
                             Spacer(minLength: 6)
                             if let favorited = media.favorited {
@@ -728,7 +731,7 @@ struct HomeView: View {
                 .offset(x: appeared ? 0 : 14).opacity(appeared ? 1 : 0)
                 .animation(entrance(1), value: appeared)
             }
-            .frame(height: 88)
+            .frame(height: Self.art)
             if model.tallPanel { Color.clear.frame(height: 12) } else { Spacer(minLength: 10) }
             // Two columns matching the row above: under the artwork the sound controls (output, level); under
             // the text the transport, centred on the progress line, with a running timer at its right end.
@@ -757,7 +760,7 @@ struct HomeView: View {
                         .help("Ses seviyesi · sistem ve uygulama sesleri")
                     }
                 }
-                .frame(width: 88, alignment: .leading)
+                .frame(width: Self.art, alignment: .leading)
                 ZStack {
                     if media.hasTrack && !media.controllable {
                         Button { media.activateSource() } label: {
