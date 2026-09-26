@@ -336,3 +336,9 @@
 "bağlam %%%lld" = "context %lld%%";
 "5 sa %%%lld" = "5h %lld%%";
 "%%%lld" = "%lld%%";
+"Yerel sunucular · %lld" = "Local servers · %lld";
+"Durdur" = "Stop";
+"Durdur?" = "Stop?";
+"Sunucuya durmasını söyler (SIGTERM, terminalde Ctrl-C gibi)" = "Asks the server to stop (SIGTERM, like Ctrl-C in its terminal)";
+"%@ · port %lld" = "%@ · port %lld";
+"Tarayıcıda aç: localhost:%lld" = "Open in browser: localhost:%lld";

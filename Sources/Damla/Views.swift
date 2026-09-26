@@ -557,7 +557,7 @@ struct ExpandedView: View {
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
                 case .focus: FocusView(model: model)
-                case .agents: AgentPanelView(service: model.agents)
+                case .agents: AgentPanelView(service: model.agents, servers: model.devServers)
                 }
             }
             .transition(.blurReplace)

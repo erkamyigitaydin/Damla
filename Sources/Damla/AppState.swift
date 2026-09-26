@@ -102,6 +102,7 @@ final class AppState: ObservableObject {
     let lyrics = LyricsService()
     let monitor = SystemMonitor()
     let deviceBatteries = DeviceBatteryWatcher()
+    let devServers = DevServerMonitor()
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
     let updater = UpdateService()

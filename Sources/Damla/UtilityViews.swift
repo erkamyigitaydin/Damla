@@ -180,8 +180,34 @@ struct HeroAgentCard: View {
 
 struct AgentPanelView: View {
     @ObservedObject var service: AgentStatusService
+    @ObservedObject var servers: DevServerMonitor
     @State private var showHistory = false
+    @State private var showServers = true
     var body: some View {
+        content
+            .onAppear { servers.start() }
+            .onDisappear { servers.stop() }
+    }
+
+    /// Dev servers and databases listening on this Mac, folded like the history.
+    @ViewBuilder private var serverSection: some View {
+        if !servers.servers.isEmpty {
+            Button { withAnimation(Theme.quick) { showServers.toggle() } } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                        .rotationEffect(.degrees(showServers ? 90 : 0))
+                    Text("Yerel sunucular · \(servers.servers.count)").font(.system(size: 10.5, weight: .medium))
+                    Spacer()
+                }
+                .foregroundStyle(Theme.dim).padding(.horizontal, 8).frame(height: 22).contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            if showServers {
+                ForEach(servers.servers) { DevServerRow(server: $0, monitor: servers) }
+            }
+        }
+    }
+
+    private var content: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let now = context.date
             let active = service.sessions.filter { $0.isActive(at: now) }
@@ -207,11 +233,15 @@ struct AgentPanelView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Label("Henüz durum gelmedi", systemImage: "antenna.radiowaves.left.and.right")
                             .font(.system(size: 12, weight: .medium))
-                        Text("Bağlı bir Claude Code veya Codex oturumunda yeni bir mesajla başlar.")
-                            .font(.system(size: 11)).foregroundStyle(Theme.dim)
-                        Text("Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
-                            .font(.system(size: 10)).foregroundStyle(Theme.faint)
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                        if servers.servers.isEmpty {
+                            Text("Bağlı bir Claude Code veya Codex oturumunda yeni bir mesajla başlar.")
+                                .font(.system(size: 11)).foregroundStyle(Theme.dim)
+                            Text("Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
+                                .font(.system(size: 10)).foregroundStyle(Theme.faint)
+                        } else {
+                            ScrollView { LazyVStack(spacing: 5) { serverSection } }.scrollIndicators(.hidden)
+                        }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 5) {
@@ -233,6 +263,7 @@ struct AgentPanelView: View {
                                     ForEach(history) { AgentRow(session: $0, now: now, service: service).opacity(0.75) }
                                 }
                             }
+                            serverSection
                         }
                     }.scrollIndicators(.hidden)
                 }
@@ -469,6 +500,51 @@ private struct OptionFlowLayout: SwiftUI.Layout {
             }
         }
         return rows
+    }
+}
+
+/// One listening server: a tap opens it in the browser (databases have no page to open); on hover a stop button
+/// asks once more before sending SIGTERM.
+struct DevServerRow: View {
+    let server: DevServer
+    @ObservedObject var monitor: DevServerMonitor
+    @State private var hovering = false
+    @State private var confirming = false
+    var body: some View {
+        Button { open() } label: {
+            HStack(spacing: 9) {
+                Image(systemName: server.isDatabase ? "cylinder.split.1x2" : "globe").font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(server.isDatabase ? Theme.dim : Theme.agent).frame(width: 30)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text(verbatim: ":\(server.port)").font(.system(size: 11.5, weight: .semibold, design: .monospaced))
+                        Text(server.project).font(.system(size: 11, weight: .medium)).lineLimit(1)
+                    }
+                    Text(server.name).font(.system(size: 9.5)).foregroundStyle(Theme.faint).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if hovering || confirming {
+                    Button { if confirming { monitor.terminate(server) } else { confirming = true } } label: {
+                        Text(confirming ? "Durdur?" : "Durdur").font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(confirming ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.dim)
+                            .padding(.horizontal, 8).frame(height: 20).background(Theme.fill, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Sunucuya durmasını söyler (SIGTERM, terminalde Ctrl-C gibi)")
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 6)
+            .background(hovering ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(server.isDatabase ? String(localized: "\(server.name) · port \(server.port)") : String(localized: "Tarayıcıda aç: localhost:\(server.port)"))
+        .onHover { hovering = $0; if !$0 { confirming = false } }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+    private func open() {
+        guard !server.isDatabase, let url = URL(string: "http://localhost:\(server.port)") else { return }
+        NSWorkspace.shared.open(url)
     }
 }
 

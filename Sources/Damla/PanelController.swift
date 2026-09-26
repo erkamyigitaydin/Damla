@@ -645,7 +645,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     VStack(spacing: 6) { DropletMascot(phase: phase, size: 64); Text(phase.shortTitle).font(.caption).foregroundStyle(.white) }
                 }
             }.padding(20))),
-            ("agents", AnyView(AgentPanelView(service: model.agents).padding(.horizontal, 24).padding(.vertical, 12)
+            ("agents", AnyView(AgentPanelView(service: model.agents, servers: model.devServers).padding(.horizontal, 24).padding(.vertical, 12)
                 .frame(width: Layout.panelWidth, height: Layout.contentHeight)))
         ]
         for (name, view) in pairs {

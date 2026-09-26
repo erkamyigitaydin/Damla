@@ -188,6 +188,14 @@ func runSelfTests() -> Int32 {
     check(BluetoothBattery.parse(Data(profile.utf8), name: "iPhone") == nil && BluetoothBattery.parse(Data(profile.utf8), name: "MX Keys Mini") == nil,
           "No battery line for disconnected or battery-less devices")
     check(BluetoothBattery.parseAll(Data(profile.utf8)).keys.sorted() == ["Erkam’ın AirPods Pro"], "Outputs list reads every connected battery at once")
+    check(DevServer.isDevProcess(path: "/opt/homebrew/bin/node", cwd: "/Users/x/site")
+          && !DevServer.isDevProcess(path: "/Applications/Docker.app/Contents/MacOS/com.docker.backend", cwd: "/Users/x")
+          && !DevServer.isDevProcess(path: "/usr/libexec/rapportd", cwd: "/Users/x")
+          && !DevServer.isDevProcess(path: "/opt/homebrew/bin/mongod", cwd: "/"), "Only shell-started processes count as dev servers")
+    check(DevServer.projectName(cwd: "/Users/x/Projects/shop/.data/postgres", fileExists: { $0 == "/Users/x/Projects/shop/.git" }) == "shop"
+          && DevServer.projectName(cwd: "/Users/x/tmp/api", fileExists: { _ in false }) == "api", "A server is named after its repository")
+    check(DevServer(pid: 1, port: 5432, name: "postgres", project: "shop").isDatabase
+          && !DevServer(pid: 1, port: 3000, name: "node", project: "shop").isDatabase, "Databases are told apart from web servers")
     var lowBattery: [String] = []
     let watcher = DeviceBatteryWatcher()
     watcher.onLow = { name, _, level in lowBattery.append("\(name) \(level)") }
