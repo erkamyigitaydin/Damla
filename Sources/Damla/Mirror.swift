@@ -283,7 +283,7 @@ struct MirrorView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            viewfinder.frame(width: 214, height: 214)
+            viewfinder.frame(width: 160, height: 160)
             pile.frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -325,7 +325,7 @@ struct MirrorView: View {
                     .overlay(alignment: .bottomTrailing) {
                         TimelineView(.everyMinute) { context in
                             Text(verbatim: PhotoCard.stamp(context.date))
-                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
                                 .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: 2.5)
                                 .padding(10)
@@ -345,7 +345,7 @@ struct MirrorView: View {
                 ProgressView().controlSize(.small)
             }
             if let countdown {
-                Text("\(countdown)").font(.system(size: 72, weight: .heavy, design: .rounded)).foregroundStyle(.white)
+                Text("\(countdown)").font(.system(size: 58, weight: .heavy, design: .rounded)).foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.5), radius: 8)
                     .contentTransition(.numericText(countsDown: true))
                     .transition(.scale.combined(with: .opacity))
@@ -354,7 +354,7 @@ struct MirrorView: View {
                 // The shutter row appears over the picture only while the pointer is on it and nothing is being shot.
                 VStack(spacing: 0) {
                     Spacer()
-                    controls.padding(.horizontal, 12).padding(.bottom, 12).padding(.top, 28)
+                    controls.padding(.horizontal, 9).padding(.bottom, 9).padding(.top, 24)
                         .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
                 }
                 .transition(.opacity)
@@ -374,15 +374,15 @@ struct MirrorView: View {
         HStack {
             Button { withAnimation(Theme.quick) { lookName = look.next.rawValue } } label: {
                 Image(systemName: look.icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
-                    .frame(width: 34, height: 34).contentShape(Circle())
+                    .frame(width: 30, height: 30).contentShape(Circle())
             }
             .buttonStyle(GlassCircleStyle())
             .help(String(localized: "Film görünümü: \(look.title) · değiştir"))
             Spacer(minLength: 6)
             Button(action: shoot) {
                 ZStack {
-                    Circle().fill(.white).frame(width: 40, height: 40)
-                    Circle().strokeBorder(.white.opacity(0.6), lineWidth: 2.5).frame(width: 50, height: 50)
+                    Circle().fill(.white).frame(width: 34, height: 34)
+                    Circle().strokeBorder(.white.opacity(0.6), lineWidth: 2.5).frame(width: 43, height: 43)
                 }
                 .contentShape(Circle())
             }
@@ -394,7 +394,7 @@ struct MirrorView: View {
             Button { useTimer.toggle() } label: {
                 Image(systemName: useTimer ? "3.circle" : "bolt.fill").font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(useTimer ? Theme.accent : .white).contentTransition(.symbolEffect(.replace))
-                    .frame(width: 34, height: 34).contentShape(Circle())
+                    .frame(width: 30, height: 30).contentShape(Circle())
             }
             .buttonStyle(GlassCircleStyle())
             .help(useTimer ? "3 saniye geri sayım · kapat" : "Hemen çeker · geri sayımı aç")
@@ -404,14 +404,14 @@ struct MirrorView: View {
     // Pile of prints
 
     private var pile: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             ZStack(alignment: .top) {
                 if album.prints.isEmpty {
                     VStack(spacing: 6) {
                         Image(systemName: "photo.on.rectangle.angled").font(.system(size: 22, weight: .light)).foregroundStyle(Theme.faint)
                         Text("Çektiklerin burada birikir").font(.system(size: 10.5)).foregroundStyle(Theme.faint).multilineTextAlignment(.center)
                     }
-                    .frame(maxWidth: .infinity).padding(.top, 60)
+                    .frame(maxWidth: .infinity).padding(.top, 40)
                 }
                 ForEach(Array(album.prints.enumerated().reversed()), id: \.element.id) { index, print in
                     PrintView(print: print, fresh: album.fresh == print.url, album: album, onSettled: { album.settle() })
@@ -421,7 +421,7 @@ struct MirrorView: View {
                         .transition(.printOut)
                 }
             }
-            .frame(height: 178, alignment: .top)
+            .frame(height: 140, alignment: .top)
             Spacer(minLength: 0)
             Button { NSWorkspace.shared.open(MirrorAlbum.folder) } label: {
                 Label(album.total == 0 ? String(localized: "Klasör") : String(localized: "\(album.total) fotoğraf"), systemImage: "folder")
@@ -481,7 +481,7 @@ private struct PrintView: View {
     @ObservedObject var album: MirrorAlbum
     let onSettled: () -> Void
     @State private var developed = false
-    static let width: CGFloat = 118
+    static let width: CGFloat = 92
     var body: some View {
         let w = Self.width, margin = w * 0.07, side = w * 0.86
         Image(nsImage: print.image).resizable().interpolation(.high)

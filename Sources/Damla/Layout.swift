@@ -31,7 +31,6 @@ enum Layout {
     static let panelWidth: CGFloat = 404
     static let contentHeight: CGFloat = 188
     static let tallContentHeight: CGFloat = 380   // the lyrics stretch the panel down
-    static let mirrorContentHeight: CGFloat = 242 // the Ayna camera: the viewfinder and the pile of prints
     static func contentHeight(tall: Bool) -> CGFloat { tall ? tallContentHeight : contentHeight }
     static let pillHeight: CGFloat = 36
     static let pillGap: CGFloat = 8

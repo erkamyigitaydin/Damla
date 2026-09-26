@@ -92,10 +92,9 @@ final class AppState: ObservableObject {
     @Published var lyricsExpanded = false
     /// The lyrics stretch the panel down; it also stays open when the pointer leaves.
     var tallPanel: Bool { selectedTab == .home && homePane == .player && lyricsExpanded && media.hasTrack }
-    /// How tall the panel's content is right now: normal, the Ayna camera, or the lyrics.
-    var contentHeight: CGFloat {
-        selectedTab == .mirror ? Layout.mirrorContentHeight : Layout.contentHeight(tall: tallPanel)
-    }
+    /// Every page shares one height, so switching pages never pulls the panel out from under the pointer;
+    /// only the lyrics, opened within the page, stretch it.
+    var contentHeight: CGFloat { Layout.contentHeight(tall: tallPanel) }
     /// Scroll on the notch strip: vertical for volume, a horizontal swipe to skip tracks.
     @Published var notchGestures = UserDefaults.standard.object(forKey: "notchGestures") as? Bool ?? true {
         didSet { UserDefaults.standard.set(notchGestures, forKey: "notchGestures") }
@@ -513,8 +512,14 @@ final class AppState: ObservableObject {
             self.pinnedOpen = false
         }
     }
+    static let focusMinutes = 1...240
     func setFocus(minutes: Int, phase: FocusSession.Phase = .focus) {
-        session.reset(minutes: minutes, phase: phase); saveSession()
+        session.reset(minutes: min(max(minutes, Self.focusMinutes.lowerBound), Self.focusMinutes.upperBound), phase: phase); saveSession()
+    }
+    /// Scrolling on the ring: a minute at a time, only while the timer is stopped.
+    func adjustFocus(by minutes: Int) {
+        guard !session.running, minutes != 0 else { return }
+        setFocus(minutes: Int(session.duration / 60) + minutes, phase: session.phase)
     }
     func toggleFocus() {
         if session.running { session.pause() } else { session.start() }

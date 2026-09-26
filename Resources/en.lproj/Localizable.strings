@@ -404,3 +404,5 @@
 "Ana Sahne" = "Center Stage";
 "Ana Sahne açık: kamera seni kadrajda tutar · kapat" = "Center Stage on: the camera keeps you in frame · turn off";
 "Ana Sahne kapalı · aç" = "Center Stage off · turn on";
+"Tıkla: süreyi yaz · kaydır: dakika dakika ayarla" = "Click to type a length · scroll to adjust by the minute";
+"dk" = "min";

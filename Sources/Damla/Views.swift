@@ -1182,6 +1182,9 @@ extension Color {
 
 struct FocusView: View {
     @ObservedObject var model: AppState
+    @State private var editing = false
+    @State private var typed = ""
+    @FocusState private var fieldFocused: Bool
     var body: some View {
         let running = model.session.running
         HStack(spacing: 26) {
@@ -1193,10 +1196,32 @@ struct FocusView: View {
                     .shadow(color: Theme.accent.opacity(running ? 0.5 : 0), radius: 6)
                 VStack(spacing: 4) {
                     Image(systemName: model.session.phase == .focus ? "brain.head.profile" : "cup.and.saucer").font(.system(size: 12)).foregroundStyle(Theme.dim)
-                    Text(model.timeLabel).font(.system(size: 30, weight: .light, design: .rounded)).monospacedDigit().tracking(-1)
-                        .contentTransition(.numericText())
+                    if editing {
+                        // Type any length: minutes, 1 to 240.
+                        HStack(spacing: 3) {
+                            TextField("", text: $typed)
+                                .textFieldStyle(.plain).multilineTextAlignment(.trailing)
+                                .font(.system(size: 30, weight: .light, design: .rounded)).monospacedDigit()
+                                .frame(width: 56).focused($fieldFocused)
+                                .onSubmit(commit)
+                                .onExitCommand { editing = false }
+                                .onChange(of: typed) { _, value in
+                                    let digits = String(value.filter(\.isNumber).prefix(3))
+                                    if digits != value { typed = digits }
+                                }
+                            Text("dk").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.dim)
+                        }
+                    } else {
+                        Text(model.timeLabel).font(.system(size: 30, weight: .light, design: .rounded)).monospacedDigit().tracking(-1)
+                            .contentTransition(.numericText())
+                            .onTapGesture { startEditing() }
+                            .help(running ? "" : String(localized: "Tıkla: süreyi yaz · kaydır: dakika dakika ayarla"))
+                    }
                 }
-            }.frame(width: 128, height: 128)
+            }
+            .frame(width: 128, height: 128)
+            .overlay(ScrollCatcher { steps in model.adjustFocus(by: steps) }.allowsHitTesting(!running && !editing))
+            .onChange(of: fieldFocused) { _, focused in if !focused && editing { commit() } }
             VStack(spacing: 16) {
                 HStack(spacing: 5) {
                     ForEach([25, 45, 50], id: \.self) { minutes in
@@ -1220,6 +1245,45 @@ struct FocusView: View {
                 }
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func startEditing() {
+        guard !model.session.running else { return }
+        typed = String(Int(model.session.duration / 60))
+        editing = true
+        model.requestKeyFocus?()
+        DispatchQueue.main.async { fieldFocused = true }
+    }
+    private func commit() {
+        if let minutes = Int(typed), minutes > 0 { model.setFocus(minutes: minutes, phase: model.session.phase) }
+        editing = false
+    }
+}
+
+/// Turns scrolling over a view into whole steps (up = +1) without taking its clicks: it only claims the pointer
+/// for scroll events. A trackpad needs about 12 points of travel per step; a mouse wheel click is one step.
+struct ScrollCatcher: NSViewRepresentable {
+    let onStep: (Int) -> Void
+    func makeNSView(context: Context) -> CatcherView { CatcherView(onStep: onStep) }
+    func updateNSView(_ view: CatcherView, context: Context) { view.onStep = onStep }
+
+    final class CatcherView: NSView {
+        var onStep: (Int) -> Void
+        private var pending: CGFloat = 0
+        init(onStep: @escaping (Int) -> Void) { self.onStep = onStep; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { fatalError() }
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            NSApp.currentEvent?.type == .scrollWheel ? super.hitTest(point) : nil
+        }
+        override func scrollWheel(with event: NSEvent) {
+            if !event.momentumPhase.isEmpty { return }
+            let up = event.isDirectionInvertedFromDevice ? -event.scrollingDeltaY : event.scrollingDeltaY
+            guard event.hasPreciseScrollingDeltas else { if up != 0 { onStep(up > 0 ? 1 : -1) }; return }
+            if event.phase.contains(.began) { pending = 0 }
+            pending += up
+            let steps = Int(pending / 12)
+            if steps != 0 { pending -= CGFloat(steps) * 12; onStep(steps) }
+        }
     }
 }
 

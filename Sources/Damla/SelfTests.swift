@@ -241,6 +241,9 @@ func runSelfTests() -> Int32 {
     check(merged.flatMap { PDFDocument(url: $0)?.pageCount } == 2 && ShelfAction.available(for: pdfs[0], shelf: pdfs) == [.mergePDFs]
           && ShelfAction.available(for: pdfs[0], shelf: [pdfs[0]]).isEmpty, "PDFs on the shelf merge into one")
     try? FileManager.default.removeItem(at: shelfFolder)
+    var focusClock = FocusSession()
+    focusClock.reset(minutes: 37)
+    check(focusClock.duration == 37 * 60 && focusClock.remaining() == 37 * 60, "Any focus length can be set")
     var lowBattery: [String] = []
     let watcher = DeviceBatteryWatcher()
     watcher.onLow = { name, _, level in lowBattery.append("\(name) \(level)") }
