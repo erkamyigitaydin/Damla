@@ -738,12 +738,24 @@ struct HomeView: View {
             HStack(spacing: 14) {
                 HStack(spacing: 6) {
                     // Plain buttons: a SwiftUI Menu would flatten these labels to their first text.
+                    // The output's name rides in the capsule, scrolling when it is too long. When the timer or a
+                    // meeting takes the space to the right, only the icon stays.
+                    let named = !model.session.hasStarted && model.calendar.upcoming == nil
                     Button { withAnimation(Theme.quick) { model.homePane = .outputs } } label: {
-                        Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.white)
-                            .frame(width: 28, height: 28).contentShape(Circle())
+                        HStack(spacing: 5) {
+                            Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold))
+                            if named {
+                                MarqueeText(text: outputName, width: 50, font: .system(size: 10.5, weight: .semibold, design: .rounded))
+                                    .transition(.opacity)
+                            }
+                        }
+                        .foregroundStyle(.white).padding(.horizontal, named ? 8 : 0).frame(minWidth: 28, minHeight: 28)
+                        .glassLook(AnyShape(Capsule()))
+                        .contentShape(Capsule())
                     }
-                    .buttonStyle(GlassCircleStyle())
+                    .buttonStyle(.plain)
                     .help(outputHelp)
+                    .animation(Theme.quick, value: named)
                     if let volume = model.volume {
                         Button { withAnimation(Theme.quick) { model.homePane = .levels } } label: {
                             HStack(spacing: 4) {
@@ -760,7 +772,9 @@ struct HomeView: View {
                         .help("Ses seviyesi · sistem ve uygulama sesleri")
                     }
                 }
+                .fixedSize()   // may reach past the cover's column into the empty start of the transport zone
                 .frame(width: Self.art, alignment: .leading)
+                .zIndex(1)
                 ZStack {
                     if media.hasTrack && !media.controllable {
                         Button { media.activateSource() } label: {
@@ -792,7 +806,9 @@ struct HomeView: View {
                             .help(meeting.joinURL == nil ? String(localized: "Takvimde aç") : String(localized: "Toplantıya katıl"))
                         }
                         Spacer()
-                        if media.hasTrack {
+                        // Only when there is something to show: lyrics found, or the lookup still off (this button
+                        // turns it on). Hidden while searching, so songs without lyrics never flash it.
+                        if media.hasTrack && (lyrics.state == .found || lyrics.state == .off) {
                             Button {
                                 // Lyrics mode on/off; turning it on also allows the lookup if it was off.
                                 withAnimation(Theme.motion(open: !model.lyricsExpanded)) { model.lyricsExpanded.toggle() }
@@ -808,8 +824,10 @@ struct HomeView: View {
                             }
                             .buttonStyle(GlassCircleStyle())
                             .help(model.lyricsExpanded ? "Şarkı sözlerini kapat" : "Şarkı sözlerini aç")
+                            .transition(.scale(scale: 0.6).combined(with: .opacity))
                         }
                     }
+                    .animation(Theme.quick, value: lyrics.state)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -900,6 +918,44 @@ struct SourceChip: View {
         }
         .buttonStyle(.plain)
         .help(count > 1 ? "\(count) kaynak · geçiş yap" : "\(MediaService.appName(for: media.sourceBundleID ?? "")) · uygulamayı aç")
+    }
+}
+
+/// One line that fits a fixed width: shown as is when short, otherwise scrolling slowly right to left with a pause
+/// at the start, fading at both edges.
+struct MarqueeText: View {
+    let text: String
+    let width: CGFloat
+    var font: Font = .system(size: 10.5, weight: .semibold)
+    @State private var textWidth: CGFloat = 0
+    @State private var scrolled = false
+    private let gap: CGFloat = 22
+    var body: some View {
+        let overflow = textWidth > width
+        HStack(spacing: gap) {
+            label.background(GeometryReader { proxy in
+                Color.clear.onAppear { textWidth = proxy.size.width }.onChange(of: proxy.size.width) { _, value in textWidth = value }
+            })
+            if overflow { label }
+        }
+        .offset(x: overflow && scrolled ? -(textWidth + gap) : 0)
+        .frame(width: overflow ? width : textWidth, alignment: .leading)
+        .clipped()
+        .mask(LinearGradient(stops: overflow ? [.init(color: .clear, location: 0), .init(color: .black, location: 0.04),
+                                                 .init(color: .black, location: 0.9), .init(color: .clear, location: 1)]
+                                              : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
+                             startPoint: .leading, endPoint: .trailing))
+        .onChange(of: text) { _, _ in restart() }
+        .onChange(of: overflow) { _, _ in restart() }
+        .onAppear { restart() }
+    }
+    private var label: some View { Text(text).font(font).lineLimit(1).fixedSize() }
+    private func restart() {
+        var reset = Transaction(); reset.disablesAnimations = true
+        withTransaction(reset) { scrolled = false }
+        guard textWidth > width else { return }
+        // About 22 points a second, after a short pause; the copy behind makes the loop seamless.
+        withAnimation(.linear(duration: Double(textWidth + gap) / 22).delay(1.6).repeatForever(autoreverses: false)) { scrolled = true }
     }
 }
 

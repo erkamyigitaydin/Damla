@@ -217,6 +217,11 @@ final class AppState: ObservableObject {
             Accent.update(from: cover)
             self?.objectWillChange.send()
         }.store(in: &cancellables)
+        // A song without lyrics folds the lyrics view away: its button is hidden, so nothing else could close it.
+        lyrics.$state.removeDuplicates().receive(on: RunLoop.main).sink { [weak self] state in
+            guard let self, state == .missing, self.lyricsExpanded else { return }
+            self.lyricsExpanded = false   // the panel animates its own height change
+        }.store(in: &cancellables)
         // Lyrics follow the shown track; only songs a player named an artist for, 30 s – 20 min long.
         Publishers.CombineLatest4(media.$title, media.$artist, media.$duration, media.$artistKnown)
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
