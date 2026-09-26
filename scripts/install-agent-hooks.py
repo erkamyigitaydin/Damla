@@ -40,9 +40,9 @@ def merge(original, provider, binary, approvals=False):
         if event == "Notification":
             group["matcher"] = "permission_prompt|elicitation_dialog"
         hooks.setdefault(event, []).append(group)
-    # Opt-in: lets the user answer Claude Code's permission prompts from the notch. The hook prints a decision
-    # only when the user clicked one in Damla; otherwise nothing, and Claude Code asks as usual.
-    if approvals and provider == "claude":
+    # Opt-in: lets the user answer the agent's permission prompts from the notch. The hook prints a decision
+    # only when the user clicked one in Damla; otherwise nothing, and the agent asks as usual.
+    if approvals:
         hooks.setdefault("PermissionRequest", []).append({"hooks": [{
             "type": "command", "command": shlex.quote(str(binary)) + " --agent-approval " + provider,
             "timeout": APPROVAL_TIMEOUT, "statusMessage": APPROVAL_MARKER}]})
@@ -68,7 +68,7 @@ def main():
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--approvals", action="store_true",
-                        help="Claude Code izin sorularını çentikten yanıtlamayı da kur (yalnızca Claude Code)")
+                        help="Claude Code ve Codex izin sorularını çentikten yanıtlamayı da kur")
     args = parser.parse_args()
     if not args.binary.is_file():
         parser.error("Damla uygulaması bulunamadı")

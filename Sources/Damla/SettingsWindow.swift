@@ -231,34 +231,39 @@ private struct MediaSettings: View {
 
 private struct AgentSettings: View {
     @ObservedObject var agents: AgentStatusService
-    @State private var approvalHookInstalled = AgentSettings.checkApprovalHook()
+    @State private var approvalHooks = AgentSettings.checkApprovalHooks()
+    @State private var codexTrusted = HookInstaller.codexApprovalTrusted()
     @State private var installError: String?
     var body: some View {
         Form {
             Section {
                 Toggle(isOn: $agents.approvalsEnabled) {
                     Text("İzinleri çentikten onayla")
-                    Text("Claude Code bir komut veya dosya için izin isteyince çentik açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin.")
+                    Text("Claude Code veya Codex bir komut veya dosya için izin isteyince çentik açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin.")
                 }
                 Picker("Bekleme süresi", selection: $agents.approvalWait) {
                     ForEach(AgentApprovals.waitChoices, id: \.self) { Text("\(Int($0)) sn").tag($0) }
                 }
                 .disabled(!agents.approvalsEnabled)
-                LabeledContent("Onay hook’u") {
-                    HStack {
-                        Text(approvalHookInstalled ? "Kurulu" : "Kurulu değil").foregroundStyle(approvalHookInstalled ? Color.secondary : Color.orange)
-                        if !approvalHookInstalled && HookInstaller.isAvailable(.claude) {
-                            Button("Kur") { installApprovalHook() }
+                ForEach(HookInstaller.Provider.allCases.filter { HookInstaller.isAvailable($0) }, id: \.self) { provider in
+                    let installed = approvalHooks.contains(provider)
+                    let untrusted = installed && provider == .codex && codexTrusted == false
+                    LabeledContent(provider == .claude ? "Claude Code onay hook’u" : "Codex onay hook’u") {
+                        HStack {
+                            Text(untrusted ? "Codex’te /hooks ile güven onayı bekliyor" : installed ? "Kurulu" : "Kurulu değil")
+                                .foregroundStyle(installed && !untrusted ? Color.secondary : Color.orange)
+                            if !installed { Button("Kur") { installApprovalHook(provider) } }
                         }
                     }
                 }
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Sorunun sahibi uygulama (Terminal, Claude…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır.")
+                    Text("Sorunun sahibi uygulama (Terminal, Claude, Codex…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır.")
+                    Text("Codex’te bu, terminaldeki Codex CLI’nin komut onaylarında çalışır; Codex çentik beklerken kendi sorusunu göstermez, terminale geçince soru hemen oraya döner. ChatGPT uygulamasının yetki sorusu yalnızca kendi penceresinden yanıtlanır; çentik onu “Onay bekliyor” olarak gösterir. Yeni hook’a Codex’te /hooks ile bir kez güven onayı vermen gerekir.")
                     if let installError { Text(installError).foregroundStyle(.orange) }
                 }
             }
-            .onAppear { approvalHookInstalled = AgentSettings.checkApprovalHook() }
+            .onAppear { approvalHooks = AgentSettings.checkApprovalHooks(); codexTrusted = HookInstaller.codexApprovalTrusted() }
             Section {
                 Toggle(isOn: $agents.soundEnabled) {
                     Text("Onay beklerken ses çal")
@@ -270,22 +275,20 @@ private struct AgentSettings: View {
         }
     }
 
-    /// Adds the approval hook (with the status hooks) to ~/.claude/settings.json; the installer keeps a backup.
-    private func installApprovalHook() {
+    /// Adds the approval hook (with the status hooks) to the agent's settings; the installer keeps a backup.
+    private func installApprovalHook(_ provider: HookInstaller.Provider) {
         do {
-            try HookInstaller.install(.claude, approvals: true)
+            try HookInstaller.install(provider, approvals: true)
             installError = nil
         } catch {
             installError = String(localized: "Kurulamadı: \(String(describing: error))")
         }
-        approvalHookInstalled = AgentSettings.checkApprovalHook()
+        approvalHooks = AgentSettings.checkApprovalHooks(); codexTrusted = HookInstaller.codexApprovalTrusted()
     }
 
-    /// True when ~/.claude/settings.json runs Damla's approval hook.
-    static func checkApprovalHook() -> Bool {
-        let file = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
-        guard let data = try? Data(contentsOf: file), data.count < 4_000_000 else { return false }
-        return String(decoding: data, as: UTF8.self).contains("--agent-approval")
+    /// The agents whose settings run Damla's approval hook.
+    static func checkApprovalHooks() -> Set<HookInstaller.Provider> {
+        Set(HookInstaller.Provider.allCases.filter { HookInstaller.isInstalled($0, approvals: true) })
     }
 }
 

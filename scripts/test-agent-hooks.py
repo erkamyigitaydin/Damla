@@ -33,9 +33,12 @@ class InstallerTests(unittest.TestCase):
         encoded = json.dumps(result)
         for forbidden in ["behavior", "allow", "trust", "async", "SubagentStop", "--agent-approval"]:
             self.assertNotIn(forbidden, encoded)
-        # Codex never gets the approval hook, even when asked; Claude only gets it when asked.
-        self.assertNotIn("--agent-approval", json.dumps(installer.merge({}, "codex", Path("/tmp/Damla"), True)))
+        # Either agent gets the approval hook only when asked.
+        self.assertNotIn("--agent-approval", json.dumps(installer.merge({}, "codex", Path("/tmp/Damla"))))
         self.assertNotIn("--agent-approval", json.dumps(installer.merge({}, "claude", Path("/tmp/Damla"))))
+        codex = installer.merge({}, "codex", Path("/tmp/Damla"), True)["hooks"]["PermissionRequest"]
+        self.assertEqual([h["command"] for g in codex for h in g["hooks"] if "--agent-approval" in h["command"]],
+                         ["/tmp/Damla --agent-approval codex"])
 
     def test_approval_hook_is_opt_in_and_removable(self):
         with_approvals = installer.merge({}, "claude", Path("/tmp/Damla"), True)

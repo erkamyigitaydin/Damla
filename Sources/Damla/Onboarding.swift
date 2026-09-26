@@ -173,7 +173,7 @@ private struct OnboardingView: View {
                     }
                 }
             }
-            Toggle("Claude Code’un izin sorularını çentikten yanıtla", isOn: $approvals)
+            Toggle("İzin sorularını çentikten yanıtla", isOn: $approvals)
                 .help("Terminal öndeyken çentik sormaz; süre dolarsa soru terminalde kalır.")
             if let hookError { Label(hookError, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.callout) }
             Text("Codex, yeni hook’lara /hooks içinde güven onayı verilene kadar çalıştırmaz.").font(.callout).foregroundStyle(.secondary)
@@ -240,7 +240,7 @@ private struct OnboardingView: View {
 
     private func install(_ provider: HookInstaller.Provider) {
         do {
-            try HookInstaller.install(provider, approvals: approvals && provider == .claude)
+            try HookInstaller.install(provider, approvals: approvals)
             hookError = nil
         } catch {
             hookError = String(localized: "Kurulamadı: \(String(describing: error))")

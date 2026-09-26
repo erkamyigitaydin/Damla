@@ -15,8 +15,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--agent-event") {
 }
 
 if let index = CommandLine.arguments.firstIndex(of: "--agent-approval") {
-    // Installed only on request (install-agent-hooks.py --approvals). Prints a decision only when the user
-    // made one in Damla; otherwise nothing, and Claude Code shows its own prompt.
+    // Installed only on request (the tour, Settings → Agents, or install-agent-hooks.py --approvals). Prints a
+    // decision only when the user made one in Damla; otherwise nothing, and the agent shows its own prompt.
     if CommandLine.arguments.indices.contains(index + 1),
        let provider = AgentProvider(rawValue: CommandLine.arguments[index + 1]) {
         var data = Data()

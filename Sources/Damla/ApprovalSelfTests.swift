@@ -31,6 +31,13 @@ func runApprovalSelfTests(_ check: (Bool, String) -> Void) {
     check(AgentApprovals.summary(tool: "Edit", input: ["file_path": "/a/b.swift", "old_string": "x"]).summary == "/a/b.swift", "File edits show the path")
     check(AgentApprovals.summary(tool: "mcp__figma__use", input: ["a": 1]).summary == "{\"a\":1}", "Other tools show their input")
     check(AgentApprovals.summary(tool: "Bash", input: ["command": String(repeating: "x", count: 5000)]).summary.count == 2001, "Very long input is capped")
+    let patch = "*** Begin Patch\n*** Update File: Sources/a.swift\n@@\n-x\n+y\n*** Add File: b.md\n+hi\n*** Delete File: old.txt\n*** End Patch"
+    check(AgentApprovals.summary(tool: "apply_patch", input: ["command": patch]).summary == "~ Sources/a.swift\n+ b.md\n− old.txt",
+          "Codex patches show one line per file")
+    check(ApprovalCard.title(for: "apply_patch") == "dosya düzenlemek istiyor", "Codex patches read as file edits")
+    check(AgentApprovals.effectiveWait(120, provider: .codex, host: nil) == AgentApprovals.codexUnknownHostWait
+          && AgentApprovals.effectiveWait(120, provider: .codex, host: "com.apple.Terminal") == 120
+          && AgentApprovals.effectiveWait(120, provider: .claude, host: nil) == 120, "Codex keeps its silent prompt short when the host is unknown")
     check(ApprovalCard.title(for: "mcp__figma__use_figma") == "figma aracını kullanmak istiyor", "MCP tools are named by server")
 
     // What Claude Code reads.
@@ -63,6 +70,10 @@ func runApprovalSelfTests(_ check: (Bool, String) -> Void) {
     AgentApprovals.heartbeat(directory: approvals)
     answer(.deny)
     check(AgentApprovals.handle(provider: .claude, input: event(), host: nil, directory: approvals, sessions: sessions, environment: env) == .deny, "Deny from the notch reaches the hook")
+    AgentApprovals.heartbeat(directory: approvals)
+    answer(.allow)
+    check(AgentApprovals.handle(provider: .codex, input: event("apply_patch", ["command": patch]), host: nil, directory: approvals, sessions: sessions, environment: env) == .allow,
+          "Codex requests are answered the same way")
     AgentApprovals.heartbeat(directory: approvals)
     let started = Date()
     check(AgentApprovals.handle(provider: .claude, input: event(), host: nil, directory: approvals, sessions: sessions, environment: env) == nil

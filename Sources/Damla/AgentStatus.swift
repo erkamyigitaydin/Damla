@@ -76,6 +76,9 @@ enum AgentPhase: String, Codable {
 /// Only state metadata is retained: no prompts, tool arguments, outputs or transcripts.
 struct AgentSession: Codable, Identifiable, Equatable {
     static let questionTools: Set<String> = ["AskUserQuestion", "request_user_input", "request_user_input_async"]
+    /// Codex's app asks for a turn's sandbox permissions through this tool, answered in its own window; no
+    /// PermissionRequest hook runs for it, so its start is the only sign the session is waiting for approval.
+    static let permissionTools: Set<String> = ["request_permissions"]
 
     var id: String
     var provider: AgentProvider
@@ -157,8 +160,9 @@ struct AgentSession: Codable, Identifiable, Equatable {
             phase = pending.isEmpty ? .working : .waiting
             if pending.isEmpty { clearWaiting() }
         case "PreToolUse":
-            if let toolName, Self.questionTools.contains(toolName) {
-                pending.insert(key); phase = .waiting; detail = String(localized: "Yanıt bekliyor")
+            if let toolName, Self.questionTools.contains(toolName) || Self.permissionTools.contains(toolName) {
+                pending.insert(key); phase = .waiting
+                detail = Self.permissionTools.contains(toolName) ? String(localized: "Onay bekliyor") : String(localized: "Yanıt bekliyor")
                 waitingTool = toolName; if waitingSince == nil { waitingSince = now }
             } else {
                 tool = toolName

@@ -58,7 +58,7 @@ Running Claude Code or Codex in the background? Damla shows every session: which
   <img src="docs/screenshots/approval.png" width="550" alt="A Claude Code permission request shown in the notch with Allow and Deny buttons">
 </p>
 
-When Claude Code asks for permission, the question drops out of the notch with the exact command. Hit **Allow** or **Deny** and keep working. If you're already looking at the terminal, Damla stays out of the way.
+When Claude Code or the Codex CLI asks for permission, the question drops out of the notch with the exact command (or, for a Codex patch, the files it touches). Hit **Allow** or **Deny** and keep working. If you're already looking at the terminal, Damla stays out of the way. The ChatGPT app's own permission requests can only be answered in its window; Damla shows them as waiting so you don't miss them.
 
 ### A shelf for your files
 
@@ -96,9 +96,9 @@ A short tour on first launch asks for the few permissions Damla can use. Every o
 
 ### Connecting your agents
 
-Open the tour from the menu bar (**Tour…**) and go to the **Agents** step. Click **Connect** next to Claude Code or Codex, and leave the notch approvals switch on if you want to answer Claude Code's permission prompts from the notch. You can add the approval hook later too, in **Settings → Agents**.
+Open the tour from the menu bar (**Tour…**) and go to the **Agents** step. Click **Connect** next to Claude Code or Codex, and leave the notch approvals switch on if you want to answer their permission prompts from the notch. You can add the approval hook later too, in **Settings → Agents**.
 
-Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. In Codex, approve the new hooks once with `/hooks`. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
+Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. In Codex, approve the new hooks once with `/hooks`. While the notch is asking, Codex holds back its own prompt; switch to the session's app and the prompt shows up there right away. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
 
 ## Privacy
 

@@ -28,6 +28,25 @@ enum HookInstaller {
         return text.contains(approvals ? "--agent-approval" : "--agent-event")
     }
 
+    /// Codex runs a hook only after the user trusted it with /hooks, which it records in config.toml under the
+    /// handler's position ("…/hooks.json:permission_request:1:0"). False when Damla's approval handler is
+    /// installed but has no trust entry yet; nil when it is not installed at all.
+    static func codexApprovalTrusted(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool? {
+        let hooksFile = settingsURL(.codex, home: home)
+        guard let data = try? Data(contentsOf: hooksFile),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let groups = (root["hooks"] as? [String: Any])?["PermissionRequest"] as? [[String: Any]] else { return nil }
+        for (g, group) in groups.enumerated() {
+            for (h, handler) in (group["hooks"] as? [[String: Any]] ?? []).enumerated()
+            where (handler["command"] as? String)?.contains("--agent-approval") == true {
+                let config = home.appendingPathComponent(".codex/config.toml")
+                let text = (try? String(contentsOf: config, encoding: .utf8)) ?? ""
+                return text.contains("\"\(hooksFile.path):permission_request:\(g):\(h)\"")
+            }
+        }
+        return nil
+    }
+
     /// Same quoting as Python's shlex.quote, so both installers write identical commands.
     static func shellQuote(_ value: String) -> String {
         let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@%+=:,./-_")
@@ -65,9 +84,9 @@ enum HookInstaller {
             if event == "Notification" { group["matcher"] = "permission_prompt|elicitation_dialog" }
             hooks[event] = (hooks[event] as? [[String: Any]] ?? []) + [group]
         }
-        // Opt-in: answers Claude Code's permission prompts from the notch. A decision is only ever printed after
-        // the user clicked one in Damla; otherwise Claude Code asks as usual.
-        if approvals && provider == .claude {
+        // Opt-in: answers the agent's permission prompts from the notch. A decision is only ever printed after
+        // the user clicked one in Damla; otherwise the agent asks as usual.
+        if approvals {
             let group: [String: Any] = ["hooks": [["type": "command", "command": command + " --agent-approval " + provider.rawValue,
                                                    "timeout": approvalTimeout, "statusMessage": approvalMarker]]]
             hooks["PermissionRequest"] = (hooks["PermissionRequest"] as? [[String: Any]] ?? []) + [group]

@@ -17,11 +17,22 @@ func runHookInstallerSelfTests(_ check: (Bool, String) -> Void) {
     let text = { (object: [String: Any]) in String(decoding: (try? JSONSerialization.data(withJSONObject: object)) ?? Data(), as: UTF8.self) }
     check(!text(merged).contains("--agent-approval") && !text(merged).contains("behavior"), "Approval hook only on request; no decision in settings")
     let codex = (try? HookInstaller.merge([:], provider: .codex, binary: binary, approvals: true)) ?? [:]
-    check(!text(codex).contains("--agent-approval") && text(codex).contains("Interrupt"), "Codex never gets the approval hook")
+    let codexPlain = (try? HookInstaller.merge([:], provider: .codex, binary: binary, approvals: false)) ?? [:]
+    check(text(codex).contains("--agent-approval codex") && !text(codexPlain).contains("--agent-approval") && text(codex).contains("Interrupt"),
+          "Codex gets the approval hook only on request")
     let withApprovals = (try? HookInstaller.merge(merged, provider: .claude, binary: binary, approvals: true)) ?? [:]
     let removed = (try? HookInstaller.merge(withApprovals, provider: .claude, binary: binary, approvals: false)) ?? [:]
     check(text(withApprovals).contains("--agent-approval") && !text(removed).contains("--agent-approval")
           && NSDictionary(dictionary: removed).isEqual(to: merged), "Approval hook can be taken out again")
+    let trustHome = FileManager.default.temporaryDirectory.appendingPathComponent("Damla-trust-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: trustHome) }
+    try? FileManager.default.createDirectory(at: trustHome.appendingPathComponent(".codex"), withIntermediateDirectories: true)
+    try? JSONSerialization.data(withJSONObject: codex).write(to: HookInstaller.settingsURL(.codex, home: trustHome))
+    let untrusted = HookInstaller.codexApprovalTrusted(home: trustHome)
+    let hooksPath = HookInstaller.settingsURL(.codex, home: trustHome).path
+    try? Data("[hooks.state.\"\(hooksPath):permission_request:1:0\"]\ntrusted_hash = \"sha256:x\"\n".utf8)
+        .write(to: trustHome.appendingPathComponent(".codex/config.toml"))
+    check(untrusted == false && HookInstaller.codexApprovalTrusted(home: trustHome) == true, "Codex approval hook reports whether /hooks trusted it")
     check((try? HookInstaller.merge(["hooks": [1, 2]], provider: .claude, binary: binary, approvals: false)) == nil, "Unexpected hooks shape is refused")
 
     let home = FileManager.default.temporaryDirectory.appendingPathComponent("Damla-hooks-test-\(UUID().uuidString)")

@@ -68,12 +68,12 @@
 "Buraya bırak" = "Drop here";
 "Bırak" = "Drop";
 "CANLI" = "LIVE";
-"Claude Code bir komut veya dosya için izin isteyince çentik açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin." = "When Claude Code asks permission for a command or file, the notch opens; see the full command and choose Allow or Deny.";
+"Claude Code veya Codex bir komut veya dosya için izin isteyince çentik açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin." = "When Claude Code or Codex asks permission for a command or file, the notch opens; see the full command and choose Allow or Deny.";
 "Claude Code ve Codex ne yapıyor, izinleri çentikten onayla" = "What Claude Code and Codex are doing; approve permissions from the notch";
 "Claude Code ve Codex oturumları; izin soruları kapalıyken de gelir" = "Claude Code and Codex sessions; permission prompts still come when this is off";
 "Claude Code ve Codex’in ne yaptığını çentikte görmek için Damla onların ayar dosyasına küçük bir durum bildirimi ekler. Yalnızca Damla’nın kayıtlarına dokunulur, önce yedek alınır." = "To show what Claude Code and Codex are doing, Damla adds a small status hook to their settings file. Only Damla’s entries are touched, and a backup is made first.";
 "Claude Code veya Codex senden izin beklediğinde kısa bir ses çıkar." = "Plays a short sound when Claude Code or Codex waits for your permission.";
-"Claude Code’un izin sorularını çentikten yanıtla" = "Answer Claude Code’s permission prompts from the notch";
+"İzin sorularını çentikten yanıtla" = "Answer permission prompts from the notch";
 "Codex ilk bağlantıda /hooks üzerinden güven onayı ister." = "Codex asks you to trust the hooks in /hooks the first time.";
 "Codex, yeni hook’lara /hooks içinde güven onayı verilene kadar çalıştırmaz." = "Codex won’t run new hooks until you trust them in /hooks.";
 "Damla" = "Damla";
@@ -183,7 +183,10 @@
 "Onay beklerken ses: açık" = "Sound while waiting: on";
 "Onay beklerken ses: kapalı" = "Sound while waiting: off";
 "Onay bekliyor" = "Waiting for approval";
-"Onay hook’u" = "Approval hook";
+"Claude Code onay hook’u" = "Claude Code approval hook";
+"Codex onay hook’u" = "Codex approval hook";
+"Codex’te bu, terminaldeki Codex CLI’nin komut onaylarında çalışır; Codex çentik beklerken kendi sorusunu göstermez, terminale geçince soru hemen oraya döner. ChatGPT uygulamasının yetki sorusu yalnızca kendi penceresinden yanıtlanır; çentik onu “Onay bekliyor” olarak gösterir. Yeni hook’a Codex’te /hooks ile bir kez güven onayı vermen gerekir." = "For Codex this works with command approvals in the Codex CLI in your terminal; while the notch waits, Codex holds back its own prompt, and switching to the terminal brings it back at once. The ChatGPT app’s permission request can only be answered in its own window; the notch shows it as “Waiting for approval”. Trust the new hook once in Codex with /hooks.";
+"Codex’te /hooks ile güven onayı bekliyor" = "Needs trust in Codex (/hooks)";
 "Oturum" = "Session";
 "Oynat" = "Play";
 "Oynatıcı" = "Player";
@@ -226,7 +229,7 @@
 "Sistem" = "System";
 "Sistem · tüm oynatıcılar" = "System · all players";
 "Sonraki" = "Next";
-"Sorunun sahibi uygulama (Terminal, Claude…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır." = "If the app asking (Terminal, Claude…) is in front, the notch doesn’t ask; if time runs out or you answer in the terminal, the prompt stays there.";
+"Sorunun sahibi uygulama (Terminal, Claude, Codex…) öndeyse çentik sormaz; süre dolarsa veya terminalde yanıtlarsan soru orada kalır." = "If the app asking (Terminal, Claude, Codex…) is in front, the notch doesn’t ask; if time runs out or you answer in the terminal, the prompt stays there.";
 "Soruyu orada yanıtla" = "Answer the prompt there";
 "Sözler" = "Lyrics";
 "Sözler aranıyor…" = "Looking for lyrics…";
@@ -308,3 +311,4 @@
 "Değişiklik Damla yeniden açılınca uygulanır." = "Takes effect when Damla reopens.";
 "Yeniden başlat" = "Relaunch";
 "Yeni dil için Damla’yı yeniden başlat" = "Relaunch Damla for the new language";
+"Yetki için onay bekliyor" = "Waiting for permission approval";

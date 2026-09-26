@@ -18,8 +18,8 @@ struct ApprovalRequest: Codable, Identifiable, Equatable {
 
 enum ApprovalDecision: String { case allow, deny }
 
-/// Lets the notch answer Claude Code's permission prompts. The hook process (`Damla --agent-approval claude`,
-/// installed only with `install-agent-hooks.py --approvals`) writes a request file and waits for a decision
+/// Lets the notch answer Claude Code's and Codex's permission prompts. The hook process (`Damla --agent-approval
+/// claude|codex`, installed only on request) writes a request file and waits for a decision
 /// file from the app. It steps aside, printing nothing so the normal terminal prompt appears, when:
 /// the setting is off, Damla is not running, the app hosting the session is in front (the user is looking at
 /// the prompt already), the prompt was answered in the terminal, or no decision came before the deadline.
@@ -28,6 +28,10 @@ enum AgentApprovals {
     static let waitKey = "agentApprovalWait"
     static let waitChoices: [TimeInterval] = [30, 60, 120]
     static let defaultWait: TimeInterval = 60
+    /// Codex runs the hook before it shows its own prompt, so the terminal stays silent while the notch waits.
+    /// Leaving for the host app ends the wait at once; when the host is unknown that cannot happen, so the
+    /// silence is kept short.
+    static let codexUnknownHostWait: TimeInterval = 30
     static let heartbeatMaxAge: TimeInterval = 4
     static var directory: URL { AgentEventStore.directory.appendingPathComponent("approvals", isDirectory: true) }
 
@@ -45,6 +49,7 @@ enum AgentApprovals {
         let summary: String
         switch tool {
         case "Bash": summary = text("command") ?? ""
+        case "apply_patch": summary = patchFiles(text("command") ?? text("patch") ?? text("input") ?? "")
         case "Edit", "Write", "MultiEdit", "Read", "NotebookEdit": summary = text("file_path") ?? text("notebook_path") ?? ""
         case "WebFetch": summary = text("url") ?? ""
         case "WebSearch": summary = text("query") ?? ""
@@ -57,6 +62,22 @@ enum AgentApprovals {
         return (clean(summary, limit: 2000), clean(detail, limit: 200))
     }
 
+    /// Codex's patch as one line per file: "~ a.swift" changed, "+ b.swift" added, "− c.swift" deleted.
+    static func patchFiles(_ patch: String) -> String {
+        let marks = [("*** Update File: ", "~ "), ("*** Add File: ", "+ "), ("*** Delete File: ", "− "), ("*** Move to: ", "→ ")]
+        let lines = patch.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line -> String? in
+            let line = line.trimmingCharacters(in: .whitespaces)
+            guard let (prefix, mark) = marks.first(where: { line.hasPrefix($0.0) }) else { return nil }
+            return mark + line.dropFirst(prefix.count)
+        }
+        return lines.isEmpty ? patch : lines.joined(separator: "\n")
+    }
+
+    /// How long the notch waits for this request (see `codexUnknownHostWait`).
+    static func effectiveWait(_ wait: TimeInterval, provider: AgentProvider, host: String?) -> TimeInterval {
+        provider == .codex && host == nil ? min(wait, codexUnknownHostWait) : wait
+    }
+
     /// Drops control characters (a terminal escape in a command must not reach the UI) and caps the length.
     static func clean(_ value: String, limit: Int) -> String {
         let scalars = value.unicodeScalars.filter { $0 == "\n" || $0 == "\t" || !CharacterSet.controlCharacters.contains($0) }
@@ -64,7 +85,7 @@ enum AgentApprovals {
         return text.count > limit ? String(text.prefix(limit)) + "…" : text
     }
 
-    /// The hook's stdout for Claude Code's PermissionRequest decision control.
+    /// The hook's stdout for the PermissionRequest decision; Claude Code and Codex read the same shape.
     static func output(_ decision: ApprovalDecision) -> Data {
         var inner: [String: Any] = ["behavior": decision.rawValue]
         if decision == .deny { inner["message"] = String(localized: "Kullanıcı Damla'dan reddetti.") }
@@ -102,7 +123,7 @@ enum AgentApprovals {
         let request = ApprovalRequest(id: UUID().uuidString, session: AgentSession.identifier(provider: provider, session: sessionKey),
                                       provider: provider, project: cwd.isEmpty ? String(localized: "Oturum") : clean(URL(fileURLWithPath: cwd).lastPathComponent, limit: 80),
                                       tool: clean(tool, limit: 120), summary: summary, detail: detail, host: host,
-                                      created: start, deadline: start.addingTimeInterval(env.wait()))
+                                      created: start, deadline: start.addingTimeInterval(effectiveWait(env.wait(), provider: provider, host: host)))
         guard write(request, directory: directory) else { return nil }
         let requestFile = directory.appendingPathComponent(request.id + ".json")
         let decisionFile = directory.appendingPathComponent(request.id + ".decision")

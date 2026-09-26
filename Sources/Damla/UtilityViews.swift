@@ -43,6 +43,7 @@ enum AgentText {
             if let start = s.turnStarted { parts.append(duration(now.timeIntervalSince(start))) }
         case .waiting:
             if let tool = s.waitingTool, AgentSession.questionTools.contains(tool) { parts.append(String(localized: "Yanıt bekliyor")) }
+            else if let tool = s.waitingTool, AgentSession.permissionTools.contains(tool) { parts.append(String(localized: "Yetki için onay bekliyor")) }
             else if let tool = s.waitingTool { parts.append(String(localized: "\(tool) için onay bekliyor")) }
             else { parts.append(s.detail.isEmpty ? String(localized: "Onay bekliyor") : s.detail) }
             if let since = s.waitingSince { parts.append(duration(now.timeIntervalSince(since), seconds: true)) }
@@ -255,7 +256,7 @@ struct ApprovalCard: View {
     static func title(for tool: String) -> String {
         switch tool {
         case "Bash": return String(localized: "komut çalıştırmak istiyor")
-        case "Edit", "MultiEdit", "NotebookEdit": return String(localized: "dosya düzenlemek istiyor")
+        case "Edit", "MultiEdit", "NotebookEdit", "apply_patch": return String(localized: "dosya düzenlemek istiyor")
         case "Write": return String(localized: "dosya yazmak istiyor")
         case "Read": return String(localized: "dosya okumak istiyor")
         case "WebFetch": return String(localized: "web sayfası açmak istiyor")
