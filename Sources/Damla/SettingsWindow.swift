@@ -85,6 +85,7 @@ private struct GeneralSettings: View {
                     } label: { Text("Yeni dil için Damla’yı yeniden başlat") }
                 }
             }
+            MeetingSettings(model: model, calendar: model.calendar)
             Section("Kısayol") {
                 LabeledContent("Paneli aç veya kapat") {
                     Text("⌃ ⌥ Space").font(.system(.body, design: .rounded)).foregroundStyle(.secondary)
@@ -225,6 +226,37 @@ private struct MediaSettings: View {
                     Text("Sözler lrclib.net’ten gelir: çalan şarkının adı, sanatçısı, albümü ve süresi gönderilir, başka hiçbir şey gitmez. Bulunan sözler bu Mac’te saklanır. Tarayıcı videoları ve canlı yayınlar için sorgu yapılmaz.")
                 }
             }
+        }
+    }
+}
+
+/// Calendar countdown and the microphone slot, in General.
+private struct MeetingSettings: View {
+    @ObservedObject var model: AppState
+    @ObservedObject var calendar: CalendarService
+    var body: some View {
+        Section {
+            Toggle(isOn: $calendar.enabled) {
+                Text("Sıradaki toplantı")
+                Text("Başlamasına 10 dakika kala çentikte geri sayım; Zoom, Meet, Teams, Webex veya FaceTime bağlantısı varsa tek tıkla katıl.")
+            }
+            if calendar.enabled && (calendar.access == .denied || calendar.access == .restricted) {
+                LabeledContent {
+                    Button("Ayarları aç") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") { NSWorkspace.shared.open(url) }
+                    }
+                } label: {
+                    Text("Takvim erişimi kapalı").foregroundStyle(.orange)
+                }
+            }
+            Toggle(isOn: $model.micInNotch) {
+                Text("Mikrofon kullanımdayken göster")
+                Text("Bir uygulama mikrofonu kullanırken çentikte görünür; dokununca tüm uygulamalar için sessize alır.")
+            }
+        } header: {
+            Text("Takvim ve görüşmeler")
+        } footer: {
+            Text("Takvim bu Mac’te okunur; hiçbir yere gönderilmez.")
         }
     }
 }

@@ -247,9 +247,11 @@ struct DamlaView: View {
 
 /// A live activity the closed notch can show. Each has a glyph (identity) and a status (motion).
 enum CompactActivity: Equatable {
-    case timer, agent(AgentSession), media
-    /// Left-to-right order when two share the island: the timer first, media next, the agent last.
-    var rank: Int { switch self { case .timer: return 0; case .media: return 1; case .agent: return 2 } }
+    case mic, timer, meeting, agent(AgentSession), media
+    /// Left-to-right order when two share the island: mic, timer, meeting, media, the agent last.
+    var rank: Int {
+        switch self { case .mic: return 0; case .timer: return 1; case .meeting: return 2; case .media: return 3; case .agent: return 4 }
+    }
 }
 
 struct CompactRow: View {
@@ -257,10 +259,13 @@ struct CompactRow: View {
     @ObservedObject var media: MediaService
     let metrics: Layout.Metrics
 
-    /// Up to two activities; when three compete the timer and the agent win because both need attention.
+    /// Up to two activities, the most urgent first: a live microphone, the timer, a meeting about to start,
+    /// an agent, then media.
     private var activities: [CompactActivity] {
         var list: [CompactActivity] = []
+        if model.micActive { list.append(.mic) }
         if model.session.hasStarted { list.append(.timer) }
+        if model.calendar.soon != nil { list.append(.meeting) }
         if let agent = model.agentBadge { list.append(.agent(agent)) }
         if media.hasTrack { list.append(.media) }
         return Array(list.prefix(2)).sorted { $0.rank < $1.rank }
@@ -301,6 +306,10 @@ struct CompactRow: View {
     private var helpText: String {
         activities.map { activity -> String in
             switch activity {
+            case .mic: return model.microphone.muted ? String(localized: "Mikrofon kapalı · tıkla: aç") : String(localized: "Mikrofon kullanımda · tıkla: sessize al")
+            case .meeting:
+                guard let meeting = model.calendar.soon else { return "" }
+                return meeting.title + (meeting.joinURL == nil ? "" : String(localized: " · tıkla: katıl"))
             case .timer: return "Odak · \(model.timeLabel)"
             case .agent(let agent): return "\(agent.provider.title) · \(agent.project) · \(agent.phase.title)"
             case .media:
@@ -313,6 +322,17 @@ struct CompactRow: View {
 
     @ViewBuilder private func glyph(_ activity: CompactActivity) -> some View {
         switch activity {
+        case .mic:
+            Image(systemName: model.microphone.muted ? "mic.slash.fill" : "mic.fill").font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(model.microphone.muted ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.amber)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 22, height: 22).contentShape(Rectangle())
+                .onTapGesture { model.toggleMicrophone() }
+        case .meeting:
+            Image(systemName: model.calendar.soon?.joinURL == nil ? "calendar" : "video.fill").font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 22, height: 22).contentShape(Rectangle())
+                .onTapGesture { if let meeting = model.calendar.soon { model.calendar.open(meeting) } }
         case .timer:
             Text(model.timeLabel).font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
                 .contentTransition(.numericText())
@@ -344,6 +364,14 @@ struct CompactRow: View {
 
     @ViewBuilder private func status(_ activity: CompactActivity) -> some View {
         switch activity {
+        case .mic:
+            Text(model.microphone.muted ? "Kapalı" : "Açık").font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(model.microphone.muted ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.dim)
+                .onTapGesture { model.toggleMicrophone() }
+        case .meeting:
+            Text(model.calendar.soon.map { CalendarService.countdown($0) } ?? "").font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .monospacedDigit().contentTransition(.numericText())
+                .onTapGesture { if let meeting = model.calendar.soon { model.calendar.open(meeting) } }
         case .timer:
             Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim)
         case .agent(let agent):
@@ -750,6 +778,13 @@ struct HomeView: View {
                             Button { model.select(.focus) } label: {
                                 statusLabel("timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
                             }.buttonStyle(.plain).help("Odak")
+                        } else if let meeting = model.calendar.upcoming {
+                            // The next meeting in the coming hours; a tap joins the call or opens Calendar.
+                            Button { model.calendar.open(meeting) } label: {
+                                statusLabel(meeting.joinURL == nil ? "calendar" : "video", CalendarService.countdown(meeting) + " · " + meeting.title,
+                                            tint: model.calendar.isSoon(meeting) ? Theme.accent : nil)
+                            }.buttonStyle(.plain)
+                            .help(meeting.joinURL == nil ? String(localized: "Takvimde aç") : String(localized: "Toplantıya katıl"))
                         }
                         Spacer()
                         if media.hasTrack {
@@ -815,7 +850,7 @@ struct HomeView: View {
     private func statusLabel(_ icon: String, _ text: String, tint: Color? = nil) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon).font(.system(size: 9.5, weight: .medium))
-            Text(text).font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit()
+            Text(text).font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit().lineLimit(1)
         }.foregroundStyle(tint ?? Theme.dim)
     }
     private func transport(_ icon: String, _ label: LocalizedStringKey, size: CGFloat, action: @escaping () -> Void) -> some View {

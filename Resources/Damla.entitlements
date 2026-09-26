@@ -4,4 +4,6 @@
 <!-- Hardened runtime keeps everything else locked down; Apple Events are needed only for the
      Apple Music / Spotify fallback when the Now Playing bridge is unavailable. -->
 <key>com.apple.security.automation.apple-events</key><true/>
+<!-- Calendar: the next meeting in the notch, only after the user turns it on. -->
+<key>com.apple.security.personal-information.calendars</key><true/>
 </dict></plist>

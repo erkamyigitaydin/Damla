@@ -103,6 +103,13 @@ final class AppState: ObservableObject {
     let monitor = SystemMonitor()
     let deviceBatteries = DeviceBatteryWatcher()
     let devServers = DevServerMonitor()
+    let calendar = CalendarService()
+    let microphone = MicrophoneMonitor()
+    @Published var micInNotch = UserDefaults.standard.object(forKey: "micInNotch") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(micInNotch, forKey: "micInNotch") }
+    }
+    /// The microphone slot: an app is using the mic and the user wants to see it.
+    var micActive: Bool { micInNotch && microphone.inUse }
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
     let updater = UpdateService()
@@ -130,7 +137,7 @@ final class AppState: ObservableObject {
         cleaning.active || (expanded && activeScreenID == screenID) ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
     }
     /// Live activities the closed notch can show (focus timer, agent, media), at most two at once.
-    var compactSlots: Int { min(2, [session.hasStarted, agentBadge != nil, media.hasTrack].filter { $0 }.count) }
+    var compactSlots: Int { min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil, media.hasTrack].filter { $0 }.count) }
     /// True when the closed notch has something to show beside the physical notch.
     var compactContent: Bool { compactSlots > 0 }
 
@@ -159,6 +166,15 @@ final class AppState: ObservableObject {
                                 detail: String(localized: "Pil azaldı · %\(level)"))
         }
         deviceBatteries.start()
+        // The notch's size depends on the meeting countdown and the mic slot: redraw with them.
+        calendar.objectWillChange.merge(with: microphone.objectWillChange).receive(on: RunLoop.main)
+            .sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        calendar.onStarting = { [weak self] meeting in
+            self?.showDeviceHUD("calendar", meeting.title, detail: meeting.joinURL == nil ? String(localized: "1 dk sonra başlıyor")
+                                                                                       : String(localized: "1 dk sonra · çentikten katıl"))
+        }
+        calendar.start()
+        microphone.start()
         agents.onUsageWarning = { [weak self] percent, resets in
             self?.showDeviceHUD("gauge.with.dots.needle.67percent", String(localized: "Claude kullanımı %\(percent)"),
                                 detail: String(localized: "\(resets.formatted(date: .omitted, time: .shortened)) sıfırlanır"))
@@ -339,6 +355,13 @@ final class AppState: ObservableObject {
     /// The current output's battery, when it is a Bluetooth device that reports one.
     var currentOutputBattery: BluetoothBattery.Levels? {
         outputs.first { $0.id == currentOutput && $0.isBluetooth }.flatMap { outputBatteries[$0.name] }
+    }
+    func toggleMicrophone() {
+        if microphone.toggleMute() {
+            showHUD(microphone.muted ? "mic.slash.fill" : "mic.fill", microphone.muted ? String(localized: "Mikrofon kapalı") : String(localized: "Mikrofon açık"), 1)
+        } else {
+            showNotice(String(localized: "Bu mikrofonun sessize alma anahtarı yok."))
+        }
     }
     /// The neighbouring page for a swipe; the first and last pages do not wrap around.
     func turnPage(forward: Bool) {

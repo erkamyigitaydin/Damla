@@ -196,6 +196,19 @@ func runSelfTests() -> Int32 {
           && DevServer.projectName(cwd: "/Users/x/tmp/api", fileExists: { _ in false }) == "api", "A server is named after its repository")
     check(DevServer(pid: 1, port: 5432, name: "postgres", project: "shop").isDatabase
           && !DevServer(pid: 1, port: 3000, name: "node", project: "shop").isDatabase, "Databases are told apart from web servers")
+    check(CalendarService.joinURL(in: [nil, "Oda 3", "Katıl: https://us02web.zoom.us/j/8123456789?pwd=abc ve not"])?.absoluteString == "https://us02web.zoom.us/j/8123456789?pwd=abc"
+          && CalendarService.joinURL(in: ["https://meet.google.com/abc-defg-hij"])?.host == "meet.google.com"
+          && CalendarService.joinURL(in: ["https://teams.microsoft.com/l/meetup-join/19%3ameeting_x"]) != nil
+          && CalendarService.joinURL(in: ["https://example.com/j/1", "Toplantı odası"]) == nil, "Video-call links are found, other links are not")
+    let clock = Date()
+    let meetings = [CalendarService.Meeting(id: "old", title: "Eski", start: clock.addingTimeInterval(-900), end: clock.addingTimeInterval(900), joinURL: nil),
+                    CalendarService.Meeting(id: "day", title: "Tatil", start: clock.addingTimeInterval(-3600), end: clock.addingTimeInterval(20000), joinURL: nil),
+                    CalendarService.Meeting(id: "late", title: "Sonra", start: clock.addingTimeInterval(7200), end: clock.addingTimeInterval(9000), joinURL: nil),
+                    CalendarService.Meeting(id: "next", title: "Standup", start: clock.addingTimeInterval(240), end: clock.addingTimeInterval(1200), joinURL: nil)]
+    let picked = CalendarService.pick(meetings, allDay: ["day"], now: clock)
+    check(picked?.id == "next", "Next meeting skips all-day events and ones running for over five minutes")
+    check(picked.map { CalendarService.countdown($0, at: clock) } == "4 dk" && picked.map { CalendarService().isSoon($0, at: clock) } == true
+          && picked.map { CalendarService().isSoon($0, at: clock.addingTimeInterval(-700)) } == false, "The countdown starts ten minutes before")
     var lowBattery: [String] = []
     let watcher = DeviceBatteryWatcher()
     watcher.onLow = { name, _, level in lowBattery.append("\(name) \(level)") }
