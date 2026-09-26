@@ -35,6 +35,8 @@ enum Theme {
     }
     static var basket: Animation { reduceMotion ? .easeOut(duration: 0.15) : .spring(duration: 0.42, bounce: 0.3) }
     static var quick: Animation { reduceMotion ? .easeOut(duration: 0.1) : .spring(duration: 0.3, bounce: 0.1) }
+    /// Moving between pages: the content and the pill's highlight travel together, with a touch of spring.
+    static var page: Animation { reduceMotion ? .easeOut(duration: 0.12) : .spring(duration: 0.38, bounce: 0.18) }
 }
 
 extension HUDItem {
@@ -594,7 +596,7 @@ struct ExpandedView: View {
                 }
                 }
             }
-            .transition(.blurReplace)
+            .transition(.page(model.pageDirection))
             .id(model.tour.map { "tour-\($0.rawValue)" } ?? (model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue))
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
             .frame(width: Layout.panelWidth, height: model.contentHeight)
@@ -617,12 +619,30 @@ struct ExpandedView: View {
         }
         .animation(Theme.quick, value: model.notice)
         .foregroundStyle(.white)
-        .animation(Theme.quick, value: model.selectedTab)
+        .animation(Theme.page, value: model.selectedTab)
+        .animation(Theme.page, value: model.tour)
     }
+}
+
+extension AnyTransition {
+    /// A page change: the new page slides in a little from the side it lies on, coming into focus; the old one
+    /// just fades and blurs away (its direction would be stale by the time it leaves).
+    static func page(_ direction: Int) -> AnyTransition {
+        guard !Theme.reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .modifier(active: PageShift(x: CGFloat(direction) * 26, blur: 6, opacity: 0), identity: PageShift(x: 0, blur: 0, opacity: 1)),
+            removal: .modifier(active: PageShift(x: 0, blur: 4, opacity: 0), identity: PageShift(x: 0, blur: 0, opacity: 1))
+                .animation(.easeOut(duration: 0.14)))
+    }
+}
+private struct PageShift: ViewModifier {
+    let x: CGFloat, blur: CGFloat, opacity: Double
+    func body(content: Content) -> some View { content.offset(x: x).blur(radius: blur).opacity(opacity) }
 }
 
 struct TabPill: View {
     @ObservedObject var model: AppState
+    @Namespace private var selection
     var body: some View {
         HStack(spacing: 2) {
             ForEach(model.visibleTabs) { tab in
@@ -639,7 +659,10 @@ struct TabPill: View {
                         }
                     }
                     .foregroundStyle(selected ? Color.white : Theme.dim)
-                    .background(selected ? Theme.fillStrong : .clear, in: Capsule())
+                    .background {
+                        // One highlight that glides from tab to tab instead of fading out and in.
+                        if selected { Capsule().fill(Theme.fillStrong).matchedGeometryEffect(id: "selected", in: selection) }
+                    }
                     .contentShape(Capsule())
                 }.buttonStyle(.plain).help(tab.title).accessibilityLabel(tab.title)
             }
@@ -651,7 +674,7 @@ struct TabPill: View {
         .frame(height: Layout.pillHeight)
         .glassEffect(.clear.tint(.black.opacity(0.62)).interactive(), in: Capsule())
         .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-        .animation(Theme.quick, value: model.selectedTab)
+        .animation(Theme.page, value: model.selectedTab)
     }
     private func pillButton(_ icon: String, _ label: LocalizedStringKey, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {

@@ -47,7 +47,15 @@ struct HUDItem: Identifiable {
 final class AppState: ObservableObject {
     @Published var expanded = false
     @Published var pinnedOpen = false
-    @Published var selectedTab: PanelTab = PanelTab.allCases.first(where: PanelTab.loadEnabled().contains) ?? .home
+    @Published var selectedTab: PanelTab = PanelTab.allCases.first(where: PanelTab.loadEnabled().contains) ?? .home {
+        willSet {
+            // Which way the next page comes in: from the right when it sits to the right in the pill.
+            let from = PanelTab.allCases.firstIndex(of: selectedTab) ?? 0, to = PanelTab.allCases.firstIndex(of: newValue) ?? 0
+            if from != to { pageDirection = to > from ? 1 : -1 }
+        }
+    }
+    /// +1 when the page just shown lies to the right of the previous one (or the tour moved on), -1 to the left.
+    private(set) var pageDirection = 1
     /// Pages shown in the tab pill. Turning off the page on screen moves to the first one still on.
     @Published private(set) var enabledTabs = PanelTab.loadEnabled() {
         didSet {
@@ -74,7 +82,9 @@ final class AppState: ObservableObject {
     @Published var outputs: [AudioOutput] = []
     /// What Özet shows: the player, the output list, or the volume levels.
     enum HomePane { case player, outputs, levels, sources }
-    @Published var homePane: HomePane = .player
+    @Published var homePane: HomePane = .player {
+        willSet { if newValue != homePane { pageDirection = newValue == .player ? -1 : 1 } }   // a pane opens forward, closes back
+    }
     /// Lyrics mode: the panel grows down with the lyrics flowing under the player, and stays open when the pointer
     /// leaves. Left by the lyrics button or by closing the panel by hand; never restored on the next open.
     @Published var lyricsExpanded = false
@@ -390,6 +400,7 @@ final class AppState: ObservableObject {
         pinnedOpen = pinnedBeforeTour
     }
     private func showTourStep(_ step: TourStep) {
+        pageDirection = (tour?.rawValue ?? -1) < step.rawValue ? 1 : -1
         tour = step
         // The pill points at the page the step is about, when that page is switched on.
         if enabledTabs.contains(step.tab) { selectedTab = step.tab } else if let first = visibleTabs.first { selectedTab = first }
