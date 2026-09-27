@@ -41,6 +41,19 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
     private var pipWindowID: CGWindowID = 0
     private var pipElement: AXUIElement?
     private var dockTimer: Timer?
+    /// A clear window over the parked PiP window that takes the pointer. The notch lets the pointer through until it
+    /// is over its shape, so the first move would reach the PiP window and Chrome would draw its own controls into
+    /// the picture. Barely-there alpha takes the events; a non-opaque window does not make Chrome stop drawing.
+    private lazy var shield: NSPanel = {
+        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        panel.isOpaque = false
+        panel.hasShadow = false
+        panel.backgroundColor = NSColor.black.withAlphaComponent(0.02)
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)   // above PiP, below the notch
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        panel.isReleasedWhenClosed = false
+        return panel
+    }()
     private var treeRequested = false
     private var generation = 0
     private let scriptQueue = DispatchQueue(label: "damla.video.script", qos: .userInitiated)
@@ -81,13 +94,18 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
         }
     }
 
-    func stop() {
+    /// `waiting`: on quit, the video has to leave PiP before the app is gone.
+    func stop(waiting: Bool = false) {
         generation += 1
         dockTimer?.invalidate(); dockTimer = nil
+        shield.orderOut(nil)
         let old = stream
         stream = nil
         Task { try? await old?.stopCapture() }
-        if let tabRef, let bundleID { runJavaScript("document.pictureInPictureElement && document.exitPictureInPicture(); 1", tab: tabRef, bundleID: bundleID) }
+        if let tabRef, let bundleID {
+            runJavaScript("document.pictureInPictureElement && document.exitPictureInPicture(); 1", tab: tabRef, bundleID: bundleID)
+            if waiting { scriptQueue.sync {} }
+        }
         if treeRequested {
             AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), "AXManualAccessibility" as CFString, kCFBooleanFalse)
             treeRequested = false
@@ -128,9 +146,11 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
     /// and waits for the PiP window. Runs off the main thread: Apple Events and the page tree can take a moment.
     private static func enterPictureInPicture(bundleID: String, pid: pid_t, axApp: AXUIElement) -> Result<PipWindow, Problem> {
         let mark = """
-        (()=>{const vs=[...document.querySelectorAll('video')].filter(v=>!v.paused&&v.readyState>=2&&v.videoWidth>0);
-        if(!vs.length) return 'none';
-        const v=vs.sort((a,b)=>b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight)[0];
+        (()=>{const all=[...document.querySelectorAll('video')].filter(v=>v.readyState>=2&&v.videoWidth>0);
+        const big=(a,b)=>b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight;
+        const playing=all.filter(v=>!v.paused).sort(big), started=all.filter(v=>v.currentTime>1).sort(big);
+        const v=document.pictureInPictureElement||playing[0]||started[0];
+        if(!v) return 'none';
         document.querySelectorAll('.damla-pip').forEach(e=>e.classList.remove('damla-pip'));
         v.classList.add('damla-pip');
         const arm=e=>{if(e.target!==v) return; e.stopImmediatePropagation(); e.preventDefault();
@@ -254,9 +274,15 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
         let target: CGPoint
         if let box = dockTarget?() {
             target = CGPoint(x: (box.midX - frame.width / 2).rounded(), y: (box.midY - frame.height / 2).rounded())
+            // Over the whole box (the PiP window sits inside it, a few points lower when the menu bar pushes it).
+            let primaryTop = NSScreen.screens.first?.frame.maxY ?? 0
+            let cover = NSRect(x: box.minX, y: primaryTop - box.maxY - 12, width: box.width, height: box.height + 12)
+            if shield.frame != cover { shield.setFrame(cover, display: false) }
+            if !shield.isVisible { shield.orderFrontRegardless() }
         } else {
             let left = NSScreen.screens.map(\.frame.minX).min() ?? 0
             target = CGPoint(x: left - frame.width - 4000, y: 200)
+            if shield.isVisible { shield.orderOut(nil) }
         }
         // The system keeps windows below the menu bar, so a few points off at the top are expected; the notch's
         // rim covers them.

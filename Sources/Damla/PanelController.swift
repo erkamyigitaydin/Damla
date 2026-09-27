@@ -823,6 +823,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationWillTerminate(_ notification: Notification) {
         model.media.restoreDucked()   // never leave the music quiet after a ducked handoff
+        model.video.stop(waiting: true)   // the parked PiP window would otherwise stay under the notch on its own
         model.appVolumes.stopAll()
         model.cleaning.onEnd = nil
         model.cleaning.stop()
