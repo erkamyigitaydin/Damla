@@ -605,12 +605,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private var approvalKeys: [EventHotKeyRef] = []
+    /// `kill` / `pkill` (scripts, a relaunch) end the app through the normal quit, so its clean-up still runs.
+    private var terminateSignal: DispatchSourceSignal?
     private var approvalKeysArmed = Date.distantFuture
     private var observers = Set<AnyCancellable>()
     private lazy var settings = SettingsWindowController(model: model)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        signal(SIGTERM, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        source.setEventHandler { NSApp.terminate(nil) }
+        source.resume()
+        terminateSignal = source
         model = AppState()
         manager = PanelManager(model: model)
         model.presentSettings = { [weak self] in self?.settings.present() }
