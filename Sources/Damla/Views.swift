@@ -117,13 +117,14 @@ struct DamlaView: View {
     @State private var glassVisible = false
     init(model: AppState, screen: ScreenMetrics) { self.model = model; media = model.media; self.screen = screen }
 
-    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics; var content: CGFloat }
+    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics; var content: CGFloat; var video: Layout.VideoSpec? }
     private var state: NotchState { model.state(for: screen.id) }
     private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
-    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots, content: model.contentHeight) }
+    private var video: Layout.VideoSpec? { open ? nil : model.videoSpec }
+    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots, content: model.contentHeight, video: video) }
     private var shape: NotchShape {
-        let bottom: CGFloat = open ? 26 : state == .drop ? 24 : 13
+        let bottom: CGFloat = open ? 26 : state == .drop ? 24 : video.map { $0.large ? 22 : 18 } ?? 13
         return metrics.hasNotch
             ? NotchShape(topEar: Layout.ear(metrics, open: open), topRadius: 0, bottomRadius: bottom)
             : NotchShape(topEar: 0, topRadius: open ? 24 : bottom, bottomRadius: open ? 24 : bottom)
@@ -143,7 +144,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics, content: model.contentHeight))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics, content: model.contentHeight, video: video))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -196,6 +197,12 @@ struct DamlaView: View {
             shape.fill(Color.black.opacity(open ? (model.tallPanel ? 0.55 : 0.45) : 0))
                 .animation(.easeInOut(duration: 0.35), value: model.tallPanel)
             content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
+            // Outside the state switch, so a HUD over the notch leaves the video playing under it.
+            if let video, state == .closed || state == .hud {
+                VideoNotchView(model: model, video: model.video, media: media, size: Layout.videoSize(video, metrics, compactSlots: model.compactSlots))
+                    .padding(.top, Layout.closedHeight(metrics) + Layout.videoGap)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
+            }
         }
         .clipShape(shape)
         .overlay {
@@ -277,8 +284,10 @@ struct CompactRow: View {
         if model.micActive { list.append(.mic) }
         if model.session.hasStarted { list.append(.timer) }
         if model.calendar.soon != nil { list.append(.meeting) }
-        if let agent = model.agentBadge { list.append(.agent(agent)) }
-        if media.hasTrack { list.append(.media) }
+        if !model.video.active {   // the video under the notch already says what is playing
+            if let agent = model.agentBadge { list.append(.agent(agent)) }
+            if media.hasTrack { list.append(.media) }
+        }
         return Array(list.prefix(2)).sorted { $0.rank < $1.rank }
     }
 
@@ -736,6 +745,14 @@ struct HomeView: View {
                         HStack(alignment: .center, spacing: 8) {
                             Text(media.title).font(.system(size: 15, weight: .semibold)).tracking(-0.2).lineLimit(1)
                             Spacer(minLength: 6)
+                            // A browser or video player: its picture can play on under the closed notch.
+                            if VideoNotch.canShow(media.sourceBundleID) && media.controllable {
+                                Button { model.video.active ? model.stopVideo() : model.startVideo() } label: {
+                                    Image(systemName: model.video.active ? "pip.exit" : "pip.enter").font(.system(size: 11.5, weight: .semibold))
+                                        .foregroundStyle(model.video.active ? tint : Theme.dim).contentTransition(.symbolEffect(.replace))
+                                        .frame(width: 18, height: 18).contentShape(Rectangle())
+                                }.buttonStyle(.plain).help(model.video.active ? "Videoyu çentikten kaldır" : "Videoyu çentikte izle")
+                            }
                             if let favorited = media.favorited {
                                 Button { media.toggleFavorite() } label: {
                                     Image(systemName: favorited ? "heart.fill" : "heart").font(.system(size: 11.5, weight: .semibold))
@@ -756,14 +773,21 @@ struct HomeView: View {
                             HStack(spacing: 5) {
                                 Circle().fill(Color.red).frame(width: 6, height: 6)
                                 Text("CANLI").font(.system(size: 9.5, weight: .bold, design: .rounded)).tracking(0.6)
+                                Spacer(minLength: 10)
+                                if let meeting = meetingInTimes { meetingLine(meeting) }
                             }
                             .foregroundStyle(Theme.dim).frame(height: 29, alignment: .bottomLeading)
                         } else if media.controllable {
-                            ScrubBar(position: media.livePosition(at: model.now), duration: media.duration, tint: tint) { media.seek($0) }
+                            ScrubBar(position: media.livePosition(at: model.now), duration: media.duration, tint: tint,
+                                     middle: meetingInTimes.map { AnyView(meetingLine($0)) }) { media.seek($0) }
                         } else {
-                            Label("Arka planda · son bilinen durum", systemImage: "rectangle.stack")
-                                .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.faint).lineLimit(1)
-                                .frame(height: 29, alignment: .bottomLeading)
+                            HStack(spacing: 10) {
+                                Label("Arka planda · son bilinen durum", systemImage: "rectangle.stack")
+                                    .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.faint).lineLimit(1)
+                                Spacer(minLength: 0)
+                                if let meeting = meetingInTimes { meetingLine(meeting).layoutPriority(1) }
+                            }
+                            .frame(height: 29, alignment: .bottomLeading)
                         }
                     } else {
                         Text("Müzik").font(.system(size: 15, weight: .semibold))
@@ -792,7 +816,7 @@ struct HomeView: View {
                     // Plain buttons: a SwiftUI Menu would flatten these labels to their first text.
                     // The output's name rides in the capsule, scrolling when it is too long. When the timer or a
                     // meeting takes the space to the right, only the icon stays.
-                    let named = !model.session.hasStarted && model.calendar.upcoming == nil
+                    let named = !model.session.hasStarted && meetingInTransport == nil
                     Button { withAnimation(Theme.quick) { model.homePane = .outputs } } label: {
                         HStack(spacing: 5) {
                             Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold))
@@ -827,11 +851,28 @@ struct HomeView: View {
                 .fixedSize()   // may reach past the cover's column into the empty start of the transport zone
                 .frame(width: Self.art, alignment: .leading)
                 .zIndex(1)
-                ZStack {
+                // Three columns: equal flexible ends keep the transport centred on the progress line, and whatever
+                // sits at an end (the timer, the next meeting) is cut to its column instead of running under it.
+                HStack(spacing: 8) {
+                    HStack(spacing: 0) {
+                        if model.session.hasStarted {
+                            Button { model.select(.focus) } label: {
+                                statusLabel("timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
+                            }.buttonStyle(.plain).help("Odak")
+                        } else if let meeting = meetingInTransport {
+                            // The next meeting in the coming hours; a tap joins the call or opens Calendar.
+                            Button { model.calendar.open(meeting) } label: { meetingChip(meeting) }
+                                .buttonStyle(.plain)
+                                .help(meeting.title + " · " + (meeting.joinURL == nil ? String(localized: "Takvimde aç") : String(localized: "Toplantıya katıl")))
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity)
                     if media.hasTrack && !media.controllable {
                         Button { media.activateSource() } label: {
                             Label("Oynatıcıyı aç", systemImage: "arrow.up.forward.app").font(.system(size: 10.5, weight: .medium))
                         }.buttonStyle(PillStyle()).help("Tarayıcı sekmesi artık sistemin Şimdi Çalıyor kaynağı değil; kontrol için oynatıcıya geç.")
+                        .fixedSize()
                     } else if media.hasTrack {
                         HStack(spacing: 14) {
                             transport("backward.fill", "Önceki", size: 13) { media.command("previous track") }
@@ -842,24 +883,12 @@ struct HomeView: View {
                             }.buttonStyle(GlassCircleStyle()).help(media.playing ? "Duraklat" : "Oynat")
                             transport("forward.fill", "Sonraki", size: 13) { media.command("next track") }
                         }
+                        .fixedSize()
                     }
-                    // Either end of the transport zone: a running timer on the left, lyrics on/off on the right.
-                    HStack {
-                        if model.session.hasStarted {
-                            Button { model.select(.focus) } label: {
-                                statusLabel("timer", model.timeLabel, tint: model.session.running ? Theme.accent : nil)
-                            }.buttonStyle(.plain).help("Odak")
-                        } else if let meeting = model.calendar.upcoming {
-                            // The next meeting in the coming hours; a tap joins the call or opens Calendar.
-                            Button { model.calendar.open(meeting) } label: {
-                                statusLabel(meeting.joinURL == nil ? "calendar" : "video", CalendarService.countdown(meeting) + " · " + meeting.title,
-                                            tint: model.calendar.isSoon(meeting) ? Theme.accent : nil)
-                            }.buttonStyle(.plain)
-                            .help(meeting.joinURL == nil ? String(localized: "Takvimde aç") : String(localized: "Toplantıya katıl"))
-                        }
-                        Spacer()
-                        // Only when there is something to show: lyrics found, or the lookup still off (this button
-                        // turns it on). Hidden while searching, so songs without lyrics never flash it.
+                    // Only when there is something to show: lyrics found, or the lookup still off (this button
+                    // turns it on). Hidden while searching, so songs without lyrics never flash it.
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
                         if media.hasTrack && (lyrics.state == .found || lyrics.state == .off) {
                             Button {
                                 // Lyrics mode on/off; turning it on also allows the lookup if it was off.
@@ -879,6 +908,8 @@ struct HomeView: View {
                             .transition(.scale(scale: 0.6).combined(with: .opacity))
                         }
                     }
+                    // With nothing in the middle there is nothing to balance: the left end gets the whole row.
+                    .frame(maxWidth: media.hasTrack ? .infinity : 0)
                     .animation(Theme.quick, value: lyrics.state)
                 }
                 .frame(maxWidth: .infinity)
@@ -927,6 +958,50 @@ struct HomeView: View {
             Image(systemName: icon).font(.system(size: 9.5, weight: .medium))
             Text(text).font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit().lineLimit(1)
         }.foregroundStyle(tint ?? Theme.dim)
+    }
+    /// The next meeting sits in the line under the progress bar (between the times, or beside the live / background
+    /// note), where there is room for its title; with nothing playing it takes the transport row instead.
+    private var meetingInTimes: CalendarService.Meeting? {
+        model.session.hasStarted || !media.hasTrack ? nil : model.calendar.upcoming
+    }
+    private var meetingInTransport: CalendarService.Meeting? {
+        model.session.hasStarted || media.hasTrack ? nil : model.calendar.upcoming
+    }
+    private func meetingLine(_ meeting: CalendarService.Meeting) -> some View {
+        let soon = model.calendar.isSoon(meeting)
+        return Button { model.calendar.open(meeting) } label: {
+            HStack(spacing: 4) {
+                Image(systemName: meeting.joinURL == nil ? "calendar" : "video.fill").font(.system(size: 9, weight: .semibold))
+                Text(CalendarService.countdown(meeting)).font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .fixedSize()
+                Text(verbatim: "·").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.faint)
+                Text(meeting.title).font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
+                    .lineLimit(1).truncationMode(.tail)
+            }
+            .foregroundStyle(soon ? Theme.accent : .white.opacity(0.8))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(meeting.title + " · " + (meeting.joinURL == nil ? String(localized: "Takvimde aç") : String(localized: "Toplantıya katıl")))
+    }
+    /// The next meeting as a small capsule: countdown first (it is what matters), the title after it, cut short
+    /// to fit. Tinted when the meeting is under ten minutes away.
+    private func meetingChip(_ meeting: CalendarService.Meeting) -> some View {
+        let soon = model.calendar.isSoon(meeting)
+        return HStack(spacing: 5) {
+            Image(systemName: meeting.joinURL == nil ? "calendar" : "video.fill").font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(soon ? Theme.accent : .white.opacity(0.7))
+            Text(CalendarService.countdown(meeting))
+                .font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(soon ? Theme.accent : .white)
+                .fixedSize()
+            Text(meeting.title)
+                .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
+                .lineLimit(1).truncationMode(.tail)
+        }
+        .padding(.horizontal, 9).frame(height: 28)
+        .glassLook(AnyShape(Capsule()))
+        .contentShape(Capsule())
     }
     private func transport(_ icon: String, _ label: LocalizedStringKey, size: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -1074,6 +1149,8 @@ struct ScrubBar: View {
     var position: Double
     var duration: Double
     var tint: Color = .white
+    /// Something short between the two times (the next meeting); cut to the gap, never over the times.
+    var middle: AnyView? = nil
     var onSeek: (Double) -> Void
     @State private var dragging = false
     @State private var dragValue = 0.0
@@ -1101,12 +1178,13 @@ struct ScrubBar: View {
             .frame(height: 12)
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.15), value: hovering)
-            HStack {
+            HStack(spacing: 10) {
                 Text(Self.format(shown))
-                Spacer()
+                Spacer(minLength: 0)
                 Text("-" + Self.format(max(0, duration - shown)))
             }
             .font(.system(size: 9.5, weight: .medium, design: .rounded)).monospacedDigit().foregroundStyle(Theme.faint)
+            .overlay { middle.padding(.horizontal, 46) }
         }
     }
     static func format(_ seconds: Double) -> String {

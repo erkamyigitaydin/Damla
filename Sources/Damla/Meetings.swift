@@ -83,6 +83,12 @@ final class CalendarService: ObservableObject {
             .min { $0.start < $1.start }
     }
 
+    /// Debug: a fake meeting `minutes` from now, for screenshots.
+    func injectDemo(title: String, minutes: Double, link: Bool) {
+        next = Meeting(id: "demo", title: title, start: Date().addingTimeInterval(minutes * 60), end: Date().addingTimeInterval(minutes * 60 + 1800),
+                       joinURL: link ? URL(string: "https://meet.google.com/abc-defg-hij") : nil)
+    }
+
     func isSoon(_ meeting: Meeting, at now: Date = Date()) -> Bool {
         meeting.start.timeIntervalSince(now) <= Self.soonBefore && now < meeting.start.addingTimeInterval(Self.soonAfter)
     }

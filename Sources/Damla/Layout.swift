@@ -51,13 +51,37 @@ enum Layout {
     /// Width of one side of the closed notch for the given number of live activities (0, 1 or 2).
     static func compactSide(slots: Int) -> CGFloat { slots >= 2 ? compactSideSplit : compactSide }
 
-    static func shapeSize(_ state: NotchState, _ m: Metrics, compactSlots: Int, content: CGFloat = contentHeight) -> CGSize {
+    /// Video under the closed notch: its shape (width / height) and size.
+    struct VideoSpec: Equatable {
+        var aspect: CGFloat
+        var large: Bool
+    }
+    static let videoInset: CGFloat = 8
+    static let videoGap: CGFloat = 3
+
+    /// Small: as wide as the closed notch around it. Large: as wide as the open panel. Tall videos are held by height.
+    static func videoSize(_ spec: VideoSpec, _ m: Metrics, compactSlots: Int) -> CGSize {
+        let closed = shapeSize(.closed, m, compactSlots: compactSlots).width
+        let maxWidth = spec.large ? panelWidth - videoInset * 2 : max(closed, 200) - videoInset * 2
+        let maxHeight: CGFloat = spec.large ? 300 : 170
+        var width = maxWidth, height = width / max(spec.aspect, 0.3)
+        if height > maxHeight { height = maxHeight; width = height * spec.aspect }
+        return CGSize(width: width.rounded(), height: height.rounded())
+    }
+
+    static func shapeSize(_ state: NotchState, _ m: Metrics, compactSlots: Int, content: CGFloat = contentHeight, video: VideoSpec? = nil) -> CGSize {
         switch state {
-        case .closed:
-            let extra: CGFloat = compactSlots > 0 ? compactSide(slots: compactSlots) * 2 : (m.hasNotch ? 12 : notchlessIdleWidth)
-            return CGSize(width: m.notchWidth + extra, height: closedHeight(m))
-        case .hud:
-            return CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m))
+        case .closed, .hud:
+            let base: CGSize
+            if state == .closed {
+                let extra: CGFloat = compactSlots > 0 ? compactSide(slots: compactSlots) * 2 : (m.hasNotch ? 12 : notchlessIdleWidth)
+                base = CGSize(width: m.notchWidth + extra, height: closedHeight(m))
+            } else {
+                base = CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m))
+            }
+            guard let video else { return base }
+            let box = videoSize(video, m, compactSlots: compactSlots)
+            return CGSize(width: max(base.width, box.width + videoInset * 2), height: base.height + videoGap + box.height + videoInset)
         case .drop:
             // Basket: a wider, slightly taller target that appears while a file is being dragged anywhere.
             return CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m) + dropBandHeight)
@@ -74,8 +98,8 @@ enum Layout {
     }
 
     /// Screen-space rect of everything currently drawn (shape plus the tab pill when open).
-    static func visibleRect(_ state: NotchState, _ m: Metrics, compactSlots: Int, midX: CGFloat, top: CGFloat, content: CGFloat = contentHeight) -> CGRect {
-        var size = shapeSize(state, m, compactSlots: compactSlots, content: content)
+    static func visibleRect(_ state: NotchState, _ m: Metrics, compactSlots: Int, midX: CGFloat, top: CGFloat, content: CGFloat = contentHeight, video: VideoSpec? = nil) -> CGRect {
+        var size = shapeSize(state, m, compactSlots: compactSlots, content: content, video: video)
         if state == .expanded { size.height += pillGap + pillHeight }
         return CGRect(x: midX - size.width / 2, y: top - size.height, width: size.width, height: size.height)
     }

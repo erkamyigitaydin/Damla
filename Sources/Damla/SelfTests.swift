@@ -55,6 +55,13 @@ func runSelfTests() -> Int32 {
     check(Layout.shapeSize(.hud, notch, compactSlots: 0).width > Layout.shapeSize(.closed, notch, compactSlots: 2).width, "HUD widens beyond compact content")
     check(Layout.shapeSize(.closed, notch, compactSlots: 2).width > Layout.shapeSize(.closed, notch, compactSlots: 1).width, "Two activities widen the closed notch")
     check(Layout.shapeSize(.expanded, notch, compactSlots: 0).height == 32 + Layout.contentHeight, "Expanded panel sits under the notch")
+    let wide = Layout.VideoSpec(aspect: 16.0 / 9.0, large: false)
+    check(Layout.videoSize(wide, notch, compactSlots: 1).width == Layout.shapeSize(.closed, notch, compactSlots: 1).width - Layout.videoInset * 2,
+          "Small video is as wide as the closed notch")
+    check(Layout.shapeSize(.closed, notch, compactSlots: 1, video: wide).height > Layout.closedHeight(notch) + 100, "Video hangs under the notch")
+    check(Layout.videoSize(Layout.VideoSpec(aspect: 9.0 / 16.0, large: false), notch, compactSlots: 1).height <= 170, "Tall videos are held by height")
+    check(Layout.videoSize(Layout.VideoSpec(aspect: 16.0 / 9.0, large: true), notch, compactSlots: 1).width == Layout.panelWidth - Layout.videoInset * 2,
+          "Large video is as wide as the panel")
     check(Layout.shapeSize(.expanded, flat, compactSlots: 0).height == 12 + Layout.contentHeight, "Notchless panel uses a slim header")
     check(Layout.shapeSize(.expanded, notch, compactSlots: 0, content: Layout.tallContentHeight).height == 32 + Layout.tallContentHeight
           && Layout.windowSize(notch).height >= 32 + Layout.tallContentHeight + Layout.pillGap + Layout.pillHeight, "Lyrics panel grows down inside the window")

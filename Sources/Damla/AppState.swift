@@ -118,6 +118,7 @@ final class AppState: ObservableObject {
     let deviceBatteries = DeviceBatteryWatcher()
     let devServers = DevServerMonitor()
     let calendar = CalendarService()
+    let video = VideoNotch()
     let screenshots = ScreenshotWatcher()
     let shortcuts = ShortcutsService()
     @Published var screenshotsToShelf = UserDefaults.standard.object(forKey: "screenshotsToShelf") as? Bool ?? true {
@@ -159,7 +160,17 @@ final class AppState: ObservableObject {
         cleaning.active || (expanded && activeScreenID == screenID) ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
     }
     /// Live activities the closed notch can show (focus timer, agent, media), at most two at once.
-    var compactSlots: Int { min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil, media.hasTrack].filter { $0 }.count) }
+    /// While a video plays under the notch, the video stands for the media and the agents stay out of its way.
+    var compactSlots: Int { min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video.active, media.hasTrack && !video.active].filter { $0 }.count) }
+    /// The video under the closed notch, when one is showing.
+    var videoSpec: Layout.VideoSpec? { video.active ? Layout.VideoSpec(aspect: video.aspect, large: video.large) : nil }
+    /// Shows the playing app's video under the notch and folds the panel away so it can be seen.
+    func startVideo() {
+        guard media.hasTrack, let id = media.sourceBundleID else { return }
+        video.start(bundleID: id, title: media.title)
+        pinnedOpen = false; expanded = false
+    }
+    func stopVideo() { video.stop() }
     /// True when the closed notch has something to show beside the physical notch.
     var compactContent: Bool { compactSlots > 0 }
 
@@ -193,8 +204,19 @@ final class AppState: ObservableObject {
         }
         deviceBatteries.start()
         // The notch's size depends on the meeting countdown and the mic slot: redraw with them.
-        calendar.objectWillChange.merge(with: microphone.objectWillChange).receive(on: RunLoop.main)
+        calendar.objectWillChange.merge(with: microphone.objectWillChange, video.objectWillChange).receive(on: RunLoop.main)
             .sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        video.onProblem = { [weak self] text in self?.showNotice(text, duration: 6) }
+        // The video follows the player: another app or another video is looked up again; no track, no video.
+        media.$sourceBundleID.combineLatest(media.$title, media.$hasTrack).removeDuplicates { $0 == $1 }
+            .debounce(for: .seconds(0.8), scheduler: RunLoop.main)
+            .sink { [weak self] id, title, hasTrack in
+                guard let self else { return }
+                if hasTrack { self.video.mediaChanged(bundleID: id, title: title) } else if self.video.active { self.video.stop() }
+            }.store(in: &cancellables)
+        media.$playing.removeDuplicates().filter { $0 }.sink { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self?.video.playbackResumed() }
+        }.store(in: &cancellables)
         calendar.onStarting = { [weak self] meeting in
             self?.showDeviceHUD("calendar", meeting.title, detail: meeting.joinURL == nil ? String(localized: "1 dk sonra başlıyor")
                                                                                        : String(localized: "1 dk sonra · çentikten katıl"))

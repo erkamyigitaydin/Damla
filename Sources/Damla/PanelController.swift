@@ -236,7 +236,14 @@ final class PanelController {
 
     func visibleRect() -> NSRect {
         guard let screen else { return .zero }
-        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY, content: model.contentHeight)
+        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY,
+                                  content: model.contentHeight, video: state == .expanded ? nil : model.videoSpec)
+    }
+    /// The video's part of the closed notch (below the notch strip), in screen coordinates.
+    private func videoRect() -> NSRect? {
+        guard state == .closed || state == .hud, model.videoSpec != nil else { return nil }
+        let visible = visibleRect()
+        return NSRect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height - Layout.closedHeight(screenInfo.metrics))
     }
 
     /// Hover is checked ten times a second near the notch or while it is open, once a second otherwise: an idle
@@ -252,7 +259,7 @@ final class PanelController {
     }
     private var needsFastHover: Bool {
         state != .closed || model.expanded || model.dragActive || enteredAt != nil
-            || visibleRect().insetBy(dx: -90, dy: -60).contains(NSEvent.mouseLocation)
+            || model.video.hovering || visibleRect().insetBy(dx: -90, dy: -60).contains(NSEvent.mouseLocation)
     }
     /// Every mouse event: pass clicks through where nothing is drawn, and wake the hover check when the pointer
     /// comes near (so opening still takes the same 0.12 s).
@@ -274,7 +281,12 @@ final class PanelController {
             chooseScreen(); layout()
         }
         let inside = visibleRect().insetBy(dx: -4, dy: -4).contains(location)
-        if inside {
+        // Over the video the pointer brings up its controls instead of opening the panel; the strip above still opens it.
+        let overVideo = videoRect()?.contains(location) ?? false
+        if videoRect() != nil || model.video.hovering { model.video.setHovering(overVideo) }
+        if inside && overVideo {
+            exitedAt = nil; enteredAt = nil
+        } else if inside {
             exitedAt = nil
             if enteredAt == nil { enteredAt = now }
             if state != .expanded && !model.dragActive && model.automaticOpen && now >= suppressHoverUntil
@@ -651,6 +663,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "onboarding": model.startTour()
         case let step where step.hasPrefix("onboarding-"): model.startTour(at: Int(step.dropFirst(11)).flatMap(TourStep.init(rawValue:)) ?? .welcome)
         case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
+        case let body where body.hasPrefix("meeting:"):   // meeting:<minutes>:<link 0/1>:<title>
+            let parts = body.dropFirst(8).split(separator: ":", maxSplits: 2).map(String.init)
+            if parts.count == 3 { model.calendar.injectDemo(title: parts[2], minutes: Double(parts[0]) ?? 8, link: parts[1] == "1") }
+        case "video-on": model.startVideo()
+        case "video-off": model.stopVideo()
+        case let id where id.hasPrefix("video-app:"): model.video.start(bundleID: String(id.dropFirst(10)), title: "")
+        case "video-large": model.video.large.toggle()
         case "media-demo": model.media.injectDemoSessions()
         case "media-showcase": model.media.injectShowcase()
         case let id where id.hasPrefix("select:"): model.media.select(String(id.dropFirst(7)))
