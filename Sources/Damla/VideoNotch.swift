@@ -23,6 +23,8 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
     @Published private(set) var starting = false
     /// Why it stopped or could not start; the app shows it as a notice.
     var onProblem: ((String) -> Void)?
+    /// A one-time setup step is missing (true: the browser's JavaScript setting); the app shows the setup card.
+    var onSetupNeeded: ((Bool) -> Void)?
     /// Where the video box is drawn right now (screen points, top-left origin); nil while it is not shown
     /// (panel open, full screen), when the PiP window waits off screen.
     var dockTarget: (() -> CGRect?)?
@@ -66,16 +68,8 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
 
     func start(bundleID: String) {
         guard Self.canShow(bundleID), !starting else { return }
-        guard CGPreflightScreenCaptureAccess() else {
-            CGRequestScreenCaptureAccess()
-            onProblem?(String(localized: "Videoyu çentikte göstermek için Ekran Kaydı izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı"))
-            return
-        }
-        // Pressing the video (the gesture PiP needs) and parking the window both go through Accessibility.
-        guard AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) else {
-            onProblem?(String(localized: "Videoyu çentiğe almak için Erişilebilirlik izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik"))
-            return
-        }
+        // Pressing the video (the gesture PiP needs) and parking the window go through Accessibility.
+        guard CGPreflightScreenCaptureAccess(), AXIsProcessTrusted() else { onSetupNeeded?(false); return }
         guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first else { return }
         stop()
         let token = generation
@@ -92,7 +86,10 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
                 guard let self, token == self.generation else { return }
                 self.starting = false
                 switch result {
-                case .failure(let problem): MediaService.trace("video failed: \(problem.message)"); self.stop(); self.onProblem?(problem.message)
+                case .failure(let problem):
+                    MediaService.trace("video failed: \(problem.message)")
+                    self.stop()
+                    if let setup = problem.setup { self.onSetupNeeded?(setup == .javaScript) } else { self.onProblem?(problem.message) }
                 case .success(let pip): Task { await self.capture(pip, token: token) }
                 }
             }
@@ -144,7 +141,11 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
 
     // MARK: Entering PiP
 
-    struct Problem: Error { let message: String }
+    struct Problem: Error {
+        enum Setup { case javaScript, automation }
+        var message = ""
+        var setup: Setup?
+    }
     struct PipWindow { let id: CGWindowID; let element: AXUIElement; let frame: CGRect; let tab: String }
 
     /// Marks the playing video, presses it through Accessibility (which counts as a click, the gesture PiP needs)
@@ -197,12 +198,8 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
         MediaService.trace("video find -> \(found.value ?? "nil") error=\(found.error ?? "-") code=\(found.code.map(String.init) ?? "-")")
         guard let tab = found.value, tab.hasPrefix("tab id") else {
             let text = (found.value ?? "") + " " + (found.error ?? "")
-            if text.localizedCaseInsensitiveContains("JavaScript") {
-                return .failure(Problem(message: String(localized: "Tarayıcıda Görünüm → Geliştirici → “Apple Events’ten JavaScript’e izin ver”i aç, sonra yeniden dene.")))
-            }
-            if found.code == -1743 {
-                return .failure(Problem(message: String(localized: "Damla’nın tarayıcıyı denetlemesine izin ver: Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon")))
-            }
+            if text.localizedCaseInsensitiveContains("JavaScript") { return .failure(Problem(setup: .javaScript)) }
+            if found.code == -1743 { return .failure(Problem(setup: .automation)) }
             return .failure(Problem(message: String(localized: "Oynayan bir video bulunamadı (videonun sekmesi açık ve oynuyor olmalı).")))
         }
         let existing = Set(floatingWindows(pid: pid).map(\.id))

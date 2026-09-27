@@ -82,7 +82,7 @@ final class AppState: ObservableObject {
     @Published var muted = false
     @Published var outputs: [AudioOutput] = []
     /// What Özet shows: the player, the output list, or the volume levels.
-    enum HomePane { case player, outputs, levels, sources }
+    enum HomePane { case player, outputs, levels, sources, videoSetup }
     @Published var homePane: HomePane = .player {
         willSet { if newValue != homePane { pageDirection = newValue == .player ? -1 : 1 } }   // a pane opens forward, closes back
     }
@@ -119,6 +119,7 @@ final class AppState: ObservableObject {
     let devServers = DevServerMonitor()
     let calendar = CalendarService()
     let video = VideoNotch()
+    let videoSetup = VideoSetup()
     let screenshots = ScreenshotWatcher()
     let shortcuts = ShortcutsService()
     @Published var screenshotsToShelf = UserDefaults.standard.object(forKey: "screenshotsToShelf") as? Bool ?? true {
@@ -184,6 +185,18 @@ final class AppState: ObservableObject {
         guard let id = videoBrowser else { return }
         startVideo(bundleID: id)
     }
+    /// The ⧉ button: straight in when everything is set up, the setup card otherwise.
+    func requestVideo() {
+        guard let id = videoBrowser else { return }
+        videoSetup.use(id)
+        if videoSetup.quickReady { startVideo(bundleID: id) } else { showVideoSetup() }
+    }
+    func showVideoSetup() {
+        selectedTab = .home
+        withAnimation(Theme.quick) { homePane = .videoSetup }
+        activeScreenID = activeScreenID ?? videoScreenID
+        expanded = true
+    }
     func startVideo(bundleID: String) {
         videoScreenID = activeScreenID
         video.start(bundleID: bundleID)
@@ -225,6 +238,10 @@ final class AppState: ObservableObject {
         calendar.objectWillChange.merge(with: microphone.objectWillChange, video.objectWillChange).receive(on: RunLoop.main)
             .sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         video.onProblem = { [weak self] text in self?.showNotice(text, duration: 6) }
+        video.onSetupNeeded = { [weak self] javaScript in
+            if javaScript { self?.videoSetup.javaScriptTurnedOff() }
+            self?.showVideoSetup()
+        }
         video.$active.removeDuplicates().filter { $0 }.sink { [weak self] _ in
             self?.pinnedOpen = false; self?.expanded = false
         }.store(in: &cancellables)

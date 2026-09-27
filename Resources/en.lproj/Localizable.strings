@@ -390,3 +390,17 @@
 "Videoyu çentikten kaldır" = "Remove video from the notch";
 "Videoyu çentikte izle" = "Watch video in the notch";
 "Videoyu çentiğe almak için Erişilebilirlik izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik" = "Putting the video in the notch needs Accessibility: System Settings → Privacy & Security → Accessibility";
+"Çentikte video" = "Video in the notch";
+"Videoya dokunur, pencereyi çentiğe yerleştirir" = "Presses the video, places its window at the notch";
+"Ekran Kaydı" = "Screen Recording";
+"İzin verdiysen Damla’yı yeniden başlat" = "If you allowed it, restart Damla";
+"Yalnızca videonun penceresi yakalanır" = "Only the video’s window is captured";
+"%@ denetimi" = "Control of %@";
+"Apple Events’ten JavaScript’e izin ver" = "Allow JavaScript from Apple Events";
+"%@ · %@ menüsünde" = "%@ · in %@";
+"Görünüm → Geliştirici" = "View → Developer";
+"Damla videoyu bulup resim içinde resme almak için sekmede küçük bir komut çalıştırır. Bu ayar açıkken, %@ için denetim izni verdiğin uygulamalar sekmelerde JavaScript çalıştırabilir." = "Damla runs a small script in the tab to find the video and put it in picture in picture. While this is on, apps you allow to control %@ can run JavaScript in its tabs.";
+"%@ açık olmalı" = "%@ must be open";
+"Reddedilmiş; Ayarlar → Otomasyon’dan aç" = "Denied; turn it on in Settings → Automation";
+"Sekmedeki videoyu bulmak için" = "To find the video in the tab";
+"Erişilebilirlik" = "Accessibility";

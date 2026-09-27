@@ -606,6 +606,7 @@ struct ExpandedView: View {
                     case .outputs: OutputsView(model: model)
                     case .levels: MixerView(model: model, media: model.media, apps: model.appVolumes)
                     case .sources: SourcesView(model: model, media: model.media)
+                    case .videoSetup: VideoSetupView(model: model, setup: model.videoSetup)
                     }
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
@@ -749,7 +750,7 @@ struct HomeView: View {
                             Spacer(minLength: 6)
                             // A browser or video player: its picture can play on under the closed notch.
                             if VideoNotch.canShow(media.sourceBundleID) {
-                                Button { model.video.active ? model.stopVideo() : model.startVideo() } label: {
+                                Button { model.video.active ? model.stopVideo() : model.requestVideo() } label: {
                                     Group {
                                         if model.video.starting { ProgressView().controlSize(.mini) }
                                         else {

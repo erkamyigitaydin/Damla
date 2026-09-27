@@ -689,6 +689,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "video-on": model.startVideo()
         case "video-off": model.stopVideo()
         case "video-toggle": model.video.togglePlayback()
+        case "video-setup": model.videoSetup.use(model.videoBrowser ?? "com.google.Chrome"); model.showVideoSetup()
+        case "video-setup-halfway": model.videoSetup.debugHalfway()
         case "video-large": model.video.large.toggle()
         case "media-demo": model.media.injectDemoSessions()
         case "media-showcase": model.media.injectShowcase()
