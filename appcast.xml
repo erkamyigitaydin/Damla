@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.0</title>
+      <pubDate>Sun, 27 Sep 2026 00:07:55 +0000</pubDate>
+      <sparkle:version>13</sparkle:version>
+      <sparkle:shortVersionString>0.8.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Anlık kamera, çentikten onaylar, takvim ve çok daha akıcı bir çentik.</p><p>- Ayna: çentikte anlık fotoğraf makinesi. Nostalji, siyah beyaz ve doğal film görünümleri; 3-2-1 geri sayım; tarih damgalı, krem çerçeveli kartlar çentikten basılıp banyo olur ve Resimler/Damla&#x27;ya kaydedilir. Ana Sahne açılıp kapatılabilir.</p><p>- Ajanlar: Codex CLI izinleri de çentikten onaylanır. ⌃⌥↩ izin ver, ⌃⌥⌫ reddet; &quot;Hep izin ver&quot; Claude Code&#x27;un önerdiği kuralı kaydeder. Claude Code&#x27;un seçenekli soruları çentikten yanıtlanır.</p><p>- Claude Code&#x27;un bağlam doluluğu ve 5 saatlik/haftalık kullanımı Ajanlar sayfasında; %80 ve %95&#x27;te uyarı. Açık yerel sunucular da orada: tek tıkla aç ya da durdur.</p><p>- Takvim: sıradaki toplantıya 10 dakika kala çentikte geri sayım, bağlantısı varsa tek tıkla katıl. Görüşmede mikrofon çentikte görünür, dokununca sessize alınır.</p><p>- Kestirmeler sayfası: sabitlediğin kestirmeler tek dokunuşluk düğme olur.</p><p>- Raf: yeni ekran görüntüleri kendiliğinden rafa düşer; görselleri dönüştür, küçült, sıkıştır; PDF&#x27;leri birleştir.</p><p>- Odak: süreyi halkayı kadran gibi çevirerek, yazarak ya da kaydırarak ayarla.</p><p>- Özet: ses çıkışının adı düğmede, AirPods pili çıkış listesinde; sözü olmayan şarkıda söz düğmesi gizlenir.</p><p>- İki parmakla kaydırmak sayfa değiştirir ve parmağı takip eder; sayfalar gittiğin yönden gelir, panel kapanırken çentiğe geri çekilir.</p><p>- Fare, klavye ve AirPods için düşük pil uyarısı.</p><p>- Tanıtım artık çentiğin içinde; ayarlar sadeleşti.</p><p>- Daha az işlemci: kapalı çentik boşta saniyede 36 yerine 6 kez uyanır, açık panel ~%8,6 yerine ~%1,9 kullanır.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.8.0/Damla-0.8.0.dmg" length="6106921" type="application/octet-stream" sparkle:edSignature="RqlueI/CBtkQ3oKq1yVR2Ea+3r9UEdzb+YKPyfoMd7UmkP+RJrhCFx2f08kYPf8F6bnrvxEWdVjDLmePCeA7Dg=="/>
+    </item>
+    <item>
       <title>Damla 0.7.0</title>
       <pubDate>Thu, 24 Sep 2026 21:19:30 +0000</pubDate>
       <sparkle:version>12</sparkle:version>
