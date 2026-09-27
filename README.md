@@ -42,6 +42,7 @@ Apple Music, Spotify, Podcasts, YouTube in the browser: if it's playing, Damla s
 - **Lyrics that scroll with the song.** Tap the lyrics button and the panel stretches down into an Apple Music-style lyrics view. Tap any line to jump there.
 - **Smart handoff.** Start a video and your music pauses (or ducks). Stop the video and the music picks up where it left off.
 - **Every player, side by side.** Several apps playing? Switch between them in one tap.
+- **Watch the video in the notch.** Playing a video in Chrome, Brave, Edge or Vivaldi? One tap and it keeps playing under the notch, even with the browser in the background: pause it, make it bigger, or jump back to its tab. A one-time setup card walks you through the permissions it needs.
 - **Colors from the cover.** The whole panel picks up the tint of the album you're listening to.
 
 ### Your AI agents, at a glance
@@ -113,6 +114,7 @@ Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` an
 - No account, no server, no analytics.
 - Your shelf, clipboard history and timer live in `~/Library/Application Support/Damla/`.
 - Now-playing info is read locally from macOS.
+- Video in the notch captures only the browser's own picture-in-picture window, on your Mac; nothing is recorded or sent.
 - Only two things ever touch the network: lyrics, if you turn them on (title, artist, album and duration go to [lrclib.net](https://lrclib.net)), and the daily update check.
 
 ## Building from source

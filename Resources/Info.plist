@@ -22,21 +22,21 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.8.0</string>
+	<string>0.8.1</string>
 	<key>CFBundleVersion</key>
-	<string>13</string>
+	<string>14</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Damla, seçtiğin müzik uygulamasındaki parçayı göstermek ve oynatmayı kontrol etmek, tarayıcıdaki videoyu çentikte oynatmak için erişim ister.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Damla, uygulamaların sesini mikserde ayrı ayrı kısabilmek için uygulama sesini yakalar. Ses kaydedilmez ve hiçbir yere gönderilmez.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Damla, sıradaki toplantını çentikte göstermek ve bağlantısına tek tıkla katılmanı sağlamak için takvimini okur. Takvim bu Mac’ten çıkmaz.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Damla, Ayna’da görüntünü göstermek için kamerayı yalnızca o bölme açıkken kullanır. Hiçbir şey kaydedilmez.</string>
-	<key>NSAudioCaptureUsageDescription</key>
-	<string>Damla, uygulamaların sesini mikserde ayrı ayrı kısabilmek için uygulama sesini yakalar. Ses kaydedilmez ve hiçbir yere gönderilmez.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
