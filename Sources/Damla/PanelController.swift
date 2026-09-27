@@ -291,7 +291,8 @@ final class PanelController {
         let inside = visibleRect().insetBy(dx: -4, dy: -4).contains(location)
         // Over the video the pointer brings up its controls instead of opening the panel; the strip above still opens it.
         let overVideo = videoRect()?.contains(location) ?? false
-        if videoRect() != nil || model.video.hovering { model.video.setHovering(overVideo) }
+        // Only the screen showing the video owns its hover (the other screen's notch would keep clearing it).
+        if model.videoShown(on: id) { model.video.setHovering(overVideo) }
         if inside && overVideo {
             exitedAt = nil; enteredAt = nil
         } else if inside {
