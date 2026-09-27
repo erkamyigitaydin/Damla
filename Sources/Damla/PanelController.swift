@@ -236,12 +236,12 @@ final class PanelController {
 
     func visibleRect() -> NSRect {
         guard let screen else { return .zero }
-        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY,
-                                  content: model.contentHeight, video: state == .expanded ? nil : model.videoSpec)
+        return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots(on: id), midX: screen.frame.midX, top: topY,
+                                  content: model.contentHeight, video: state == .expanded ? nil : model.videoSpec(on: id))
     }
     /// The video's part of the closed notch (below the notch strip), in screen coordinates.
     private func videoRect() -> NSRect? {
-        guard state == .closed || state == .hud, model.videoSpec != nil else { return nil }
+        guard state == .closed || state == .hud, model.videoSpec(on: id) != nil else { return nil }
         let visible = visibleRect()
         return NSRect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height - Layout.closedHeight(screenInfo.metrics))
     }
@@ -668,7 +668,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if parts.count == 3 { model.calendar.injectDemo(title: parts[2], minutes: Double(parts[0]) ?? 8, link: parts[1] == "1") }
         case "video-on": model.startVideo()
         case "video-off": model.stopVideo()
-        case let id where id.hasPrefix("video-app:"): model.video.start(bundleID: String(id.dropFirst(10)), title: "")
+        case let id where id.hasPrefix("video-app:"): model.startVideo(bundleID: String(id.dropFirst(10)), title: "")
         case "video-large": model.video.large.toggle()
         case "media-demo": model.media.injectDemoSessions()
         case "media-showcase": model.media.injectShowcase()

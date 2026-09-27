@@ -121,8 +121,9 @@ struct DamlaView: View {
     private var state: NotchState { model.state(for: screen.id) }
     private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
-    private var video: Layout.VideoSpec? { open ? nil : model.videoSpec }
-    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: model.compactSlots, content: model.contentHeight, video: video) }
+    private var video: Layout.VideoSpec? { open ? nil : model.videoSpec(on: screen.id) }
+    private var slots: Int { model.compactSlots(on: screen.id) }
+    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: slots, content: model.contentHeight, video: video) }
     private var shape: NotchShape {
         let bottom: CGFloat = open ? 26 : state == .drop ? 24 : video.map { $0.large ? 22 : 18 } ?? 13
         return metrics.hasNotch
@@ -144,7 +145,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: model.compactSlots, dropping: dropping, metrics: metrics, content: model.contentHeight, video: video))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: slots, dropping: dropping, metrics: metrics, content: model.contentHeight, video: video))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -199,7 +200,7 @@ struct DamlaView: View {
             content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
             // Outside the state switch, so a HUD over the notch leaves the video playing under it.
             if let video, state == .closed || state == .hud {
-                VideoNotchView(model: model, video: model.video, media: media, size: Layout.videoSize(video, metrics, compactSlots: model.compactSlots))
+                VideoNotchView(model: model, video: model.video, media: media, size: Layout.videoSize(video, metrics, compactSlots: slots))
                     .padding(.top, Layout.closedHeight(metrics) + Layout.videoGap)
                     .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
             }
@@ -254,7 +255,7 @@ struct DamlaView: View {
             DropRow(metrics: metrics, targeted: dropping, count: model.files.count, dragged: model.dragURLs).transition(.blurReplace)
         case .closed:
             // The closed notch's activities come back once the panel has nearly folded away.
-            CompactRow(model: model, media: media, metrics: metrics)
+            CompactRow(model: model, media: media, metrics: metrics, screenID: screen.id)
                 .transition(.asymmetric(insertion: AnyTransition(.blurReplace).animation(.easeOut(duration: 0.24).delay(Theme.reduceMotion ? 0 : 0.16)),
                                         removal: AnyTransition(.blurReplace)))
         }
@@ -276,6 +277,7 @@ struct CompactRow: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
     let metrics: Layout.Metrics
+    var screenID: UInt32? = nil
 
     /// Up to two activities, the most urgent first: a live microphone, the timer, a meeting about to start,
     /// an agent, then media.
@@ -284,7 +286,7 @@ struct CompactRow: View {
         if model.micActive { list.append(.mic) }
         if model.session.hasStarted { list.append(.timer) }
         if model.calendar.soon != nil { list.append(.meeting) }
-        if !model.video.active {   // the video under the notch already says what is playing
+        if !(screenID.map(model.videoShown(on:)) ?? false) {   // the video under this notch already says what is playing
             if let agent = model.agentBadge { list.append(.agent(agent)) }
             if media.hasTrack { list.append(.media) }
         }

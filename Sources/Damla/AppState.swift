@@ -160,14 +160,27 @@ final class AppState: ObservableObject {
         cleaning.active || (expanded && activeScreenID == screenID) ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
     }
     /// Live activities the closed notch can show (focus timer, agent, media), at most two at once.
-    /// While a video plays under the notch, the video stands for the media and the agents stay out of its way.
-    var compactSlots: Int { min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video.active, media.hasTrack && !video.active].filter { $0 }.count) }
+    var compactSlots: Int { compactSlots(on: nil) }
+    /// On the screen showing the video, the video stands for the media and the agents stay out of its way.
+    func compactSlots(on screenID: UInt32?) -> Int {
+        let video = screenID.map(videoShown(on:)) ?? false
+        return min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video, media.hasTrack && !video].filter { $0 }.count)
+    }
     /// The video under the closed notch, when one is showing.
-    var videoSpec: Layout.VideoSpec? { video.active ? Layout.VideoSpec(aspect: video.aspect, large: video.large) : nil }
+    /// Only on the screen it was started from; the other screens keep their usual notch.
+    private(set) var videoScreenID: UInt32?
+    func videoShown(on screenID: UInt32) -> Bool { video.active && (videoScreenID == nil || videoScreenID == screenID) }
+    func videoSpec(on screenID: UInt32) -> Layout.VideoSpec? {
+        videoShown(on: screenID) ? Layout.VideoSpec(aspect: video.aspect, large: video.large) : nil
+    }
     /// Shows the playing app's video under the notch and folds the panel away so it can be seen.
     func startVideo() {
         guard media.hasTrack, let id = media.sourceBundleID else { return }
-        video.start(bundleID: id, title: media.title)
+        startVideo(bundleID: id, title: media.title)
+    }
+    func startVideo(bundleID: String, title: String) {
+        videoScreenID = activeScreenID
+        video.start(bundleID: bundleID, title: title)
         pinnedOpen = false; expanded = false
     }
     func stopVideo() { video.stop() }
