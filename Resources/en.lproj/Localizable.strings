@@ -389,3 +389,4 @@
 "Küçült" = "Shrink";
 "Videoyu çentikten kaldır" = "Remove video from the notch";
 "Videoyu çentikte izle" = "Watch video in the notch";
+"Videoyu çentiğe almak için Erişilebilirlik izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik" = "Putting the video in the notch needs Accessibility: System Settings → Privacy & Security → Accessibility";

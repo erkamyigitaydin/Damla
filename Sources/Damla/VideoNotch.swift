@@ -71,6 +71,11 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
             onProblem?(String(localized: "Videoyu çentikte göstermek için Ekran Kaydı izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı"))
             return
         }
+        // Pressing the video (the gesture PiP needs) and parking the window both go through Accessibility.
+        guard AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) else {
+            onProblem?(String(localized: "Videoyu çentiğe almak için Erişilebilirlik izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Erişilebilirlik"))
+            return
+        }
         guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first else { return }
         stop()
         let token = generation
