@@ -6,3 +6,7 @@ DerivedData/
 dist/
 __pycache__/
 *.pyc
+.impeccable/review/
+.impeccable/questions/
+.impeccable/hook.cache.json
+.impeccable/config.local.json

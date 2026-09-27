@@ -6,7 +6,8 @@
 
 <p align="center">
   <b>Your notch, finally doing something.</b><br>
-  Music, sound, files, clipboard, focus and your AI coding agents, one glance away at the top of your screen.
+  Music, sound, files, clipboard, focus and your AI coding agents, one glance away at the top of your screen.<br>
+  <a href="https://erkamyigitaydin.github.io/Damla/">erkamyigitaydin.github.io/Damla</a>
 </p>
 
 <p align="center">

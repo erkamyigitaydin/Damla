@@ -1,0 +1,38 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.34, 1.36, .5, 1)",
+        "createdAt": "2026-09-27T22:39:05.764Z",
+        "reason": "agent: Damla's native motion is spring-based (Theme.motion bounce 0.24)"
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "cubic-bezier(.2, 1.25, .4, 1)",
+        "createdAt": "2026-09-27T22:39:05.785Z",
+        "reason": "agent: instant-camera print ejects with the app's spring (bounce 0.22)"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "docs/**"
+        ],
+        "createdAt": "2026-09-27T22:39:13.813Z",
+        "reason": "agent: notch width and panel height transitions are the product mechanism the site demonstrates"
+      },
+      {
+        "rule": "buried-raster",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-09-27T22:39:13.833Z",
+        "reason": "agent: deliberate 9% noise grain over the canvas water"
+      }
+    ]
+  }
+}

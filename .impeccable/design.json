@@ -1,0 +1,477 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-27T22:44:25.505465+00:00",
+  "title": "Design System: Damla",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tray Ink",
+        "canonical": "#0a0d12",
+        "tonalRamp": [
+          "#161c27",
+          "#2b384e",
+          "#415575",
+          "#57719c",
+          "#7a90b5",
+          "#a1b1cb",
+          "#c8d1e0",
+          "#eff1f6"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Tray Ink, Step Up",
+        "canonical": "#0e131a",
+        "tonalRamp": [
+          "#151d28",
+          "#2b3a4f",
+          "#405776",
+          "#55739e",
+          "#7992b7",
+          "#a0b2cc",
+          "#c7d2e1",
+          "#eef2f6"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Sheet Underlay",
+        "canonical": "#151c26",
+        "tonalRamp": [
+          "#161d27",
+          "#2b3a4e",
+          "#415675",
+          "#56739c",
+          "#7a92b5",
+          "#a1b2cb",
+          "#c8d2e0",
+          "#eff2f6"
+        ]
+      },
+      "water-night": {
+        "role": "neutral",
+        "displayName": "Water Night",
+        "canonical": "#111a27",
+        "tonalRamp": [
+          "#131c2b",
+          "#253855",
+          "#37557f",
+          "#4a71a9",
+          "#6f90c0",
+          "#99b1d3",
+          "#c3d1e5",
+          "#edf1f7"
+        ]
+      },
+      "notch-black": {
+        "role": "neutral",
+        "displayName": "Notch Black",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#1f1f1f",
+          "#3d3d3d",
+          "#5b5b5b",
+          "#797979",
+          "#989898",
+          "#b6b6b6",
+          "#d4d4d4",
+          "#f2f2f2"
+        ]
+      },
+      "water-blue": {
+        "role": "primary",
+        "displayName": "Agent Water Blue",
+        "canonical": "#cce3ff",
+        "tonalRamp": [
+          "#001c3d",
+          "#00377a",
+          "#0052b6",
+          "#006df3",
+          "#308dff",
+          "#6dafff",
+          "#a9d0ff",
+          "#e5f1ff"
+        ]
+      },
+      "pale-white": {
+        "role": "primary",
+        "displayName": "Default White",
+        "canonical": "#f3f6fa",
+        "tonalRamp": [
+          "#121d2b",
+          "#243956",
+          "#365681",
+          "#4772ab",
+          "#6d91c2",
+          "#98b1d4",
+          "#c2d1e6",
+          "#edf2f8"
+        ]
+      },
+      "cover-coral": {
+        "role": "secondary",
+        "displayName": "Cover Coral",
+        "canonical": "#f4a18b",
+        "tonalRamp": [
+          "#381005",
+          "#6f200b",
+          "#a62f10",
+          "#de3f15",
+          "#ed6642",
+          "#f29379",
+          "#f8bfb0",
+          "#fdece8"
+        ]
+      },
+      "waiting-amber": {
+        "role": "secondary",
+        "displayName": "Waiting Amber",
+        "canonical": "#ffcc5c",
+        "tonalRamp": [
+          "#3d2a00",
+          "#7a5400",
+          "#b67d00",
+          "#f3a700",
+          "#ffbe30",
+          "#ffd16d",
+          "#ffe4a9",
+          "#fff7e5"
+        ]
+      },
+      "sea-blue": {
+        "role": "tertiary",
+        "displayName": "Sea Blue",
+        "canonical": "#8fb3e6",
+        "tonalRamp": [
+          "#0b1b32",
+          "#163663",
+          "#215195",
+          "#2c6cc6",
+          "#568cd9",
+          "#87aee4",
+          "#b9cfef",
+          "#eaf1fa"
+        ]
+      },
+      "deep-blue": {
+        "role": "tertiary",
+        "displayName": "Deep Blue",
+        "canonical": "#3a5a8a",
+        "tonalRamp": [
+          "#121c2b",
+          "#243856",
+          "#365480",
+          "#486fab",
+          "#6d8fc2",
+          "#98b0d4",
+          "#c2d1e6",
+          "#edf1f7"
+        ]
+      },
+      "abyss-blue": {
+        "role": "tertiary",
+        "displayName": "Abyss Blue",
+        "canonical": "#162236",
+        "tonalRamp": [
+          "#121b2b",
+          "#233656",
+          "#355181",
+          "#466dac",
+          "#6c8dc3",
+          "#97aed5",
+          "#c2cfe6",
+          "#edf1f8"
+        ]
+      },
+      "bone": {
+        "role": "tertiary",
+        "displayName": "Bone Paper",
+        "canonical": "#ece9e2",
+        "tonalRamp": [
+          "#252118",
+          "#4a4230",
+          "#6e6348",
+          "#938360",
+          "#ada082",
+          "#c5bca7",
+          "#ddd8cb",
+          "#f5f3f0"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "canonical": "#eceff4",
+        "tonalRamp": [
+          "#161d27",
+          "#2d394d",
+          "#435573",
+          "#59719a",
+          "#7c91b3",
+          "#a2b1c9",
+          "#c9d1df",
+          "#eff1f6"
+        ]
+      },
+      "mute": {
+        "role": "neutral",
+        "displayName": "Mute",
+        "canonical": "#a4adbb",
+        "tonalRamp": [
+          "#1a1e23",
+          "#343b46",
+          "#4e5868",
+          "#68758b",
+          "#8994a7",
+          "#abb3c0",
+          "#ced3da",
+          "#f0f2f4"
+        ]
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint",
+        "canonical": "#737e8f",
+        "tonalRamp": [
+          "#1b1e22",
+          "#363b44",
+          "#515965",
+          "#6c7687",
+          "#8c95a3",
+          "#aeb4be",
+          "#cfd3d9",
+          "#f1f2f4"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(230, 236, 245, .12)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headline and the three-line privacy statement."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Chapter, book and finale headings."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Sheet titles and small section heads."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Ledes and descriptions in the Mac system face, 44-46ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Fine print, requirements, version line."
+      },
+      "command": {
+        "displayName": "Command",
+        "purpose": "Homebrew command and inline code only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "pulled-sheet",
+        "value": "0 0 0 clamp(6px, .75vw, 11px) #ece9e2, 0 34px 50px -30px rgba(0,0,0,.95)",
+        "purpose": "Bone held edge and drop under each book sheet."
+      },
+      {
+        "name": "finale-print",
+        "value": "0 40px 70px -30px rgba(0,0,0,.9), 0 2px 0 rgba(255,255,255,.4) inset",
+        "purpose": "The large pulled print in the finale."
+      },
+      {
+        "name": "button-primary",
+        "value": "0 10px 24px -12px rgba(0,0,0,.7)",
+        "purpose": "Primary button at rest."
+      },
+      {
+        "name": "button-primary-hover",
+        "value": "0 16px 30px -14px rgba(0,0,0,.8)",
+        "purpose": "Primary button on hover, with a 1px lift."
+      },
+      {
+        "name": "panel-open",
+        "value": "0 calc(22px * var(--open)) calc(44px * var(--open)) -14px rgba(0,0,0,.7)",
+        "purpose": "Panel replica; grows with how far it has opened."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Default easing: drops blooming, chapters arriving, sheets straightening."
+      },
+      {
+        "name": "spring",
+        "value": "cubic-bezier(.34, 1.36, .5, 1)",
+        "purpose": "The notch and panel opening, and shelf tiles landing."
+      },
+      {
+        "name": "notch-open",
+        "value": "width .5s spring",
+        "purpose": "Notch nav widening and its menu unfolding."
+      },
+      {
+        "name": "chapter-change",
+        "value": "opacity .5s, transform .8s ease-out, filter .5s (blur 8px to 0)",
+        "purpose": "Stage chapters crossfading."
+      },
+      {
+        "name": "drop-bloom",
+        "value": "700ms + 4ms per px radius",
+        "purpose": "A pigment drop spreading on the water after it lands."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "all durations .001ms; drops land at full size; combs off",
+        "purpose": "Honours prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "chapters-2col",
+        "value": "1100px"
+      },
+      {
+        "name": "stack",
+        "value": "900px"
+      },
+      {
+        "name": "mobile",
+        "value": "720px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one solid action: download for Mac. White, like the app's default accent.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4v11M7 10l5 5 5-5M5 20h14\"/></svg>Download for Mac</a>",
+      "css": ":root{--ink:#0a0d12;--mint:#cce3ff;--pale:#f3f6fa;--bone:#ece9e2;--coral:#f4a18b;--amber:#ffcc5c;--text:#eceff4;--mute:#a4adbb;--line:rgba(230,236,245,.12);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.36,.5,1);--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Nunito Sans',system-ui,sans-serif;--display:'Nunito',ui-rounded,'SF Pro Rounded',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;}.ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:54px;padding:0 24px;border-radius:14px;font:650 1.02rem/1 var(--sans);letter-spacing:-.005em;text-decoration:none;background:var(--pale);color:var(--ink);box-shadow:0 10px 24px -12px rgba(0,0,0,.7);transition:transform .25s var(--ease-out),box-shadow .25s,background .2s}.ds-btn-primary:hover{background:#fff;transform:translateY(-1px);box-shadow:0 16px 30px -14px rgba(0,0,0,.8)}.ds-btn-primary:active{transform:translateY(0)}.ds-btn-primary:focus-visible{outline:2px solid var(--mint);outline-offset:3px}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Secondary actions (try the camera, save your print): bone hairline on ink.",
+      "html": "<button class=\"ds-btn-quiet\" type=\"button\">Save your print</button>",
+      "css": ":root{--ink:#0a0d12;--mint:#cce3ff;--pale:#f3f6fa;--bone:#ece9e2;--coral:#f4a18b;--amber:#ffcc5c;--text:#eceff4;--mute:#a4adbb;--line:rgba(230,236,245,.12);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.36,.5,1);--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Nunito Sans',system-ui,sans-serif;--display:'Nunito',ui-rounded,'SF Pro Rounded',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;}.ds-btn-quiet{display:inline-flex;align-items:center;height:46px;padding:0 18px;border-radius:14px;border:1px solid rgba(237,231,220,.28);background:transparent;color:var(--bone);font:650 .95rem/1 var(--sans);cursor:pointer;transition:background .2s}.ds-btn-quiet:hover{background:rgba(237,231,220,.08)}.ds-btn-quiet:focus-visible{outline:2px solid var(--mint);outline-offset:3px}"
+    },
+    {
+      "name": "Command Field",
+      "kind": "input",
+      "refersTo": "command-field",
+      "description": "The Homebrew command with a copy chip; the chip fills water blue once copied.",
+      "html": "<div class=\"ds-brew\"><code>brew install --cask erkamyigitaydin/tap/damla</code><button class=\"ds-copy\" type=\"button\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><rect x=\"8\" y=\"8\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2\"/></svg>Copy</button></div>",
+      "css": ":root{--ink:#0a0d12;--mint:#cce3ff;--pale:#f3f6fa;--bone:#ece9e2;--coral:#f4a18b;--amber:#ffcc5c;--text:#eceff4;--mute:#a4adbb;--line:rgba(230,236,245,.12);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.36,.5,1);--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Nunito Sans',system-ui,sans-serif;--display:'Nunito',ui-rounded,'SF Pro Rounded',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;}.ds-brew{display:flex;align-items:center;gap:8px;max-width:460px;padding:6px 6px 6px 16px;background:rgba(10,13,18,.86);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(6px)}.ds-brew code{flex:1;min-width:0;font:400 .82rem var(--mono);color:var(--bone);white-space:nowrap;overflow-x:auto;padding:10px 0}.ds-copy{flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:0;border-radius:10px;font:600 .85rem var(--sans);color:var(--bone);background:rgba(237,231,220,.08);cursor:pointer;transition:background .2s}.ds-copy:hover{background:rgba(237,231,220,.16)}.ds-copy:focus-visible{outline:2px solid var(--mint);outline-offset:3px}.ds-copy:active{background:var(--mint);color:var(--ink)}"
+    },
+    {
+      "name": "Notch Nav",
+      "kind": "nav",
+      "refersTo": "notch-nav",
+      "description": "The site nav is a black notch fixed at top centre, with live status on its right.",
+      "html": "<nav class=\"ds-notch\"><span class=\"ds-drop\"></span><span class=\"ds-brand\">Damla</span></nav>",
+      "css": ":root{--ink:#0a0d12;--mint:#cce3ff;--pale:#f3f6fa;--bone:#ece9e2;--coral:#f4a18b;--amber:#ffcc5c;--text:#eceff4;--mute:#a4adbb;--line:rgba(230,236,245,.12);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.36,.5,1);--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Nunito Sans',system-ui,sans-serif;--display:'Nunito',ui-rounded,'SF Pro Rounded',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;}.ds-notch{position:relative;display:flex;align-items:center;justify-content:space-between;width:196px;height:32px;padding:0 12px 0 10px;background:#000;color:#fff;border-radius:0 0 14px 14px;margin:0 auto;transition:width .5s var(--spring)}.ds-notch:hover{width:236px}.ds-notch::before,.ds-notch::after{content:'';position:absolute;top:0;width:10px;height:10px}.ds-notch::before{left:-10px;background:radial-gradient(circle at 0 100%,transparent 9.5px,#000 10px)}.ds-notch::after{right:-10px;background:radial-gradient(circle at 100% 100%,transparent 9.5px,#000 10px)}.ds-drop{width:14px;height:18px;background:var(--mint);border-radius:50% 50% 50% 50%/60% 60% 40% 40%}.ds-brand{font:800 13px/1 var(--display);color:rgba(255,255,255,.86)}"
+    },
+    {
+      "name": "Language Toggle",
+      "kind": "chip",
+      "description": "TR / EN segmented pill inside the open notch; the pressed segment is white.",
+      "html": "<div class=\"ds-lang\"><button aria-pressed=\"true\">EN</button><button aria-pressed=\"false\">TR</button></div>",
+      "css": ":root{--ink:#0a0d12;--mint:#cce3ff;--pale:#f3f6fa;--bone:#ece9e2;--coral:#f4a18b;--amber:#ffcc5c;--text:#eceff4;--mute:#a4adbb;--line:rgba(230,236,245,.12);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.36,.5,1);--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Nunito Sans',system-ui,sans-serif;--display:'Nunito',ui-rounded,'SF Pro Rounded',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;}.ds-lang{display:inline-flex;background:#000;padding:3px;border-radius:999px;box-shadow:inset 0 0 0 100px rgba(255,255,255,.1)}.ds-lang button{border:0;background:none;font:600 12px/1 -apple-system,system-ui,sans-serif;padding:6px 11px;border-radius:999px;color:rgba(255,255,255,.7);cursor:pointer}.ds-lang button:hover{color:#fff}.ds-lang button[aria-pressed=true]{background:rgba(255,255,255,.9);color:#000}.ds-lang button:focus-visible{outline:2px solid var(--mint);outline-offset:2px}"
+    },
+    {
+      "name": "Slip Note",
+      "kind": "card",
+      "refersTo": "slip-note",
+      "description": "A privacy fact attached to a chapter: dashed pigment border on translucent ink.",
+      "html": "<p class=\"ds-slip\">Damla only remembers where your files are. It never moves or changes them.</p>",
+      "css": ":root{--ink:#0a0d12;--mint:#cce3ff;--pale:#f3f6fa;--bone:#ece9e2;--coral:#f4a18b;--amber:#ffcc5c;--text:#eceff4;--mute:#a4adbb;--line:rgba(230,236,245,.12);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.36,.5,1);--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Nunito Sans',system-ui,sans-serif;--display:'Nunito',ui-rounded,'SF Pro Rounded',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;}.ds-slip{max-width:36ch;margin:0;padding:12px 14px;border-radius:12px;border:1px dashed color-mix(in oklab,var(--mint) 55%,transparent);background:rgba(10,13,18,.6);color:var(--text);font:400 .9rem/1.5 var(--sans)}"
+    },
+    {
+      "name": "Pulled Sheet",
+      "kind": "custom",
+      "description": "An ebru sheet with a bone held edge, slightly rotated; straightens on hover. Carries a feature's real UI.",
+      "html": "<figure class=\"ds-sheet\"><div class=\"ds-paper\"></div><figcaption><b>Shortcuts</b><span>Anything you made in the Shortcuts app, pinned as a one-tap button.</span><small>Taraklı</small></figcaption></figure>",
+      "css": ":root{--ink:#0a0d12;--mint:#cce3ff;--pale:#f3f6fa;--bone:#ece9e2;--coral:#f4a18b;--amber:#ffcc5c;--text:#eceff4;--mute:#a4adbb;--line:rgba(230,236,245,.12);--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.36,.5,1);--sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Nunito Sans',system-ui,sans-serif;--display:'Nunito',ui-rounded,'SF Pro Rounded',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;}.ds-sheet{margin:0;max-width:320px;font-family:var(--sans);color:var(--text)}.ds-paper{aspect-ratio:4/3;border-radius:2px;background:radial-gradient(circle at 30% 40%,#cce3ff 0 10%,#3a5a8a 10% 16%,transparent 16%),radial-gradient(circle at 70% 60%,#ece9e2 0 8%,#8fb3e6 8% 13%,transparent 13%),#162236;box-shadow:0 0 0 9px var(--bone),0 34px 50px -30px rgba(0,0,0,.95);transform:rotate(-1.2deg);transition:transform .6s var(--ease-out)}.ds-sheet:hover .ds-paper{transform:rotate(0) translateY(-4px)}.ds-sheet figcaption{margin-top:28px;display:grid;gap:8px}.ds-sheet b{font:850 1.35rem/1.15 var(--display);letter-spacing:-.015em}.ds-sheet span{color:var(--mute);font-size:.98rem}.ds-sheet small{font-size:.8rem;font-style:italic;color:#737e8f}"
+    },
+    {
+      "name": "Approval Buttons (replica)",
+      "kind": "custom",
+      "description": "Panel replica controls at the app's native size: translucent white pills, coral Allow.",
+      "html": "<div class=\"ds-ask\"><button class=\"ds-pill\">Deny</button><button class=\"ds-pill\">Always allow</button><button class=\"ds-pill ds-allow\">Allow</button></div>",
+      "css": ".ds-ask{display:inline-flex;gap:5px;padding:14px;background:#000;border-radius:0 0 22px 22px}.ds-pill{height:26px;padding:0 11px;border:0;border-radius:13px;font:600 12.5px/1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#fff;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 .75px rgba(255,255,255,.16);cursor:pointer;transition:transform .15s,filter .2s}.ds-pill:hover{filter:brightness(1.15)}.ds-pill:active{transform:scale(.94)}.ds-pill:focus-visible{outline:2px solid #cce3ff;outline-offset:2px}.ds-allow{background:#f4a18b;color:#000}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Ebru Tray",
+    "overview": "**Creative North Star: \"The Ebru Tray\"**\n\nDamla means drop, and the site is a tray of dark water. The ground is near-black cool ink, the same black as the notch it hangs from. Pigment lands on it only in two ways: once, when the page opens and a drop falls from the notch and is pulled into a tulip, and afterwards only when the visitor clicks. A drag combs what is there, and scrolling pulls slow tines through it. Everything else holds still. Calm water is the default state, and pigment is an event.\n\nThe pigments are Damla's own in-app colours, not a generic marbling palette. The agents' pale water blue leads, white is the default accent, bone is the paper, and the demo cover's coral is used sparingly. Amber means one thing, as it does in the app: something is waiting. The product appears as a faithful replica of the live panel, drawn at the app's native point size in the system font and scaled as one piece, so the page shows the real thing rather than an illustration of it.\n\nThe page reads as a sequence: the tray, a pinned stage where the panel melts out of the notch and turns its pages, a book of pulled ebru sheets for the smaller features, a quiet privacy statement, and a finale where the visitor's own marbling is pulled as a print. Liquid Glass lens effects were tried on this surface and rejected; so were automatic pours, a mint accent, and \"demo data\" disclaimers.",
+    "keyCharacteristics": [
+      "Near-black cool ink ground; calm until the visitor touches it.",
+      "Tonal blue pigments with bone paper and a sparing coral.",
+      "Rounded heavy display (Nunito 850–900) over the Mac's own system text.",
+      "The product appears as an exact-scale replica of the live panel, never a mockup.",
+      "Pulled paper sheets with bone edges, slightly rotated, carry secondary features.",
+      "The site nav is a black notch at the top centre."
+    ],
+    "rules": [
+      {
+        "name": "The Own Colours Rule",
+        "body": "Every accent on the page is a colour the app itself uses. Water blue, white, coral from the cover, amber for waiting. Nothing is imported from a generic marbling or SaaS palette, and there is no mint.",
+        "section": "colors"
+      },
+      {
+        "name": "The Amber Means Waiting Rule",
+        "body": "Amber is never decorative. If it is on screen, something is waiting for the user.",
+        "section": "colors"
+      },
+      {
+        "name": "The Calm Water Rule",
+        "body": "Backgrounds stay calm. The ground is dark tonal blues combed into slow ribbons; bright pigment covers a small share of any viewport and arrives only from the opening drop or a visitor's click.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Is For Commands Rule",
+        "body": "JetBrains Mono appears only where the visitor would type or copy something. It is never a stylistic label face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Replica Follows The App Rule",
+        "body": "Inside the panel replica and the sheet vignettes, type is the Mac system font at the app's own point sizes (for example 16.5px track titles, 12.5px buttons). The replica never adopts the site's display or body scale.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Lens Rule",
+        "body": "No Liquid Glass lens, refraction or frosted-glass cards on the site. The only blur is a light 6px backdrop behind the command field so the command stays legible over pigment.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep the ground near-black cool ink (`ink`, `ink-2`, `ink-3`) and let pigment arrive only from the opening drop or a visitor's click; a drag combs, scrolling pulls slow tines.",
+      "**Do** lead with water blue (`water-blue`) and white (`pale-white`); keep coral to cover-tinted details and a single ring in the water.",
+      "**Do** use amber (`waiting-amber`) only for waiting state.",
+      "**Do** draw product UI at the app's native point size in the system font and scale it as one piece, matching the live app.",
+      "**Do** give every sheet a bone held edge, a slight rotation and its feature's real UI.",
+      "**Do** keep JetBrains Mono for commands and code only.",
+      "**Do** honour Reduce Motion: drops land at once, combs and loops stop, the page stays fully readable."
+    ],
+    "donts": [
+      "**Don't** pour colour into the water automatically, on a timer, or on page changes.",
+      "**Don't** label the replica or its content as \"demo data\".",
+      "**Don't** use a Liquid Glass lens, refraction or frosted-glass cards.",
+      "**Don't** introduce a mint or teal site accent.",
+      "**Don't** make backgrounds busy: no bright full-field pigment, no constant motion behind copy.",
+      "**Don't** set the panel replica in Nunito or at the site's body sizes."
+    ]
+  }
+}

@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Damla · your notch, finally doing something</title>
+<meta name="description" content="Damla turns the MacBook notch into a small hub for music, sound, files, clipboard, focus and your AI coding agents. Free for macOS 26 and later.">
+<meta name="theme-color" content="#0a0d12">
+<meta name="color-scheme" content="dark">
+<link rel="icon" type="image/png" href="assets/favicon-64.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Damla · your notch, finally doing something">
+<meta property="og:description" content="Music, sound, files, clipboard, focus and your AI coding agents, one glance away at the top of your screen.">
+<meta property="og:image" content="https://erkamyigitaydin.github.io/Damla/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+<script type="module" src="assets/site.js"></script>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+
+<canvas id="tray" class="tray" aria-hidden="true"></canvas>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- The site's navigation is a notch: hover or click it and it opens. -->
+<header class="notch" id="notch" data-open="false" data-mode="brand">
+  <button class="notch-bar" id="notch-toggle" aria-expanded="false" aria-controls="notch-menu">
+    <span class="sr-only" data-i18n="menu">Menu</span>
+    <svg class="mascot mini" data-phase="idle" viewBox="-6 -4 116 108" aria-hidden="true"></svg>
+    <span class="notch-status" aria-hidden="true">
+      <span class="ns ns-brand">Damla</span>
+      <span class="ns ns-music"><i></i><i></i><i></i><i></i></span>
+      <span class="ns ns-agents">46 s</span>
+      <span class="ns ns-files">4</span>
+      <span class="ns ns-sound">75</span>
+    </span>
+  </button>
+  <nav class="notch-menu" id="notch-menu" aria-label="Site">
+    <div class="notch-menu-in">
+    <ul>
+      <li><a href="#stage" data-i18n="nav.features">Features</a></li>
+      <li><a href="#agents" data-i18n="nav.agents">Agents</a></li>
+      <li><a href="#more" data-i18n="nav.more">Small things</a></li>
+      <li><a href="#privacy" data-i18n="nav.privacy">Privacy</a></li>
+      <li><a href="#install" data-i18n="nav.install">Install</a></li>
+    </ul>
+    <div class="notch-tools">
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang="tr" aria-pressed="false">TR</button>
+      </div>
+      <a class="gh" href="https://github.com/erkamyigitaydin/Damla" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+      </a>
+    </div>
+    </div>
+  </nav>
+</header>
+
+<main id="main">
+
+<!-- 1 · The tray -->
+<section class="hero" id="top" aria-labelledby="hero-title">
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <h1 id="hero-title" data-i18n="hero.title">Your notch, finally doing something.</h1>
+      <p class="lede" data-i18n="hero.lede">Music, sound, files, clipboard, focus and your AI coding agents, one glance away at the top of your screen. Hover the notch and a panel melts out of it; move away and it slips back.</p>
+    </div>
+    <div class="install-block" id="hero-install">
+      <div class="brew">
+        <code>brew install --cask erkamyigitaydin/tap/damla</code>
+        <button type="button" class="copy" data-copy="brew install --cask erkamyigitaydin/tap/damla">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 6.5V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v7A1.5 1.5 0 0 0 5 13.5h1.5"/></svg>
+          <span data-i18n="copy">Copy</span>
+        </button>
+      </div>
+      <a class="button primary dmg-link" href="https://github.com/erkamyigitaydin/Damla/releases/latest">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16.5h12"/></svg>
+        <span data-i18n="download">Download for Mac</span>
+      </a>
+      <p class="fine"><span data-i18n="req">macOS 26 or later · Apple Silicon and Intel · Free</span> <span class="version"></span></p>
+    </div>
+  </div>
+  <p class="hint" data-i18n="hero.hint">Click the water to drop a colour. Drag to comb it.</p>
+</section>
+
+<!-- 2 · The panel melts out of the notch. Pinned while you scroll through its pages. -->
+<section class="stage" id="stage" aria-label="What Damla shows">
+  <div class="stage-pin">
+    <div class="panel-wrap">
+      <div class="panel" id="panel" data-page="music">
+        <!-- Home: now playing -->
+        <div class="page page-music" data-page="music" role="group" aria-label="Now playing">
+          <div class="np">
+            <div class="cover" aria-hidden="true"><svg class="cover-art" viewBox="0 0 100 100"></svg></div>
+            <div class="np-meta">
+              <div class="np-top">
+                <div class="np-text">
+                  <p class="np-title">Golden Hour</p>
+                  <p class="np-artist"><span class="app-badge" aria-hidden="true"><svg viewBox="0 0 16 16"><path class="fill" d="M11.5 2.2v7.6a2 2 0 1 1-1.2-1.8V4.6L6.2 5.5v5.8a2 2 0 1 1-1.2-1.8V4.1Z"/></svg></span><span class="np-by">Nova Lane</span></p>
+                </div>
+                <div class="np-icons">
+                  <button type="button" class="ghost heart" aria-pressed="false" aria-label="Favorite"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16.5s-6.5-3.9-6.5-8.4A3.6 3.6 0 0 1 10 6a3.6 3.6 0 0 1 6.5 2.1c0 4.5-6.5 8.4-6.5 8.4Z"/></svg></button>
+                  <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                </div>
+              </div>
+              <div class="bar"><span class="bar-fill"></span></div>
+              <div class="times"><span class="t-now">1:25</span><span class="meeting"><svg viewBox="0 0 20 20" aria-hidden="true"><rect class="fill" x="2" y="5.5" width="11" height="9" rx="2"/><path class="fill" d="m13.5 9 4.5-3v8l-4.5-3Z"/></svg><b data-i18n="np.in">8 min</b> · <span data-i18n="np.meeting">Design review</span></span><span class="t-left">-2:09</span></div>
+            </div>
+          </div>
+          <div class="controls">
+            <span class="glass pill" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="4" y="5" width="12" height="8" rx="1"/><path d="M2 15h16"/></svg><span data-i18n="np.speakers">Speakers</span></span>
+            <span class="glass pill" aria-hidden="true"><svg viewBox="0 0 20 20"><path class="fill" d="M3.5 8h2.6L10 5v10l-3.9-3H3.5Z"/><path d="M13 7.6a3.4 3.4 0 0 1 0 4.8"/></svg>25</span>
+            <div class="transport">
+              <button type="button" class="glass disc" data-act="prev" aria-label="Previous track"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M11.5 6.5v11L3.5 12Zm9 0v11l-8-5.5Z"/></svg></button>
+              <button type="button" class="glass disc big" data-act="play" aria-label="Pause"><svg viewBox="0 0 24 24" aria-hidden="true"><g class="i-pause fill"><rect x="7" y="5.5" width="3.6" height="13" rx="1"/><rect x="13.4" y="5.5" width="3.6" height="13" rx="1"/></g><path class="i-play fill" d="M8 5.2v13.6L19 12Z"/></svg></button>
+              <button type="button" class="glass disc" data-act="next" aria-label="Next track"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M12.5 6.5v11l8-5.5Zm-9 0v11l8-5.5Z"/></svg></button>
+            </div>
+            <button type="button" class="glass disc lyrics-btn" aria-pressed="false" aria-label="Lyrics"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 16 14h-5.5L7 17v-3H4a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 4 4.5Z"/><path d="M7.4 8.1v2.2M10.6 8.1v2.2"/></svg></button>
+          </div>
+          <ol class="lyrics" aria-label="Lyrics">
+            <li>Lights come on across the water</li>
+            <li>Every window gold for a minute</li>
+            <li>The ferry leans into the evening</li>
+            <li>And the gulls don't know it's late</li>
+            <li>Hold the rail, we're halfway over</li>
+            <li>Let the city fold behind us</li>
+            <li>Kıyıda bir ışık yanar</li>
+          </ol>
+        </div>
+
+        <!-- Agents -->
+        <div class="page page-agents" data-page="agents" data-view="list" role="group" aria-label="Agents">
+          <div class="ag-list">
+            <p class="ag-head"><span class="ag-sum" data-i18n="ag.summary">1 working · 1 waiting</span><span class="glass disc sm bell" aria-hidden="true"><svg viewBox="0 0 20 20"><path class="fill" d="M10 3a4.6 4.6 0 0 0-4.6 4.6V11L4 13.4h12L14.6 11V7.6A4.6 4.6 0 0 0 10 3Zm-1.9 11.6a1.9 1.9 0 0 0 3.8 0Z"/></svg></span></p>
+            <div class="usage" aria-label="Claude Code usage">
+              <span data-i18n="ag.5h">5 hours</span><i style="--u:.41"></i><b>41%</b>
+              <span data-i18n="ag.week">7 days</span><i style="--u:.23"></i><b>23%</b>
+            </div>
+            <div class="session waiting">
+              <div class="s-fig">
+                <svg class="mascot big" data-phase="waiting" viewBox="-6 -4 116 108" aria-hidden="true"></svg>
+                <span class="host h-editor" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m7 6-4 4 4 4M13 6l4 4-4 4"/></svg></span>
+                <span class="host h-agent" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 3v14M3 10h14M5 5l10 10M15 5 5 15"/></svg></span>
+              </div>
+              <div class="s-meta">
+                <p class="s-name">api-server <span>Claude Code</span><em class="ctx"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 10h9M4 14h6"/></svg>62%</em><em class="s-age a-api">10 sec</em></p>
+                <p class="s-state">Waiting for approval: Bash · 44 s · 12 calls</p>
+                <p class="s-tools" aria-hidden="true"><span><svg viewBox="0 0 20 20"><path d="M6 3.5h5.5L15 7v9.5H6ZM11 3.5V7h4"/></svg></span><span><svg viewBox="0 0 20 20"><path d="M5 15l1-4 7-7 3 3-7 7Z"/></svg></span><span><svg viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="11" rx="2"/><path d="M6.5 8.5 8.5 10l-2 1.5"/></svg></span></p>
+              </div>
+            </div>
+            <div class="session">
+              <div class="s-fig small"><svg class="mascot" data-phase="working" viewBox="-6 -4 116 108" aria-hidden="true"></svg></div>
+              <div class="s-meta">
+                <p class="s-name">landing-page <span>Claude Code</span><em class="ctx"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 10h9M4 14h6"/></svg>38%</em><em class="s-age a-landing">5 sec</em></p>
+                <p class="s-state muted" data-i18n="ag.editing">Editing a file · 4 min · 31 calls</p>
+              </div>
+            </div>
+          </div>
+          <div class="ag-ask">
+            <p class="ask-head"><span class="burst" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 3v14M3 10h14M5 5l10 10M15 5 5 15"/></svg></span><b>api-server</b><span class="amber" data-i18n="ag.wants">wants to run a command</span><span class="more">+1</span><em class="ask-timer">118 s</em></p>
+            <pre class="cmd"><code>npm run db:migrate -- --env staging</code></pre>
+            <p class="ask-why" data-i18n="ag.why">Run the pending database migrations on staging</p>
+            <div class="ask-foot">
+              <span class="goto"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="3"/><path d="M8 12l4.5-4.5M9 7.5h3.5V11"/></svg><span data-i18n="ag.goto">Go to Visual Studio Code</span></span>
+              <div class="ask-actions">
+                <button type="button" class="pillbtn" data-answer="always" data-i18n="ag.always">Always allow</button>
+                <button type="button" class="pillbtn" data-answer="deny" data-i18n="ag.deny">Deny</button>
+                <button type="button" class="pillbtn allow" data-answer="allow" data-i18n="ag.allow">Allow</button>
+              </div>
+            </div>
+            <p class="ask-done" role="status" aria-live="polite"></p>
+          </div>
+          <div class="ag-q">
+            <p class="ask-head"><span class="burst" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 3v14M3 10h14M5 5l10 10M15 5 5 15"/></svg></span><b>landing-page</b><span class="amber" data-i18n="ag.asks">is asking something</span><em class="ask-timer q-timer">96 s</em></p>
+            <p class="q-text" data-i18n="ag.q">Which font should the hero use?</p>
+            <div class="q-options" role="group">
+              <button type="button" class="q-opt">Funnel Display</button>
+              <button type="button" class="q-opt">SF Pro</button>
+              <button type="button" class="q-opt" data-i18n="ag.q3t">Both</button>
+            </div>
+            <p class="goto q-foot"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="3"/><path d="M8 12l4.5-4.5M9 7.5h3.5V11"/></svg><span data-i18n="ag.terminal">Answer in terminal</span></p>
+            <p class="q-done" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <!-- Shelf -->
+        <div class="page page-files" data-page="files" role="group" aria-label="File shelf">
+          <p class="sh-head"><span class="sh-count">4 items</span>
+            <span class="sh-tools" aria-hidden="true">
+              <span class="glass disc sm"><svg viewBox="0 0 20 20"><path d="M4.5 6h11M8 6V4.5h4V6M6 6l.7 10h6.6L14 6"/></svg></span>
+              <span class="glass disc sm"><svg viewBox="0 0 20 20"><path d="M10 12.5V3.5m0 0L7 6.5m3-3 3 3M6 9H5v7.5h10V9h-1"/></svg></span>
+              <span class="glass disc sm"><svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg></span>
+            </span>
+          </p>
+          <div class="shelf" id="shelf">
+            <p class="shelf-empty" data-i18n="sh.drop">Drop files here</p>
+          </div>
+        </div>
+
+        <!-- Mirror: the instant camera -->
+        <div class="page page-mirror" data-page="mirror" role="group" aria-label="Mirror, the instant camera">
+          <div class="finder" data-film="nostalgia">
+            <canvas class="finder-cv" width="320" height="320" aria-hidden="true"></canvas>
+            <video class="finder-video" playsinline muted aria-hidden="true"></video>
+            <span class="f-chip f-film" data-i18n="cam.nostalgia">Nostalgia</span>
+            <span class="f-chip f-stage on" data-i18n="cam.center">Center Stage</span>
+            <span class="f-stamp"></span>
+            <div class="f-controls">
+              <button type="button" class="glass disc sm film-btn" aria-label="Film look"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="2"/><path d="M10 3.5v4.5M16.5 10H12M10 16.5V12M3.5 10H8"/></svg></button>
+              <button type="button" class="shutter" aria-label="Take a photo"><i></i></button>
+              <button type="button" class="glass disc sm timer-btn on" aria-label="3 second countdown"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M8 7h3.2l-2 2.6a2 2 0 1 1-1.4 3.2"/></svg></button>
+            </div>
+            <span class="count" aria-hidden="true"></span>
+            <span class="flash" aria-hidden="true"></span>
+          </div>
+          <div class="pile-col">
+            <div class="pile" id="pile"><p class="pile-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="13" height="11" rx="2"/><path d="M7 4h11a2 2 0 0 1 2 2v9"/></svg><span data-i18n="cam.empty">What you shoot piles up here</span></p></div>
+            <p class="pile-folder"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5V15h14V8H9.5L8 6.5Z"/></svg><span class="pile-count" data-i18n="cam.folder">Folder</span></p>
+          </div>
+        </div>
+
+        <!-- Sound: output picker and per-app volume -->
+        <div class="page page-sound" data-page="sound" data-view="outputs" role="group" aria-label="Sound">
+          <div class="outputs">
+            <p class="pane-head"><span data-i18n="snd.output">Sound output</span><span class="glass disc sm" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M6 6l8 8M14 6l-8 8"/></svg></span></p>
+            <ul>
+              <li class="on"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="5" width="12" height="8" rx="1"/><path d="M2 15h16"/></svg><span data-i18n="snd.mbp">MacBook Pro Speakers</span><svg class="check" viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg></li>
+              <li><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4.5a2.5 2.5 0 0 0-2.5 2.5v3A2.5 2.5 0 0 0 6 12.5h.5v3M14 4.5a2.5 2.5 0 0 1 2.5 2.5v3a2.5 2.5 0 0 1-2.5 2.5h-.5v3"/></svg><span>AirPods Pro</span><small class="batt">L 80% · R 76% · <span data-i18n="snd.case">Case</span> 54%</small></li>
+              <li><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3.5" width="14" height="10" rx="1.5"/><path d="M8 17h4M10 13.5V17"/></svg><span>Studio Display</span></li>
+            </ul>
+          </div>
+          <div class="mixer">
+            <p class="pane-head"><span data-i18n="snd.volume">Volume</span><span class="glass disc sm" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M6 6l8 8M14 6l-8 8"/></svg></span></p>
+            <label><svg viewBox="0 0 20 20" aria-hidden="true"><path class="fill" d="M3.5 8h2.6L10 5v10l-3.9-3H3.5Z"/><path d="M13 7.6a3.4 3.4 0 0 1 0 4.8M15 5.6a6.2 6.2 0 0 1 0 8.8"/></svg><span data-i18n="snd.system">System</span><input type="range" min="0" max="100" value="25"><output>25</output></label>
+            <label><span class="app-badge" aria-hidden="true"><svg viewBox="0 0 16 16"><path class="fill" d="M11.5 2.2v7.6a2 2 0 1 1-1.2-1.8V4.6L6.2 5.5v5.8a2 2 0 1 1-1.2-1.8V4.1Z"/></svg></span><span>Music</span><input type="range" min="0" max="100" value="100"><output>100</output></label>
+            <label><span class="app-badge" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.2"/><circle cx="8" cy="8" r="2"/></svg></span><span>Chrome</span><input type="range" min="0" max="100" value="35"><output>35</output></label>
+          </div>
+        </div>
+      </div>
+      <div class="tabbar" aria-hidden="true">
+        <span data-tab="music"><svg viewBox="0 0 20 20"><rect x="4" y="4" width="5" height="5" rx="1.3"/><rect x="11" y="4" width="5" height="5" rx="1.3"/><rect x="4" y="11" width="5" height="5" rx="1.3"/><rect x="11" y="11" width="5" height="5" rx="1.3"/></svg></span>
+        <span data-tab="files" class="dot coral"><svg viewBox="0 0 20 20"><path d="M3 11.5 5 6h10l2 5.5V15H3ZM3 11.5h4.2l1 1.8h3.6l1-1.8H17"/></svg></span>
+        <span data-tab="clip"><svg viewBox="0 0 20 20"><rect x="4.5" y="6.5" width="8" height="10.5" rx="1.5"/><path d="M8 6.5V4.8A1.3 1.3 0 0 1 9.3 3.5h5.2a1.3 1.3 0 0 1 1.3 1.3v8.4a1.3 1.3 0 0 1-1.3 1.3h-2"/></svg></span>
+        <span data-tab="focus"><svg viewBox="0 0 20 20"><path d="M10 3.5a6.5 6.5 0 1 1-4.6 1.9"/><path d="M10 10 7 7"/></svg></span>
+        <span data-tab="mirror"><svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><circle cx="10" cy="8.6" r="2.3"/><path d="M5.8 16c.6-2.3 2.2-3.5 4.2-3.5s3.6 1.2 4.2 3.5"/></svg></span>
+        <span data-tab="shortcuts"><svg viewBox="0 0 20 20"><path d="M11 2.5 5 11h4.5L9 17.5 15 9h-4.5Z"/></svg></span>
+        <span data-tab="agents" class="dot amber"><svg viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="11" rx="2"/><path d="M6.5 8.5 8.5 10l-2 1.5M10 12h3"/></svg></span>
+        <i></i>
+        <span class="pin"><svg viewBox="0 0 20 20"><path class="fill" d="M7 3h6v1.5l-1 1V9l2.5 2.5v1h-9v-1L8 9V5.5l-1-1Z"/><path d="M10 12.5V17"/></svg></span>
+        <span><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.4"/><path d="M10 2.8v2M10 15.2v2M2.8 10h2M15.2 10h2M4.9 4.9l1.4 1.4M13.7 13.7l1.4 1.4M4.9 15.1l1.4-1.4M13.7 6.3l1.4-1.4"/></svg></span>
+      </div>
+    </div>
+
+    <div class="chapters">
+      <article class="chapter" data-chapter="music" aria-labelledby="ch-music">
+        <div class="ch-lead">
+          <h2 id="ch-music" data-i18n="music.title">Now playing, from anything.</h2>
+          <p data-i18n="music.body">Apple Music, Spotify, Podcasts, YouTube in the browser: if it's playing, Damla shows it. Cover art, progress, play and skip, and a heart for your Apple Music favorites.</p>
+        </div>
+        <ul class="ch-points">
+          <li data-i18n-html="music.p1"><b>Colors from the cover.</b> The whole panel takes the tint of the album you're hearing. Skip a track and watch it change.</li>
+          <li data-i18n-html="music.p2"><b>Lyrics that scroll with the song.</b> The panel stretches down and the words flow, Apple Music style.</li>
+          <li data-i18n-html="music.p4"><b>Video in the notch.</b> Playing something in Chrome, Brave, Edge or Vivaldi? One tap and it keeps playing under the notch, browser in the background or not.</li>
+          <li data-i18n-html="music.p3"><b>Every player, and smart handoff.</b> Switch between the apps that are playing in one tap. Start a video and your music pauses; stop it and the music comes back.</li>
+        </ul>
+      </article>
+
+      <article class="chapter" data-chapter="agents" id="agents" aria-labelledby="ch-agents">
+        <div class="ch-lead">
+          <h2 id="ch-agents" data-i18n="agents.title">Your AI agents, at a glance.</h2>
+          <p data-i18n="agents.body">Running Claude Code or Codex in the background? Damla shows every session: which project is working, which one needs you, and how long it has been waiting. When one asks for permission, the question drops out of the notch with the exact command.</p>
+        </div>
+        <ul class="ch-points">
+          <li data-i18n-html="agents.p1"><b>Allow, Deny or Always allow</b> for Claude Code and Codex CLI, without switching windows. Or <kbd>⌃⌥↩</kbd> and <kbd>⌃⌥⌫</kbd>. Try it on the panel.</li>
+          <li data-i18n-html="agents.p4"><b>Answer its questions.</b> When Claude Code asks you to pick between options, pick right in the notch.</li>
+          <li data-i18n-html="agents.p3"><b>Context and limits.</b> How full each session is, and your five-hour and weekly use, with a heads-up at 80 % and 95 %.</li>
+          <li data-i18n-html="agents.p2"><b>A droplet that acts it out.</b> It bounces while an agent works, waves when one needs you, smiles when it's done.</li>
+          <li class="slip" data-i18n-html="agents.slip">The hooks record status only: phase, tool name, timing. Your prompts, conversations and output are never read.</li>
+        </ul>
+      </article>
+
+      <article class="chapter" data-chapter="files" aria-labelledby="ch-files">
+        <div class="ch-lead">
+          <h2 id="ch-files" data-i18n="files.title">A shelf for your files.</h2>
+          <p data-i18n="files.body">Start dragging a file anywhere and the notch opens into a drop zone. Park files there, preview them with Space, drag them out into another app, or AirDrop them. New screenshots land on the shelf by themselves.</p>
+        </div>
+        <ul class="ch-points">
+          <li data-i18n-html="files.p1"><b>Convert and shrink.</b> Save an image as PNG, JPEG or HEIC, compress it, or merge the PDFs on the shelf into one.</li>
+          <li data-i18n-html="files.p2"><b>Try it here.</b> Drop a file from your Mac onto this page. It stays in your browser.</li>
+          <li class="slip" data-i18n-html="files.slip">Damla only remembers where your files are. It never moves or changes them.</li>
+        </ul>
+      </article>
+
+      <article class="chapter" data-chapter="mirror" aria-labelledby="ch-mirror">
+        <div class="ch-lead">
+          <h2 id="ch-mirror" data-i18n="mirror.title">An instant camera in the notch.</h2>
+          <p data-i18n="mirror.body">Mirror checks your hair before a call, then turns into a little instant camera: pick a film, count down 3-2-1, and a date-stamped print slides out of the notch and develops. It lands in Pictures › Damla.</p>
+        </div>
+        <ul class="ch-points">
+          <li data-i18n-html="mirror.p1"><b>Three films.</b> Nostalgia, black and white, and natural. Center Stage keeps you in frame.</li>
+          <li><button type="button" class="button quiet cam-try" data-i18n="mirror.try">Try it with your camera</button></li>
+          <li class="slip" data-i18n-html="mirror.slip">The camera runs only while this page is open. Here, the photo never leaves your browser.</li>
+        </ul>
+      </article>
+
+      <article class="chapter" data-chapter="sound" aria-labelledby="ch-sound">
+        <div class="ch-lead">
+          <h2 id="ch-sound" data-i18n="sound.title">Sound, your way.</h2>
+          <p data-i18n="sound.body">Switch outputs in one tap, see your AirPods' battery for each bud and the case, and give every app its own volume.</p>
+        </div>
+        <ul class="ch-points">
+          <li data-i18n-html="sound.p1"><b>Scroll on the notch</b> to change the volume or skip a track, and see Damla's own volume and brightness indicators instead of the system ones.</li>
+          <li data-i18n-html="sound.p2"><b>Turn it down.</b> A duck mode lowers everything at once, and your AirPods show their battery the moment they connect.</li>
+          <li class="slip" data-i18n-html="sound.slip">Per-app volume uses the System Audio Recording permission. Nothing is recorded or sent anywhere.</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · The pattern book -->
+<section class="book" id="more" aria-labelledby="book-title">
+  <div class="book-head">
+    <h2 id="book-title" data-i18n="book.title">And the small things.</h2>
+    <p data-i18n="book.lede">The quieter things Damla does, each laid on a sheet of ebru drawn live in your browser. Ebru masters name their patterns; the names are under each one.</p>
+  </div>
+  <ol class="swatches">
+    <li data-pattern="hatip" data-colors="#f4a18b,#ece9e2,#cce3ff,#1b2a40" style="--c: 1 / 8; --ar: 3 / 2; --r: -1.2deg">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 330" aria-hidden="true">
+          <div class="v-card v-tour">
+            <div class="v-illo"><svg class="mascot" data-phase="done" viewBox="-6 -4 116 108"></svg></div>
+            <div class="v-tour-text">
+              <b data-i18n="v.tour.t">Welcome to Damla</b>
+              <p data-i18n="v.tour.d">It lives in the notch. Move the pointer up there or press ⌃⌥Space.</p>
+              <div class="v-tour-foot"><span class="v-dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="v-skip" data-i18n="v.skip">Skip</span><span class="v-next" data-i18n="v.next">Next</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.tour.t">A tour inside the notch</h3><p data-i18n="b.tour.d">The first launch walks you through Damla one feature at a time, right where it lives, and asks for each permission only when it comes up.</p><small>Hatip</small></div>
+    </li>
+    <li data-pattern="battal" data-colors="#3a5a8a,#cce3ff,#ece9e2,#111a27" style="--c: 9 / 13; --ar: 4 / 5; --r: 1.6deg; --y: 60px">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 250" aria-hidden="true">
+          <div class="v-notch"><span class="v-glyph amber"><svg viewBox="0 0 20 20"><rect class="fill" x="7" y="2.5" width="6" height="10" rx="3"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"/></svg></span><span class="v-dotsgap"></span><span class="v-rt">Zoom</span></div>
+          <div class="v-hud"><span class="v-glyph red"><svg viewBox="0 0 20 20"><rect class="fill" x="7" y="2.5" width="6" height="10" rx="3"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5M3 3l14 14"/></svg></span><b data-i18n="v.muted">Microphone muted</b></div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.mic.t">Microphone in use?</h3><p data-i18n="b.mic.d">During a call the notch shows it, and one tap mutes it for every app at once.</p><small>Battal</small></div>
+    </li>
+    <li data-pattern="bulbul" data-colors="#cce3ff,#233651,#ece9e2,#3a5a8a" style="--c: 1 / 7; --ar: 4 / 3; --r: 1deg">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 300" aria-hidden="true">
+          <div class="v-card v-focus">
+            <div class="v-dial"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="arc"/><g class="ticks"></g><circle cx="60" cy="112" r="5" class="knob"/></svg><b>25:00</b></div>
+            <div class="v-focus-side">
+              <div class="v-chips"><span class="on">25</span><span>45</span><span>50</span></div>
+              <div class="v-btns"><span class="glass disc"><svg viewBox="0 0 20 20"><path d="M5 10a5 5 0 1 0 1.5-3.6M5 4v3h3"/></svg></span><span class="glass disc big"><svg viewBox="0 0 24 24"><path class="fill" d="M8 5.2v13.6L19 12Z"/></svg></span><span class="glass disc"><svg viewBox="0 0 20 20"><path d="M4 8h10v3a5 5 0 0 1-10 0ZM14 9h1.5a2 2 0 0 1 0 4H14M7 3.5v2M10 3.5v2"/></svg></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.focus.t">A focus timer you turn like a dial</h3><p data-i18n="b.focus.d">Spin the ring, type a number or scroll to set any length; the countdown sits right in the notch.</p><small>Bülbül yuvası</small></div>
+    </li>
+    <li data-pattern="tarakli" data-colors="#ece9e2,#3a5a8a,#8fb3e6,#162236" style="--c: 7 / 13; --ar: 4 / 3; --r: -.8deg; --y: 90px">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 300" aria-hidden="true">
+          <div class="v-card v-list">
+            <p class="v-hint" data-i18n="v.sc.hint">Pin the ones you use most; they become one-tap buttons here.</p>
+            <p class="v-row"><svg viewBox="0 0 20 20"><path d="M11 2.5 5 11h4.5L9 17.5 15 9h-4.5Z"/></svg><span data-i18n="v.sc.1">Resize for the web</span><svg class="v-pin on" viewBox="0 0 20 20"><path class="fill" d="M7 3h6v1.5l-1 1V9l2.5 2.5v1h-9v-1L8 9V5.5l-1-1Z"/><path d="M10 12.5V17"/></svg></p>
+            <p class="v-row"><svg viewBox="0 0 20 20"><path d="M11 2.5 5 11h4.5L9 17.5 15 9h-4.5Z"/></svg><span data-i18n="v.sc.2">Start a meeting note</span><svg class="v-pin on" viewBox="0 0 20 20"><path class="fill" d="M7 3h6v1.5l-1 1V9l2.5 2.5v1h-9v-1L8 9V5.5l-1-1Z"/><path d="M10 12.5V17"/></svg></p>
+            <p class="v-row"><svg viewBox="0 0 20 20"><path d="M11 2.5 5 11h4.5L9 17.5 15 9h-4.5Z"/></svg><span data-i18n="v.sc.3">Tidy Downloads</span><svg class="v-pin" viewBox="0 0 20 20"><path d="M7 3h6v1.5l-1 1V9l2.5 2.5v1h-9v-1L8 9V5.5l-1-1ZM10 12.5V17"/></svg></p>
+          </div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.shortcuts.t">Shortcuts</h3><p data-i18n="b.shortcuts.d">Anything you made in the Shortcuts app, pinned as a one-tap button.</p><small>Taraklı</small></div>
+    </li>
+    <li data-pattern="neftli" data-colors="#3a5a8a,#233651,#8fb3e6,#e4e9f0" style="--c: 1 / 6; --ar: 1 / 1; --r: -1.8deg">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 300" aria-hidden="true">
+          <div class="v-hud wide"><span class="v-glyph"><svg viewBox="0 0 20 20"><rect x="6" y="2.5" width="8" height="15" rx="4"/><path d="M10 2.5v4"/></svg></span><b>Magic Mouse</b><em class="red">%10</em></div>
+          <div class="v-hud wide"><span class="v-glyph"><svg viewBox="0 0 20 20"><path d="M6 4.5a2.5 2.5 0 0 0-2.5 2.5v3A2.5 2.5 0 0 0 6 12.5h.5v3M14 4.5a2.5 2.5 0 0 1 2.5 2.5v3a2.5 2.5 0 0 1-2.5 2.5h-.5v3"/></svg></span><b>AirPods Pro</b><em class="green" data-i18n="v.pods">L 80% · R 75% · Case 60%</em></div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.battery.t">Low battery warnings</h3><p data-i18n="b.battery.d">For your mouse, keyboard, trackpad and AirPods, before they die mid-sentence.</p><small>Neftli</small></div>
+    </li>
+    <li data-pattern="somaki" data-colors="#233651,#8fb3e6,#ffcc5c,#e4e9f0" style="--c: 6 / 13; --ar: 16 / 10; --r: 1.2deg; --y: 70px">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 290" aria-hidden="true">
+          <div class="v-card v-list">
+            <p class="v-hint strong" data-i18n="v.srv">Local servers · 3</p>
+            <p class="v-srv"><svg class="globe" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.2 2 2.2 12 0 14M10 3c-2.2 2-2.2 12 0 14"/></svg><span><b><code>:3000</code> landing-page</b><small>node</small></span></p>
+            <p class="v-srv hover"><svg class="globe" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.2 2 2.2 12 0 14M10 3c-2.2 2-2.2 12 0 14"/></svg><span><b><code>:5173</code> docs</b><small>vite</small></span><em data-i18n="v.stop">Stop</em></p>
+            <p class="v-srv"><svg viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="6" ry="2.5"/><path d="M4 5v10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5M4 10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5"/></svg><span><b><code>:5432</code> api-server</b><small>postgres</small></span></p>
+          </div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.servers.t">Local servers</h3><p data-i18n="b.servers.d">Every dev server and database running on your Mac, one click to open or stop.</p><small>Somaki</small></div>
+    </li>
+    <li data-pattern="gelgit" data-colors="#f4a18b,#162236,#ece9e2,#3a5a8a" style="--c: 1 / 8; --ar: 16 / 9; --r: -1deg">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 340" aria-hidden="true">
+          <div class="v-card v-clip">
+            <p class="v-search"><svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="5"/><path d="m13 13 3.5 3.5"/></svg><span data-i18n="v.search">Search</span></p>
+            <div class="v-clips">
+              <p><span>https://github.com/erkamyigitaydin/Damla</span><small><svg viewBox="0 0 20 20"><path d="M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-.8.8M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l.8-.8"/></svg><i data-i18n="v.link">Link</i></small></p>
+              <p><span data-i18n="v.clip.text">Invoice #2041 sent. Remind them on Friday.</span><small><svg viewBox="0 0 20 20"><path d="M4 6h12M4 10h12M4 14h7"/></svg><i data-i18n="v.text">Text</i></small></p>
+              <p class="color"><span>#153AA4</span><small><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/></svg><i data-i18n="v.color">Color</i></small></p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.clip.t">Clipboard history</h3><p data-i18n="b.clip.d">Search and pin what you copied. Off until you turn it on.</p><small>Gelgit</small></div>
+    </li>
+    <li data-pattern="sal" data-colors="#cce3ff,#3a5a8a,#ece9e2,#162236" style="--c: 8 / 13; --ar: 4 / 3; --r: .6deg; --y: 80px">
+      <div class="sheet"><canvas aria-hidden="true"></canvas>
+        <div class="vig" style="--w: 340" aria-hidden="true">
+          <div class="v-swipe"><svg viewBox="0 0 60 40"><path d="M20 30V12a3 3 0 0 1 6 0v10M26 22V9a3 3 0 0 1 6 0v13M32 20v-2a3 3 0 0 1 6 0v6c0 6-4 10-10 10h-2c-4 0-6-2-8-6l-4-7a2.6 2.6 0 0 1 4.4-2.8L20 22"/><path class="arrow" d="M44 8h12m-4-4 4 4-4 4M16 8H4m4-4-4 4 4 4"/></svg></div>
+          <div class="v-pill"><span class="hl"></span><span><svg viewBox="0 0 20 20"><rect x="4" y="4" width="5" height="5" rx="1.3"/><rect x="11" y="4" width="5" height="5" rx="1.3"/><rect x="4" y="11" width="5" height="5" rx="1.3"/><rect x="11" y="11" width="5" height="5" rx="1.3"/></svg></span><span><svg viewBox="0 0 20 20"><path d="M3 11.5 5 6h10l2 5.5V15H3ZM3 11.5h4.2l1 1.8h3.6l1-1.8H17"/></svg></span><span><svg viewBox="0 0 20 20"><rect x="4.5" y="6.5" width="8" height="10.5" rx="1.5"/><path d="M8 6.5V4.8A1.3 1.3 0 0 1 9.3 3.5h5.2a1.3 1.3 0 0 1 1.3 1.3v8.4a1.3 1.3 0 0 1-1.3 1.3h-2"/></svg></span><span><svg viewBox="0 0 20 20"><path d="M10 3.5a6.5 6.5 0 1 1-4.6 1.9"/><path d="M10 10 7 7"/></svg></span><span><svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="2.5"/><circle cx="10" cy="8.6" r="2.3"/><path d="M5.8 16c.6-2.3 2.2-3.5 4.2-3.5s3.6 1.2 4.2 3.5"/></svg></span><span><svg viewBox="0 0 20 20"><path d="M11 2.5 5 11h4.5L9 17.5 15 9h-4.5Z"/></svg></span><span><svg viewBox="0 0 20 20"><rect x="3" y="4.5" width="14" height="11" rx="2"/><path d="M6.5 8.5 8.5 10l-2 1.5M10 12h3"/></svg></span></div>
+        </div>
+      </div>
+      <div><h3 data-i18n="b.swipe.t">Swipe between pages</h3><p data-i18n="b.swipe.d">Two fingers on the trackpad and the page follows them; close it and the panel draws back into the notch.</p><small>Şal</small></div>
+    </li>
+  </ol>
+  <p class="also" data-i18n-html="book.also"><b>Also:</b> choose which pages the panel shows · a notch drawn into the menu bar on displays that don't have one · hides with the menu bar in full-screen apps · cleaning mode locks the keyboard for 60 seconds so you can wipe it · light on the processor, even with music and agents running · English and Turkish.</p>
+</section>
+
+<!-- 4 · Privacy -->
+<section class="privacy" id="privacy" aria-labelledby="privacy-title">
+  <h2 id="privacy-title" class="big-lines"><span data-i18n="pv.l1">No account.</span> <span data-i18n="pv.l2">No server.</span> <span data-i18n="pv.l3">No tracking.</span></h2>
+  <div class="pv-grid">
+    <div class="pv-text">
+      <p data-i18n-html="pv.body">Everything stays on your Mac. Your shelf, clipboard history and timer live in <code>~/Library/Application Support/Damla/</code>, and now-playing info is read locally from macOS.</p>
+      <p data-i18n="pv.net">Only two things ever touch the network: lyrics, if you turn them on (title, artist, album and duration go to lrclib.net), and the daily update check.</p>
+    </div>
+    <div class="pv-perms">
+      <h3 data-i18n="pv.perms">Every permission is optional</h3>
+      <dl>
+        <div><dt data-i18n="pv.auto">Automation</dt><dd data-i18n="pv.auto.d">Control Apple Music and Spotify in the background</dd></div>
+        <div><dt data-i18n="pv.ax">Accessibility</dt><dd data-i18n="pv.ax.d">Damla's own volume and brightness indicators, cleaning mode</dd></div>
+        <div><dt data-i18n="pv.audio">System audio recording</dt><dd data-i18n="pv.audio.d">Per-app volume. Nothing is recorded</dd></div>
+        <div><dt data-i18n="pv.cal">Calendars</dt><dd data-i18n="pv.cal.d">Your next meeting, once you turn it on</dd></div>
+        <div><dt data-i18n="pv.cam">Camera</dt><dd data-i18n="pv.cam.d">The Mirror page, only while it's open</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · Pull the paper -->
+<section class="finale" id="install" aria-labelledby="install-title">
+  <div class="finale-grid">
+    <figure class="sheet" id="sheet">
+      <div class="sheet-paper"><canvas id="print" width="1200" height="800" role="img" aria-label="A marbled pattern" data-i18n-aria="print.alt"></canvas></div>
+      <figcaption data-i18n="print.caption">The pattern you combed on the way down.</figcaption>
+    </figure>
+    <div class="finale-copy">
+      <h2 id="install-title" data-i18n="fin.title">Every scroll makes a different ebru. This one is yours.</h2>
+      <button type="button" class="button quiet" id="save-print">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16.5h12"/></svg>
+        <span data-i18n="print.save">Save your ebru</span>
+      </button>
+      <div class="install-block">
+        <div class="brew">
+          <code>brew install --cask erkamyigitaydin/tap/damla</code>
+          <button type="button" class="copy" data-copy="brew install --cask erkamyigitaydin/tap/damla">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13.5 6.5V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v7A1.5 1.5 0 0 0 5 13.5h1.5"/></svg>
+            <span data-i18n="copy">Copy</span>
+          </button>
+        </div>
+        <a class="button primary dmg-link" href="https://github.com/erkamyigitaydin/Damla/releases/latest">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0-4-4m4 4 4-4M4 16.5h12"/></svg>
+          <span data-i18n="download">Download for Mac</span>
+        </a>
+        <p class="fine" data-i18n="fin.signed">Signed and notarized by Apple, so it opens without warnings, and it keeps itself up to date.</p>
+      </div>
+      <div class="keys">
+        <p data-i18n-html="keys.open"><b>Open</b><span>hover the notch, click the drop in the menu bar, or <kbd>⌃</kbd><kbd>⌥</kbd><kbd>Space</kbd></span></p>
+        <p data-i18n-html="keys.close"><b>Close</b><span>move away, click the notch, or <kbd>Esc</kbd></span></p>
+        <p data-i18n-html="keys.settings"><b>Settings</b><span>the gear, the menu bar icon, or <kbd>⌘</kbd><kbd>,</kbd></span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <p class="foot-brand"><img src="assets/icon-256.png" alt="" width="28" height="28"> Damla <span class="version"></span></p>
+  <ul>
+    <li><a href="https://github.com/erkamyigitaydin/Damla">GitHub</a></li>
+    <li><a href="https://github.com/erkamyigitaydin/Damla/releases" data-i18n="foot.releases">Release notes</a></li>
+    <li><a href="https://github.com/erkamyigitaydin/Damla/issues" data-i18n="foot.issues">Report a problem</a></li>
+  </ul>
+  <p class="foot-note" data-i18n="foot.note">Made by Erkam Yiğit Aydın. The ebru on this page is drawn live in your browser; nothing is tracked.</p>
+</footer>
+
+</body>
+</html>
