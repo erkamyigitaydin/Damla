@@ -239,6 +239,14 @@ final class PanelController {
         return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots(on: id), midX: screen.frame.midX, top: topY,
                                   content: model.contentHeight, video: state == .expanded ? nil : model.videoSpec(on: id))
     }
+    /// The video box itself, in screen points with a top-left origin (Accessibility's), while it is drawn.
+    func videoBox() -> CGRect? {
+        guard let screen, !concealed, state == .closed || state == .hud, let spec = model.videoSpec(on: id) else { return nil }
+        let box = Layout.videoSize(spec, screenInfo.metrics, compactSlots: model.compactSlots(on: id))
+        let top = topY - Layout.closedHeight(screenInfo.metrics) - Layout.videoGap
+        let primaryTop = NSScreen.screens.first?.frame.maxY ?? screen.frame.maxY
+        return CGRect(x: screen.frame.midX - box.width / 2, y: primaryTop - top, width: box.width, height: box.height)
+    }
     /// The video's part of the closed notch (below the notch strip), in screen coordinates.
     private func videoRect() -> NSRect? {
         guard state == .closed || state == .hud, model.videoSpec(on: id) != nil else { return nil }
@@ -362,6 +370,10 @@ final class PanelManager {
     init(model: AppState) {
         self.model = model
         model.requestKeyFocus = { [weak self] in self?.focusController?.panel.makeKeyAndOrderFront(nil) }
+        model.video.dockTarget = { [weak self] in
+            guard let self else { return nil }
+            return self.controllers.lazy.compactMap { $0.videoBox() }.first
+        }
         model.setDialogMode = { [weak self] showing in
             self?.controllers.forEach { $0.dialogShowing = showing; $0.updateLevel() }
         }
@@ -668,7 +680,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if parts.count == 3 { model.calendar.injectDemo(title: parts[2], minutes: Double(parts[0]) ?? 8, link: parts[1] == "1") }
         case "video-on": model.startVideo()
         case "video-off": model.stopVideo()
-        case let id where id.hasPrefix("video-app:"): model.startVideo(bundleID: String(id.dropFirst(10)), title: "")
+        case "video-toggle": model.video.togglePlayback()
         case "video-large": model.video.large.toggle()
         case "media-demo": model.media.injectDemoSessions()
         case "media-showcase": model.media.injectShowcase()

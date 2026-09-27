@@ -171,17 +171,22 @@ final class AppState: ObservableObject {
     private(set) var videoScreenID: UInt32?
     func videoShown(on screenID: UInt32) -> Bool { video.active && (videoScreenID == nil || videoScreenID == screenID) }
     func videoSpec(on screenID: UInt32) -> Layout.VideoSpec? {
-        videoShown(on: screenID) ? Layout.VideoSpec(aspect: video.aspect, large: video.large) : nil
+        videoShown(on: screenID) ? Layout.VideoSpec(base: video.pipSize, large: video.large) : nil
     }
-    /// Shows the playing app's video under the notch and folds the panel away so it can be seen.
+    /// The browser to take the video from: the one playing, else the first supported one that is running.
+    var videoBrowser: String? {
+        if VideoNotch.canShow(media.sourceBundleID) { return media.sourceBundleID }
+        return NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier).first(where: VideoNotch.canShow)
+    }
+    /// Puts the browser's video under the notch of the screen it was asked from. The panel stays open while it
+    /// starts (a problem shows there as a notice) and folds away once the video is in place.
     func startVideo() {
-        guard media.hasTrack, let id = media.sourceBundleID else { return }
-        startVideo(bundleID: id, title: media.title)
+        guard let id = videoBrowser else { return }
+        startVideo(bundleID: id)
     }
-    func startVideo(bundleID: String, title: String) {
+    func startVideo(bundleID: String) {
         videoScreenID = activeScreenID
-        video.start(bundleID: bundleID, title: title)
-        pinnedOpen = false; expanded = false
+        video.start(bundleID: bundleID)
     }
     func stopVideo() { video.stop() }
     /// True when the closed notch has something to show beside the physical notch.
@@ -220,15 +225,8 @@ final class AppState: ObservableObject {
         calendar.objectWillChange.merge(with: microphone.objectWillChange, video.objectWillChange).receive(on: RunLoop.main)
             .sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         video.onProblem = { [weak self] text in self?.showNotice(text, duration: 6) }
-        // The video follows the player: another app or another video is looked up again; no track, no video.
-        media.$sourceBundleID.combineLatest(media.$title, media.$hasTrack).removeDuplicates { $0 == $1 }
-            .debounce(for: .seconds(0.8), scheduler: RunLoop.main)
-            .sink { [weak self] id, title, hasTrack in
-                guard let self else { return }
-                if hasTrack { self.video.mediaChanged(bundleID: id, title: title) } else if self.video.active { self.video.stop() }
-            }.store(in: &cancellables)
-        media.$playing.removeDuplicates().filter { $0 }.sink { [weak self] _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self?.video.playbackResumed() }
+        video.$active.removeDuplicates().filter { $0 }.sink { [weak self] _ in
+            self?.pinnedOpen = false; self?.expanded = false
         }.store(in: &cancellables)
         calendar.onStarting = { [weak self] meeting in
             self?.showDeviceHUD("calendar", meeting.title, detail: meeting.joinURL == nil ? String(localized: "1 dk sonra başlıyor")

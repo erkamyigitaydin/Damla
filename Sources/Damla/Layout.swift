@@ -51,22 +51,22 @@ enum Layout {
     /// Width of one side of the closed notch for the given number of live activities (0, 1 or 2).
     static func compactSide(slots: Int) -> CGFloat { slots >= 2 ? compactSideSplit : compactSide }
 
-    /// Video under the closed notch: its shape (width / height) and size.
+    /// Video under the closed notch: the size of the browser's picture-in-picture window it shows (which hides
+    /// behind it, so the small video is never smaller) and whether it is enlarged.
     struct VideoSpec: Equatable {
-        var aspect: CGFloat
+        var base: CGSize
         var large: Bool
     }
     static let videoInset: CGFloat = 8
     static let videoGap: CGFloat = 3
 
-    /// Small: as wide as the closed notch around it. Large: as wide as the open panel. Tall videos are held by height.
+    static let largeVideoWidth: CGFloat = 420
+    /// Small: the PiP window's own size. Large: a quarter bigger, up to the panel's width (tall videos by height).
     static func videoSize(_ spec: VideoSpec, _ m: Metrics, compactSlots: Int) -> CGSize {
-        let closed = shapeSize(.closed, m, compactSlots: compactSlots).width
-        let maxWidth = spec.large ? panelWidth - videoInset * 2 : max(closed, 200) - videoInset * 2
-        let maxHeight: CGFloat = spec.large ? 300 : 170
-        var width = maxWidth, height = width / max(spec.aspect, 0.3)
-        if height > maxHeight { height = maxHeight; width = height * spec.aspect }
-        return CGSize(width: width.rounded(), height: height.rounded())
+        let base = CGSize(width: max(spec.base.width, 120), height: max(spec.base.height, 68))
+        guard spec.large else { return CGSize(width: base.width.rounded(), height: base.height.rounded()) }
+        let scale = max(1, min(1.25, largeVideoWidth / base.width, 320 / base.height))
+        return CGSize(width: (base.width * scale).rounded(), height: (base.height * scale).rounded())
     }
 
     static func shapeSize(_ state: NotchState, _ m: Metrics, compactSlots: Int, content: CGFloat = contentHeight, video: VideoSpec? = nil) -> CGSize {
@@ -91,7 +91,7 @@ enum Layout {
     }
 
     static func windowSize(_ m: Metrics) -> CGSize {
-        let width = max(panelWidth, m.notchWidth + hudSide * 2) + margin * 2
+        let width = max(panelWidth, m.notchWidth + hudSide * 2, largeVideoWidth + videoInset * 2) + margin * 2
         // Sized for the tallest panel; the transparent rest never takes clicks (see visibleRect).
         let height = headerHeight(m) + tallContentHeight + pillGap + pillHeight + margin
         return CGSize(width: width, height: height)

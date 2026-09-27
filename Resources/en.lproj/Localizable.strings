@@ -375,3 +375,17 @@
 "Çentikte yaşar. İmleci çentiğe getir ya da ⌃⌥Space’e bas." = "It lives in the notch. Move the pointer up there or press ⌃⌥Space.";
 "Çıkışı değiştir, her uygulamanın sesini ayrı ayarla. Ses tuşlarının göstergesi de çentikte olabilir." = "Switch outputs and set each app’s volume. The volume keys’ indicator can live in the notch too.";
 "Şimdi çalan" = "Now playing";
+
+"Videoyu çentikte göstermek için Ekran Kaydı izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı" = "Showing the video in the notch needs Screen Recording: System Settings → Privacy & Security → Screen & System Audio Recording";
+"Tarayıcıda Görünüm → Geliştirici → “Apple Events’ten JavaScript’e izin ver”i aç, sonra yeniden dene." = "In the browser, turn on View → Developer → “Allow JavaScript from Apple Events”, then try again.";
+"Damla’nın tarayıcıyı denetlemesine izin ver: Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon" = "Let Damla control the browser: System Settings → Privacy & Security → Automation";
+"Oynayan bir video bulunamadı (videonun sekmesi açık ve oynuyor olmalı)." = "No playing video found (its tab must be open and playing).";
+"Videoya ulaşılamadı; tarayıcının penceresi açık olmalı." = "Couldn’t reach the video; the browser window must be open.";
+"Tarayıcı videoyu resim içinde resim moduna almadı." = "The browser didn’t put the video into picture in picture.";
+"Video penceresi yakalanamadı." = "Couldn’t capture the video window.";
+"Video yakalanamadı: %@" = "Couldn’t capture the video: %@";
+"Sekmeye dön" = "Back to tab";
+"Büyüt" = "Enlarge";
+"Küçült" = "Shrink";
+"Videoyu çentikten kaldır" = "Remove video from the notch";
+"Videoyu çentikte izle" = "Watch video in the notch";

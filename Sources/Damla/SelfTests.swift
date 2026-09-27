@@ -55,13 +55,14 @@ func runSelfTests() -> Int32 {
     check(Layout.shapeSize(.hud, notch, compactSlots: 0).width > Layout.shapeSize(.closed, notch, compactSlots: 2).width, "HUD widens beyond compact content")
     check(Layout.shapeSize(.closed, notch, compactSlots: 2).width > Layout.shapeSize(.closed, notch, compactSlots: 1).width, "Two activities widen the closed notch")
     check(Layout.shapeSize(.expanded, notch, compactSlots: 0).height == 32 + Layout.contentHeight, "Expanded panel sits under the notch")
-    let wide = Layout.VideoSpec(aspect: 16.0 / 9.0, large: false)
-    check(Layout.videoSize(wide, notch, compactSlots: 1).width == Layout.shapeSize(.closed, notch, compactSlots: 1).width - Layout.videoInset * 2,
-          "Small video is as wide as the closed notch")
-    check(Layout.shapeSize(.closed, notch, compactSlots: 1, video: wide).height > Layout.closedHeight(notch) + 100, "Video hangs under the notch")
-    check(Layout.videoSize(Layout.VideoSpec(aspect: 9.0 / 16.0, large: false), notch, compactSlots: 1).height <= 170, "Tall videos are held by height")
-    check(Layout.videoSize(Layout.VideoSpec(aspect: 16.0 / 9.0, large: true), notch, compactSlots: 1).width == Layout.panelWidth - Layout.videoInset * 2,
-          "Large video is as wide as the panel")
+    let pip = Layout.VideoSpec(base: CGSize(width: 336, height: 189), large: false)
+    check(Layout.videoSize(pip, notch, compactSlots: 0) == CGSize(width: 336, height: 189), "Small video covers the PiP window exactly")
+    check(Layout.shapeSize(.closed, notch, compactSlots: 0, video: pip).height == Layout.closedHeight(notch) + Layout.videoGap + 189 + Layout.videoInset,
+          "Video hangs under the notch")
+    let big = Layout.videoSize(Layout.VideoSpec(base: pip.base, large: true), notch, compactSlots: 0)
+    check(big.width > 336 && big.width <= Layout.largeVideoWidth && abs(big.width / big.height - 336.0 / 189.0) < 0.02, "Large video grows, keeping its shape")
+    check(Layout.shapeSize(.closed, notch, compactSlots: 0, video: Layout.VideoSpec(base: pip.base, large: true)).width
+          <= Layout.windowSize(notch).width - Layout.margin * 2, "Large video fits the window")
     check(Layout.shapeSize(.expanded, flat, compactSlots: 0).height == 12 + Layout.contentHeight, "Notchless panel uses a slim header")
     check(Layout.shapeSize(.expanded, notch, compactSlots: 0, content: Layout.tallContentHeight).height == 32 + Layout.tallContentHeight
           && Layout.windowSize(notch).height >= 32 + Layout.tallContentHeight + Layout.pillGap + Layout.pillHeight, "Lyrics panel grows down inside the window")

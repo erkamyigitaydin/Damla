@@ -748,12 +748,18 @@ struct HomeView: View {
                             Text(media.title).font(.system(size: 15, weight: .semibold)).tracking(-0.2).lineLimit(1)
                             Spacer(minLength: 6)
                             // A browser or video player: its picture can play on under the closed notch.
-                            if VideoNotch.canShow(media.sourceBundleID) && media.controllable {
+                            if VideoNotch.canShow(media.sourceBundleID) {
                                 Button { model.video.active ? model.stopVideo() : model.startVideo() } label: {
-                                    Image(systemName: model.video.active ? "pip.exit" : "pip.enter").font(.system(size: 11.5, weight: .semibold))
-                                        .foregroundStyle(model.video.active ? tint : Theme.dim).contentTransition(.symbolEffect(.replace))
-                                        .frame(width: 18, height: 18).contentShape(Rectangle())
-                                }.buttonStyle(.plain).help(model.video.active ? "Videoyu çentikten kaldır" : "Videoyu çentikte izle")
+                                    Group {
+                                        if model.video.starting { ProgressView().controlSize(.mini) }
+                                        else {
+                                            Image(systemName: model.video.active ? "pip.exit" : "pip.enter").font(.system(size: 11.5, weight: .semibold))
+                                                .foregroundStyle(model.video.active ? tint : Theme.dim)
+                                        }
+                                    }
+                                    .frame(width: 18, height: 18).contentShape(Rectangle())
+                                }.buttonStyle(.plain).disabled(model.video.starting)
+                                .help(model.video.active ? "Videoyu çentikten kaldır" : "Videoyu çentikte izle")
                             }
                             if let favorited = media.favorited {
                                 Button { media.toggleFavorite() } label: {

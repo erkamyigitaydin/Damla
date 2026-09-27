@@ -4,247 +4,219 @@ import CoreMedia
 import ScreenCaptureKit
 import SwiftUI
 
-/// The playing app's video, live under the closed notch. ScreenCaptureKit captures only the video's rectangle of
-/// that app's window (straight onto a layer, no copies through SwiftUI); where the video sits is found by motion
-/// (the part of the window that keeps changing) and pinned to the page element under it, so it follows scrolling.
-/// DRM video (Netflix, Apple TV+) comes through black: the system blanks it for every capture.
+/// The browser's video, live under the closed notch. A page only keeps drawing while its window can be seen, so a
+/// capture of the tab freezes as soon as the browser goes behind other windows. Picture-in-picture is the one
+/// surface browsers keep drawing in the background, so Damla puts the video into the browser's own PiP window,
+/// parks that window right under the notch (hidden behind the notch's video box, which is drawn on top of it), and
+/// shows a capture of just that window. Controls go to the video element through JavaScript.
+///
+/// Needs, once: Screen Recording (the capture), Automation for the browser plus its "Allow JavaScript from Apple
+/// Events" setting (finding and driving the video), Accessibility (already granted for the media keys).
 final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate {
     @Published private(set) var active = false
-    /// Width / height of what is shown.
-    @Published private(set) var aspect: CGFloat = 16.0 / 9.0
+    /// Size of the browser's PiP window: the small video matches it, since the window hides behind it.
+    @Published private(set) var pipSize = CGSize(width: 336, height: 189)
     @Published var large = UserDefaults.standard.bool(forKey: "videoNotchLarge") {
-        didSet { UserDefaults.standard.set(large, forKey: "videoNotchLarge"); if large != oldValue { configureOutput() } }
+        didSet { UserDefaults.standard.set(large, forKey: "videoNotchLarge") }
     }
     @Published private(set) var hovering = false
+    @Published private(set) var starting = false
     /// Why it stopped or could not start; the app shows it as a notice.
     var onProblem: ((String) -> Void)?
+    /// Where the video box is drawn right now (screen points, top-left origin); nil while it is not shown
+    /// (panel open, full screen), when the PiP window waits off screen.
+    var dockTarget: (() -> CGRect?)?
 
-    /// Apps that never have a picture to show.
-    static let audioOnly: Set<String> = ["com.apple.Music", "com.spotify.client", "com.apple.podcasts", "com.apple.iTunes"]
-    static func canShow(_ bundleID: String?) -> Bool { bundleID.map { !audioOnly.contains($0) } ?? false }
+    /// Chromium browsers that take `execute javascript` over Apple Events.
+    static let browsers: Set<String> = ["com.google.Chrome", "com.google.Chrome.beta", "com.google.Chrome.canary", "com.brave.Browser",
+                                        "com.microsoft.edgemac", "com.vivaldi.Vivaldi", "org.chromium.Chromium"]
+    static func canShow(_ bundleID: String?) -> Bool { bundleID.map(browsers.contains) ?? false }
 
     private let layers = NSHashTable<CALayer>.weakObjects()
-    private var lastSurface: IOSurface?
     private var stream: SCStream?
-    private var window: SCWindow?
     private var bundleID: String?
-    private var mediaTitle = ""
-    /// Where the video is, in the window's own points (top-left origin).
-    private var source: CGRect?
-    /// The page element the video sits in, and the video's place inside it (0…1), so scrolling moves the crop.
-    private var element: AXUIElement?
-    private var inner = CGRect(x: 0, y: 0, width: 1, height: 1)
-    private var trackTimer: Timer?
-    /// The app we asked to build its page tree; told to stop again when the video goes.
-    private var treePID: pid_t?
-    private let axQueue = DispatchQueue(label: "damla.video.ax", qos: .userInitiated)
-    private let frameQueue = DispatchQueue(label: "damla.video.frames", qos: .userInteractive)
-    // Motion probe (frameQueue only).
-    private var probing = false
-    private var probeGrids: [[Float]] = []
-    private var probeColumns = 0
+    private var pid: pid_t = 0
+    /// "tab id X of window id Y" of the tab whose video is in PiP.
+    private var tabRef: String?
+    private var pipWindowID: CGWindowID = 0
+    private var pipElement: AXUIElement?
+    private var dockTimer: Timer?
+    private var treeRequested = false
     private var generation = 0
+    private let scriptQueue = DispatchQueue(label: "damla.video.script", qos: .userInitiated)
+    private let frameQueue = DispatchQueue(label: "damla.video.frames", qos: .userInteractive)
 
     // MARK: Public
 
-    func attach(_ layer: CALayer) {
-        layers.add(layer)
-        if let lastSurface { layer.contents = lastSurface }
-    }
-
+    func attach(_ layer: CALayer) { layers.add(layer) }
     func setHovering(_ value: Bool) { if hovering != value { hovering = value } }
 
-    /// Starts on the given app's window, asking for Screen Recording access the first time.
-    func start(bundleID: String, title: String) {
-        guard Self.canShow(bundleID) else { return }
-        MediaService.trace("video start \(bundleID) preflight=\(CGPreflightScreenCaptureAccess())")
+    func start(bundleID: String) {
+        guard Self.canShow(bundleID), !starting else { return }
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
             onProblem?(String(localized: "Videoyu çentikte göstermek için Ekran Kaydı izni gerekiyor: Sistem Ayarları → Gizlilik ve Güvenlik → Ekran ve Sistem Sesi Kaydı"))
             return
         }
+        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first else { return }
+        stop()
+        let token = generation
         self.bundleID = bundleID
-        mediaTitle = title
-        Task { await self.open() }
-    }
-
-    func stop() {
-        generation += 1
-        trackTimer?.invalidate(); trackTimer = nil
-        let old = stream
-        stream = nil; window = nil; element = nil; source = nil; bundleID = nil
-        if let pid = treePID {
-            treePID = nil
-            AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), "AXManualAccessibility" as CFString, kCFBooleanFalse)
-        }
-        frameQueue.async { self.probing = false; self.probeGrids = [] }
-        Task { try? await old?.stopCapture() }
-        lastSurface = nil
-        for layer in layers.allObjects { layer.contents = nil }
-        if active { active = false }
-        if hovering { hovering = false }
-    }
-
-    /// The player moved on: another app (follow it, or stop when it has no picture) or another video (find it again).
-    func mediaChanged(bundleID: String?, title: String) {
-        guard active || stream != nil else { return }
-        if bundleID != self.bundleID {
-            guard let bundleID, Self.canShow(bundleID) else { stop(); return }
-            stop(); start(bundleID: bundleID, title: title)
-        } else if title != mediaTitle {
-            mediaTitle = title
-            probe()
-        }
-    }
-
-    /// Playback resumed: a video that was paused while we looked for it can be found now.
-    func playbackResumed() { if active && element == nil { probe() } }
-
-    // MARK: Window and stream
-
-    @MainActor private func open() async {
-        let token = generation
-        guard let bundleID, let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true) else {
-            onProblem?(String(localized: "Ekran Kaydı izni verilmemiş; izin verdikten sonra Damla’yı yeniden başlat."))
-            return
-        }
-        guard token == generation else { return }
-        let candidates = content.windows.filter {
-            $0.owningApplication?.bundleIdentifier == bundleID && $0.windowLayer == 0 && $0.frame.width > 200 && $0.frame.height > 120
-        }
-        // The tab playing the video names the window (Chrome, Safari); otherwise the largest window.
-        let key = Self.normalized(mediaTitle).prefix(24)
-        let chosen = candidates.first { !key.isEmpty && Self.normalized($0.title ?? "").contains(key) }
-            ?? candidates.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
-        guard let chosen else {
-            onProblem?(String(localized: "Videonun penceresi görünmüyor (küçültülmüş ya da başka bir masaüstünde)."))
-            return
-        }
-        window = chosen
-        MediaService.trace("video window \(chosen.title ?? "-") \(chosen.frame) of \(candidates.count)")
-        let config = SCStreamConfiguration()
-        Self.baseConfig(config)
-        Self.probeSize(config, window: chosen.frame.size)
-        let stream = SCStream(filter: SCContentFilter(desktopIndependentWindow: chosen), configuration: config, delegate: self)
-        do {
-            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: frameQueue)
-            try await stream.startCapture()
-        } catch {
-            MediaService.trace("video capture error \(error)")
-            onProblem?(String(localized: "Video yakalanamadı: \(error.localizedDescription)"))
-            return
-        }
-        guard token == generation else { try? await stream.stopCapture(); return }
-        self.stream = stream
-        // Chrome and Electron build their page tree for assistive apps only when asked.
-        if let pid = chosen.owningApplication?.processID {
-            let app = AXUIElementCreateApplication(pid)
-            if AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue) == .success { treePID = pid }
-        }
-        probe()
-        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in self?.track() }
-        timer.tolerance = 0.1
-        RunLoop.main.add(timer, forMode: .common)
-        trackTimer = timer
-    }
-
-    /// Watches the whole window at low resolution for a moment; what changes is the video.
-    private func probe() {
-        guard let stream, let window else { return }
-        element = nil
-        let config = SCStreamConfiguration()
-        Self.baseConfig(config)
-        config.minimumFrameInterval = CMTime(value: 1, timescale: 15)
-        Self.probeSize(config, window: window.frame.size)
-        let token = generation
-        frameQueue.async { self.probeGrids = []; self.probing = true }
-        stream.updateConfiguration(config) { _ in }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { [weak self] in
-            guard let self, token == self.generation else { return }
-            self.frameQueue.async {
-                let grids = self.probeGrids, columns = self.probeColumns
-                self.probing = false; self.probeGrids = []
-                let motion = Self.motionRect(grids, columns: columns)
-                DispatchQueue.main.async { self.located(motion: motion, token: token) }
-            }
-        }
-    }
-
-    /// Motion found (normalized to the window) or not: pin it to a page element, then crop to it.
-    private func located(motion: CGRect?, token: Int) {
-        guard token == generation, let window else { return }
-        MediaService.trace("video motion \(motion.map { "\($0)" } ?? "none")")
-        let size = window.frame.size
-        guard let motion else {
-            // Nothing moved (paused, or a still frame): the whole window until playback resumes.
-            setSource(CGRect(origin: .zero, size: size))
-            return
-        }
-        let rect = CGRect(x: motion.minX * size.width, y: motion.minY * size.height, width: motion.width * size.width, height: motion.height * size.height)
-        setSource(rect)
-        let screenRect = rect.offsetBy(dx: window.frame.minX, dy: window.frame.minY)
-        guard let pid = window.owningApplication?.processID else { return }
-        axQueue.async { [weak self] in
-            guard let found = Self.element(around: screenRect, pid: pid) else { return }
-            let frame = found.frame
-            // Snap to the element's edges where the motion nearly reaches them; keep letterbox bars out otherwise.
-            var inside = CGRect(x: (screenRect.minX - frame.minX) / frame.width, y: (screenRect.minY - frame.minY) / frame.height,
-                                width: screenRect.width / frame.width, height: screenRect.height / frame.height)
-            if inside.width > 0.84 { inside.origin.x = 0; inside.size.width = 1 }
-            if inside.height > 0.84 { inside.origin.y = 0; inside.size.height = 1 }
+        pid = app.processIdentifier
+        starting = true
+        // Chrome builds its page tree for assistive apps only when asked; ask now, it takes a moment.
+        let axApp = AXUIElementCreateApplication(pid)
+        if AXUIElementSetAttributeValue(axApp, "AXManualAccessibility" as CFString, kCFBooleanTrue) == .success { treeRequested = true }
+        let pid = self.pid
+        scriptQueue.async { [weak self] in
+            let result = Self.enterPictureInPicture(bundleID: bundleID, pid: pid, axApp: axApp)
             DispatchQueue.main.async {
                 guard let self, token == self.generation else { return }
-                MediaService.trace("video element \(found.frame) inner \(inside)")
-                self.element = found.element
-                self.inner = inside
-                self.track()
-            }
-        }
-    }
-
-    /// Follows the element as the page scrolls or the window resizes.
-    private func track() {
-        guard let element, let windowID = window?.windowID else { return }
-        let inner = self.inner, token = generation
-        axQueue.async { [weak self] in
-            let frame = Self.frame(of: element)
-            let bounds = Self.windowBounds(windowID)
-            DispatchQueue.main.async {
-                guard let self, token == self.generation else { return }
-                guard let frame, frame.width > 20, let bounds else { self.element = nil; self.probe(); return }
-                let video = CGRect(x: frame.minX + inner.minX * frame.width, y: frame.minY + inner.minY * frame.height,
-                                   width: inner.width * frame.width, height: inner.height * frame.height)
-                let local = video.offsetBy(dx: -bounds.minX, dy: -bounds.minY)
-                    .intersection(CGRect(origin: .zero, size: bounds.size))
-                guard !local.isNull, local.width > 40, local.height > 30 else { return }   // scrolled away: keep the last frame
-                if self.source.map({ abs($0.minX - local.minX) + abs($0.minY - local.minY) + abs($0.width - local.width) + abs($0.height - local.height) > 1 }) ?? true {
-                    self.setSource(local)
+                self.starting = false
+                switch result {
+                case .failure(let problem): MediaService.trace("video failed: \(problem.message)"); self.stop(); self.onProblem?(problem.message)
+                case .success(let pip): Task { await self.capture(pip, token: token) }
                 }
             }
         }
     }
 
-    private func setSource(_ rect: CGRect) {
-        source = rect.integral
-        let ratio = max(0.5, min(2.6, rect.width / max(rect.height, 1)))
-        if abs(ratio - aspect) > 0.01 { aspect = ratio }
-        configureOutput()
-        if !active { active = true }
+    func stop() {
+        generation += 1
+        dockTimer?.invalidate(); dockTimer = nil
+        let old = stream
+        stream = nil
+        Task { try? await old?.stopCapture() }
+        if let tabRef, let bundleID { runJavaScript("document.pictureInPictureElement && document.exitPictureInPicture(); 1", tab: tabRef, bundleID: bundleID) }
+        if treeRequested {
+            AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), "AXManualAccessibility" as CFString, kCFBooleanFalse)
+            treeRequested = false
+        }
+        tabRef = nil; bundleID = nil; pipElement = nil; pipWindowID = 0
+        for layer in layers.allObjects { layer.contents = nil }
+        if active { active = false }
+        if hovering { hovering = false }
+        if starting { starting = false }
     }
 
-    private func configureOutput() {
-        guard let stream, let source else { return }
+    func togglePlayback() {
+        guard let tabRef, let bundleID else { return }
+        runJavaScript("(()=>{const v=document.pictureInPictureElement; if(!v) return 0; if(v.paused) v.play(); else v.pause(); return 1})()", tab: tabRef, bundleID: bundleID)
+    }
+
+    /// Back to the tab: the video leaves PiP and the browser comes forward on it.
+    func showTab() {
+        guard let tabRef, let bundleID else { return }
+        let window = tabRef.components(separatedBy: " of ").last ?? ""
+        stop()
+        scriptQueue.async {
+            _ = Self.appleScript("""
+            tell application id "\(bundleID)"
+                set index of \(window) to 1
+                activate
+            end tell
+            """)
+        }
+    }
+
+    // MARK: Entering PiP
+
+    struct Problem: Error { let message: String }
+    struct PipWindow { let id: CGWindowID; let element: AXUIElement; let frame: CGRect; let tab: String }
+
+    /// Marks the playing video, presses it through Accessibility (which counts as a click, the gesture PiP needs)
+    /// and waits for the PiP window. Runs off the main thread: Apple Events and the page tree can take a moment.
+    private static func enterPictureInPicture(bundleID: String, pid: pid_t, axApp: AXUIElement) -> Result<PipWindow, Problem> {
+        let mark = """
+        (()=>{const vs=[...document.querySelectorAll('video')].filter(v=>!v.paused&&v.readyState>=2&&v.videoWidth>0);
+        if(!vs.length) return 'none';
+        const v=vs.sort((a,b)=>b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight)[0];
+        document.querySelectorAll('.damla-pip').forEach(e=>e.classList.remove('damla-pip'));
+        v.classList.add('damla-pip');
+        const arm=e=>{if(e.target!==v) return; e.stopImmediatePropagation(); e.preventDefault();
+        window.removeEventListener('click',arm,true); v.requestPictureInPicture().catch(()=>{});};
+        window.addEventListener('click',arm,true); return 'ok';})()
+        """
+        let js = escaped(mark)
+        // Active tabs first; a video in a background tab is brought to the front of its window, since only the
+        // front tab of a window is in the page tree.
+        let find = """
+        tell application id "\(bundleID)"
+            set lastError to ""
+            repeat with w in windows
+                try
+                    set t to active tab of w
+                    if (execute t javascript "\(js)") is "ok" then return "tab id " & (id of t) & " of window id " & (id of w)
+                on error message
+                    set lastError to message
+                end try
+            end repeat
+            repeat with w in windows
+                set i to 0
+                repeat with t in tabs of w
+                    set i to i + 1
+                    try
+                        if (execute t javascript "\(js)") is "ok" then
+                            set active tab index of w to i
+                            return "tab id " & (id of t) & " of window id " & (id of w)
+                        end if
+                    on error message
+                        set lastError to message
+                    end try
+                end repeat
+            end repeat
+            return "none:" & lastError
+        end tell
+        """
+        let found = appleScript(find)
+        MediaService.trace("video find -> \(found.value ?? "nil") error=\(found.error ?? "-") code=\(found.code.map(String.init) ?? "-")")
+        guard let tab = found.value, tab.hasPrefix("tab id") else {
+            let text = (found.value ?? "") + " " + (found.error ?? "")
+            if text.localizedCaseInsensitiveContains("JavaScript") {
+                return .failure(Problem(message: String(localized: "Tarayıcıda Görünüm → Geliştirici → “Apple Events’ten JavaScript’e izin ver”i aç, sonra yeniden dene.")))
+            }
+            if found.code == -1743 {
+                return .failure(Problem(message: String(localized: "Damla’nın tarayıcıyı denetlemesine izin ver: Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon")))
+            }
+            return .failure(Problem(message: String(localized: "Oynayan bir video bulunamadı (videonun sekmesi açık ve oynuyor olmalı).")))
+        }
+        let existing = Set(floatingWindows(pid: pid).map(\.id))
+        // The page tree fills in over a second or so after it is first asked for.
+        var element: AXUIElement?
+        for _ in 0..<8 {
+            element = findElement(in: axApp, domClass: "damla-pip")
+            if element != nil { break }
+            Thread.sleep(forTimeInterval: 0.35)
+        }
+        MediaService.trace("video element \(element == nil ? "missing" : "found")")
+        guard let element, AXUIElementPerformAction(element, kAXPressAction as CFString) == .success else {
+            return .failure(Problem(message: String(localized: "Videoya ulaşılamadı; tarayıcının penceresi açık olmalı.")))
+        }
+        for _ in 0..<15 {
+            Thread.sleep(forTimeInterval: 0.2)
+            let windows = floatingWindows(pid: pid)
+            guard let window = windows.first(where: { !existing.contains($0.id) }) ?? windows.first,
+                  let axWindow = axWindow(in: axApp, matching: window.frame) else { continue }
+            return .success(PipWindow(id: window.id, element: axWindow, frame: window.frame, tab: tab))
+        }
+        return .failure(Problem(message: String(localized: "Tarayıcı videoyu resim içinde resim moduna almadı.")))
+    }
+
+    // MARK: Capture and docking
+
+    @MainActor private func capture(_ pip: PipWindow, token: Int) async {
+        MediaService.trace("video pip window \(pip.id) \(pip.frame) tab \(pip.tab)")
+        tabRef = pip.tab
+        pipElement = pip.element
+        pipWindowID = pip.id
+        pipSize = pip.frame.size
+        active = true   // the notch grows its video box now, so the window has somewhere to hide
+        dock()
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false),
+              let window = content.windows.first(where: { $0.windowID == pip.id }) else {
+            stop(); onProblem?(String(localized: "Video penceresi yakalanamadı.")); return
+        }
         let config = SCStreamConfiguration()
-        Self.baseConfig(config)
-        config.sourceRect = source
-        // Retina pixels for the drawn size; the larger size gets more.
-        let width = large ? 800.0 : 580.0
-        config.width = Int(width)
-        config.height = Int((width / max(0.5, source.width / max(source.height, 1))).rounded())
-        stream.updateConfiguration(config) { _ in }
-    }
-
-    private static func baseConfig(_ config: SCStreamConfiguration) {
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.showsCursor = false
         config.capturesAudio = false
@@ -252,31 +224,55 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
         config.ignoreShadowsSingleWindow = true
         config.shouldBeOpaque = true
         config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        // The window's own pixels: the layer scales them to the drawn size (a capture larger than the window is not
+        // scaled up, it comes back padded).
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        config.width = Int((pip.frame.width * CGFloat(filter.pointPixelScale)).rounded())
+        config.height = Int((pip.frame.height * CGFloat(filter.pointPixelScale)).rounded())
+        let stream = SCStream(filter: filter, configuration: config, delegate: self)
+        do {
+            try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: frameQueue)
+            try await stream.startCapture()
+        } catch {
+            stop(); onProblem?(String(localized: "Video yakalanamadı: \(error.localizedDescription)")); return
+        }
+        guard token == generation else { try? await stream.stopCapture(); return }
+        self.stream = stream
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in self?.dock() }
+        timer.tolerance = 0.05
+        RunLoop.main.add(timer, forMode: .common)
+        dockTimer = timer
     }
 
-    private static func probeSize(_ config: SCStreamConfiguration, window: CGSize) {
-        // About 4 points per pixel on a big window: cells fine enough to find the video's edges.
-        let width = min(720, max(320, Int(window.width / 4)))
-        config.width = width
-        config.height = max(40, Int(CGFloat(width) * window.height / max(window.width, 1)))
-        config.sourceRect = CGRect(origin: .zero, size: window)
+    /// Keeps the PiP window behind the notch's video box, or off screen while the box is not drawn. A window
+    /// fully off screen stops being drawn, which is fine then: nothing shows it.
+    private func dock() {
+        guard let element = pipElement else { return }
+        guard Self.windowExists(pipWindowID) else { stop(); return }   // PiP closed from the page, or the tab went away
+        guard let frame = Self.frame(of: element) else { return }
+        if frame.width > 50, abs(frame.width - pipSize.width) > 1 || abs(frame.height - pipSize.height) > 1 { pipSize = frame.size }
+        let target: CGPoint
+        if let box = dockTarget?() {
+            target = CGPoint(x: (box.midX - frame.width / 2).rounded(), y: (box.midY - frame.height / 2).rounded())
+        } else {
+            let left = NSScreen.screens.map(\.frame.minX).min() ?? 0
+            target = CGPoint(x: left - frame.width - 4000, y: 200)
+        }
+        // The system keeps windows below the menu bar, so a few points off at the top are expected; the notch's
+        // rim covers them.
+        guard abs(frame.minX - target.x) > 2 || abs(frame.minY - target.y) > 8 else { return }
+        var point = target
+        if let value = AXValueCreate(.cgPoint, &point) { AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, value) }
     }
-
-    // MARK: Frames
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen, sampleBuffer.isValid,
               let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
               let raw = attachments.first?[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete,
-              let pixels = sampleBuffer.imageBuffer else { return }
-        if probing {
-            if let grid = Self.grid(pixels) { probeColumns = grid.columns; probeGrids.append(grid.cells) }
-            return
-        }
-        guard let surface = CVPixelBufferGetIOSurface(pixels)?.takeUnretainedValue() else { return }
+              let pixels = sampleBuffer.imageBuffer,
+              let surface = CVPixelBufferGetIOSurface(pixels)?.takeUnretainedValue() else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, self.stream === stream else { return }
-            self.lastSurface = surface
             CATransaction.begin(); CATransaction.setDisableActions(true)
             for layer in self.layers.allObjects { layer.contents = surface }
             CATransaction.commit()
@@ -287,105 +283,75 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
         DispatchQueue.main.async { [weak self] in
             guard let self, self.stream === stream else { return }
             self.stop()
-            self.onProblem?(String(localized: "Video yakalama durdu (pencere kapandı ya da izin geri alındı)."))
         }
     }
 
-    // MARK: Motion
+    // MARK: Helpers
 
-    static let cell = 8   // probe pixels per grid cell
-
-    /// Mean brightness per 8×8 cell.
-    static func grid(_ buffer: CVPixelBuffer) -> (cells: [Float], columns: Int)? {
-        CVPixelBufferLockBaseAddress(buffer, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
-        guard let base = CVPixelBufferGetBaseAddress(buffer)?.assumingMemoryBound(to: UInt8.self) else { return nil }
-        let width = CVPixelBufferGetWidth(buffer), height = CVPixelBufferGetHeight(buffer), row = CVPixelBufferGetBytesPerRow(buffer)
-        let columns = width / cell, rows = height / cell
-        guard columns > 2, rows > 2 else { return nil }
-        var cells = [Float](repeating: 0, count: columns * rows)
-        for r in 0..<rows {
-            for c in 0..<columns {
-                var sum = 0
-                for y in stride(from: r * cell, to: r * cell + cell, by: 2) {
-                    let line = base + y * row
-                    for x in stride(from: c * cell, to: c * cell + cell, by: 2) {
-                        let p = line + x * 4   // BGRA
-                        sum += Int(p[0]) + Int(p[1]) * 2 + Int(p[2])
-                    }
-                }
-                cells[r * columns + c] = Float(sum) / Float(16 * 4)
-            }
-        }
-        return (cells, columns)
+    private func runJavaScript(_ source: String, tab: String, bundleID: String) {
+        let script = "tell application id \"\(bundleID)\" to execute \(tab) javascript \"\(Self.escaped(source))\""
+        scriptQueue.async { _ = Self.appleScript(script) }
     }
 
-    /// The largest block of cells that kept changing, normalized to the frame; nil when nothing did.
-    static func motionRect(_ grids: [[Float]], columns: Int) -> CGRect? {
-        guard grids.count >= 4, columns > 0, let count = grids.first?.count, grids.allSatisfy({ $0.count == count }) else { return nil }
-        let rows = count / columns
-        var changes = [Int](repeating: 0, count: count)
-        for (a, b) in zip(grids, grids.dropFirst()) {
-            for i in 0..<count where abs(a[i] - b[i]) > 3 { changes[i] += 1 }
-        }
-        let needed = max(2, (grids.count - 1) / 4)
-        let hot = changes.map { $0 >= needed }
-        var seen = [Bool](repeating: false, count: count)
-        var best: (size: Int, minC: Int, minR: Int, maxC: Int, maxR: Int)?
-        for start in 0..<count where hot[start] && !seen[start] {
-            var stack = [start]; seen[start] = true
-            var size = 0, minC = columns, minR = rows, maxC = 0, maxR = 0
-            while let i = stack.popLast() {
-                size += 1
-                let r = i / columns, c = i % columns
-                minC = min(minC, c); maxC = max(maxC, c); minR = min(minR, r); maxR = max(maxR, r)
-                // Neighbours two cells away too, so a dark, still patch inside the video does not split it.
-                for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1), (-2, 0), (2, 0), (0, -2), (0, 2)] {
-                    let nr = r + dr, nc = c + dc
-                    guard nr >= 0, nr < rows, nc >= 0, nc < columns else { continue }
-                    let n = nr * columns + nc
-                    if hot[n] && !seen[n] { seen[n] = true; stack.append(n) }
-                }
-            }
-            let area = (maxC - minC + 1) * (maxR - minR + 1)
-            if area >= 12, best.map({ area > ($0.maxC - $0.minC + 1) * ($0.maxR - $0.minR + 1) }) ?? true {
-                best = (size, minC, minR, maxC, maxR)
-            }
-        }
-        guard let best else { return nil }
-        return CGRect(x: CGFloat(best.minC) / CGFloat(columns), y: CGFloat(best.minR) / CGFloat(rows),
-                      width: CGFloat(best.maxC - best.minC + 1) / CGFloat(columns), height: CGFloat(best.maxR - best.minR + 1) / CGFloat(rows))
+    static func escaped(_ source: String) -> String {
+        source.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"").replacingOccurrences(of: "\n", with: " ")
     }
 
-    // MARK: Accessibility
+    static func appleScript(_ source: String) -> (value: String?, error: String?, code: Int?) {
+        var error: NSDictionary?
+        let result = NSAppleScript(source: source)?.executeAndReturnError(&error)
+        return (result?.stringValue, error?[NSAppleScript.errorMessage] as? String, error?[NSAppleScript.errorNumber] as? Int)
+    }
 
-    /// The page element that best matches the moving area (a <video> or its player box).
-    static func element(around rect: CGRect, pid: pid_t) -> (element: AXUIElement, frame: CGRect)? {
-        let app = AXUIElementCreateApplication(pid)
-        AXUIElementSetMessagingTimeout(app, 0.5)
+    /// The app's windows above the normal level (a PiP window floats), newest first.
+    static func floatingWindows(pid: pid_t) -> [(id: CGWindowID, frame: CGRect)] {
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        return list.compactMap { info -> (id: CGWindowID, frame: CGRect)? in
+            guard let owner = info[kCGWindowOwnerPID as String] as? Int, pid_t(owner) == pid,
+                  let layer = info[kCGWindowLayer as String] as? Int, layer > 0, layer < 20,
+                  let number = info[kCGWindowNumber as String] as? Int,
+                  let bounds = (info[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0) }),
+                  bounds.width > 120, bounds.height > 60 else { return nil }
+            return (CGWindowID(number), bounds)
+        }.sorted { $0.id > $1.id }
+    }
+
+    /// Still there (on screen or parked off it): gone once the PiP closes.
+    static func windowExists(_ id: CGWindowID) -> Bool {
+        guard id != 0, let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]])?.first else { return false }
+        return (info[kCGWindowIsOnscreen as String] as? Bool) ?? false
+    }
+
+    static func axWindow(in app: AXUIElement, matching frame: CGRect) -> AXUIElement? {
         var windows: AnyObject?
         guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windows) == .success,
               let list = windows as? [AXUIElement] else { return nil }
-        var best: (element: AXUIElement, frame: CGRect, score: CGFloat)?
-        var visited = 0
-        func walk(_ e: AXUIElement, depth: Int) {
-            visited += 1
-            guard visited < 6000, depth < 50 else { return }
-            if let frame = frame(of: e), frame.width > 60, frame.height > 40 {
-                let overlap = frame.intersection(rect)
-                if overlap.isNull || overlap.width < 1 { return }   // children sit inside their parent's box
-                let union = frame.width * frame.height + rect.width * rect.height - overlap.width * overlap.height
-                let score = overlap.width * overlap.height / union
-                // Ties go to the deeper element: the video itself rather than the page around it.
-                if score > 0.55, score >= (best?.score ?? 0) - 0.02 { best = (e, frame, score) }
-            }
-            var children: AnyObject?
-            guard AXUIElementCopyAttributeValue(e, kAXChildrenAttribute as CFString, &children) == .success,
-                  let kids = children as? [AXUIElement] else { return }
-            for kid in kids { walk(kid, depth: depth + 1) }
+        return list.first { window in
+            guard let f = Self.frame(of: window) else { return false }
+            return abs(f.minX - frame.minX) < 2 && abs(f.minY - frame.minY) < 2 && abs(f.width - frame.width) < 2
         }
-        for window in list where frame(of: window)?.intersects(rect) ?? false { walk(window, depth: 0) }
-        return best.map { ($0.element, $0.frame) }
+    }
+
+    static func findElement(in app: AXUIElement, domClass: String) -> AXUIElement? {
+        AXUIElementSetMessagingTimeout(app, 1)
+        var windows: AnyObject?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windows) == .success,
+              let list = windows as? [AXUIElement] else { return nil }
+        var visited = 0
+        func walk(_ element: AXUIElement, depth: Int) -> AXUIElement? {
+            visited += 1
+            guard visited < 12000, depth < 80 else { return nil }
+            var classes: AnyObject?
+            if AXUIElementCopyAttributeValue(element, "AXDOMClassList" as CFString, &classes) == .success,
+               (classes as? [String])?.contains(domClass) == true { return element }
+            var children: AnyObject?
+            guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &children) == .success,
+                  let kids = children as? [AXUIElement] else { return nil }
+            for kid in kids { if let hit = walk(kid, depth: depth + 1) { return hit } }
+            return nil
+        }
+        for window in list { if let hit = walk(window, depth: 0) { return hit } }
+        return nil
     }
 
     static func frame(of element: AXUIElement) -> CGRect? {
@@ -398,21 +364,11 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
         AXValueGetValue(size as! AXValue, .cgSize, &extent)
         return CGRect(origin: point, size: extent)
     }
-
-    static func windowBounds(_ id: CGWindowID) -> CGRect? {
-        guard let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]])?.first,
-              let bounds = info[kCGWindowBounds as String] as? NSDictionary else { return nil }
-        return CGRect(dictionaryRepresentation: bounds)
-    }
-
-    static func normalized(_ text: String) -> String {
-        text.lowercased().folding(options: [.diacriticInsensitive], locale: nil).trimmingCharacters(in: .whitespaces)
-    }
 }
 
 // MARK: - View
 
-/// The video under the closed notch, with its controls on hover: close, play/pause, bigger/smaller, go to the app.
+/// The video under the closed notch, with its controls on hover: close, play/pause, bigger/smaller, back to the tab.
 struct VideoNotchView: View {
     @ObservedObject var model: AppState
     @ObservedObject var video: VideoNotch
@@ -424,26 +380,25 @@ struct VideoNotchView: View {
             if video.hovering {
                 LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
                     .allowsHitTesting(false)
-                    .transition(.opacity)
                 HStack(spacing: 10) {
-                    control("xmark", "Kapat") { withAnimation(Theme.quick) { model.stopVideo() } }
+                    control("xmark", "Kapat") { model.stopVideo() }
                     Spacer(minLength: 0)
-                    control(media.playing ? "pause.fill" : "play.fill", media.playing ? "Duraklat" : "Oynat") { media.command("playpause") }
+                    control(media.playing ? "pause.fill" : "play.fill", media.playing ? "Duraklat" : "Oynat") { video.togglePlayback() }
                     control(video.large ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                             video.large ? "Küçült" : "Büyüt") { video.large.toggle() }
-                    control("arrow.up.forward.app", "Uygulamaya git") { media.activateSource() }
+                    control("arrow.up.forward.app", "Sekmeye dön") { video.showTab() }
                 }
                 .padding(8)
                 .frame(maxHeight: .infinity, alignment: .bottom)
-                .transition(.opacity.combined(with: .offset(y: 6)))
             }
         }
         .frame(width: size.width, height: size.height)
         .background(Color.black)
         .clipShape(RoundedRectangle(cornerRadius: video.large ? 14 : 10, style: .continuous))
         .contentShape(Rectangle())
-        .onTapGesture { media.command("playpause") }
-        .animation(Theme.quick, value: video.hovering)
+        .onTapGesture { video.togglePlayback() }
+        // Only a fade: the buttons never move under the pointer.
+        .animation(.easeOut(duration: 0.15), value: video.hovering)
     }
     private func control(_ icon: String, _ label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
         Button(action: action) {
