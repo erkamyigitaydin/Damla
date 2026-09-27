@@ -164,9 +164,13 @@ final class AppState: ObservableObject {
     var compactContent: Bool { compactSlots > 0 }
 
     func start() {
-        monitor.onBattery = { [weak self] value in self?.battery = value }
+        // Published only on change: every assignment redraws both notch windows, even with the same value.
+        monitor.onBattery = { [weak self] value in if self?.battery != value { self?.battery = value } }
         monitor.onLevels = { [weak self] volume, brightness, muted in
-            self?.volume = volume; self?.brightness = brightness; self?.muted = muted
+            guard let self else { return }
+            if self.volume != volume { self.volume = volume }
+            if self.brightness != brightness { self.brightness = brightness }
+            if self.muted != muted { self.muted = muted }
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
         monitor.onOutputs = { [weak self] outputs, current in

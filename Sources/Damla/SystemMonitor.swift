@@ -3,7 +3,7 @@ import CoreAudio
 import IOKit.ps
 import Darwin
 
-struct BatterySnapshot {
+struct BatterySnapshot: Equatable {
     var percentage = 0
     var charging = false
     var plugged = false

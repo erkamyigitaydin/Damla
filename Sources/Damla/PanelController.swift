@@ -40,6 +40,7 @@ final class PanelController {
     let fixedScreen: NSScreen?
     private var cancellables = Set<AnyCancellable>()
     private var hoverTimer: Timer?
+    private var hoverFast = false
     private var mouseMonitors: [Any] = []
     private var swipeGesture = PanelSwipeGesture()
     private var enteredAt: Date?
@@ -109,10 +110,10 @@ final class PanelController {
         // Global events cover other apps; local events cover the pointer leaving our own surface.
         // Keep this event-driven so a quick move followed by a click does not wait for the hover timer.
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents, handler: { [weak self] _ in
-            self?.updateMousePassthrough()
+            self?.pointerMoved()
         }) { mouseMonitors.append(monitor) }
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents, handler: { [weak self] event in
-            self?.updateMousePassthrough()
+            self?.pointerMoved()
             return event
         }) { mouseMonitors.append(monitor) }
         // A horizontal swipe anywhere on the open panel turns the page; vertical scrolling stays with the content.
@@ -121,8 +122,7 @@ final class PanelController {
                   !self.model.cleaning.active else { return event }
             return self.handleScroll(event) ? nil : event
         }) { mouseMonitors.append(monitor) }
-        hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in self?.trackHover() }
-        if let hoverTimer { RunLoop.main.add(hoverTimer, forMode: .common) }
+        scheduleHover(fast: true)
         layout()
         panel.orderFrontRegardless()
     }
@@ -239,9 +239,33 @@ final class PanelController {
         return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots, midX: screen.frame.midX, top: topY, content: model.contentHeight)
     }
 
+    /// Hover is checked ten times a second near the notch or while it is open, once a second otherwise: an idle
+    /// notch far from the pointer used to wake the app 20 times a second across two screens for nothing.
+    private func scheduleHover(fast: Bool) {
+        guard hoverFast != fast || hoverTimer == nil else { return }
+        hoverFast = fast
+        hoverTimer?.invalidate()
+        let timer = Timer(timeInterval: fast ? 0.1 : 1, repeats: true) { [weak self] _ in self?.trackHover() }
+        timer.tolerance = fast ? 0.02 : 0.25
+        RunLoop.main.add(timer, forMode: .common)
+        hoverTimer = timer
+    }
+    private var needsFastHover: Bool {
+        state != .closed || model.expanded || model.dragActive || enteredAt != nil
+            || visibleRect().insetBy(dx: -90, dy: -60).contains(NSEvent.mouseLocation)
+    }
+    /// Every mouse event: pass clicks through where nothing is drawn, and wake the hover check when the pointer
+    /// comes near (so opening still takes the same 0.12 s).
+    private func pointerMoved() {
+        updateMousePassthrough()
+        if !hoverFast && needsFastHover { scheduleHover(fast: true); trackHover() }
+        // "Follow the mouse": the notch moves to the screen the pointer went to without waiting for the slow tick.
+        else if !hoverFast, fixedScreen == nil, model.displayMode == .followMouse, let under = Self.screenUnderMouse(), under != screen { trackHover() }
+    }
+
     private func trackHover() {
         // Also refresh with a stationary pointer when the HUD, activity width or panel state changes.
-        defer { updateMousePassthrough() }
+        defer { updateMousePassthrough(); scheduleHover(fast: needsFastHover) }
         guard !model.cleaning.active, !concealed else { return }
         let now = Date()
         let location = NSEvent.mouseLocation
@@ -370,17 +394,15 @@ final class PanelManager {
         }
         // Basket: watch for file drags anywhere. Mouse monitors need no permission; the drag pasteboard's
         // change count ticks once per drag session, so the check is cheap.
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged, handler: { [weak self] _ in self?.checkDrag() }) { dragMonitors.append(monitor) }
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged, handler: { [weak self] _ in self?.checkDrag(); self?.watchDrag() }) { dragMonitors.append(monitor) }
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp, handler: { [weak self] _ in self?.endDrag() }) { dragMonitors.append(monitor) }
-        dragTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            if NSEvent.pressedMouseButtons != 0 { self.checkDrag() }
-            else if self.model.dragActive && !self.holdBasket { self.endDrag() }
-        }
-        if let dragTimer { RunLoop.main.add(dragTimer, forMode: .common) }
-        menuBarTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.menuBarTick() }
-        menuBarTimer?.tolerance = 0.03
-        if let menuBarTimer { RunLoop.main.add(menuBarTimer, forMode: .common) }
+        // A press may start a file drag, during which the source app keeps the mouse events to itself: only then
+        // does the 0.1 s check run (it used to run all the time, 10 wake-ups a second for nothing).
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: { [weak self] _ in self?.watchDrag() }) { dragMonitors.append(monitor) }
+        // The menu bar check runs 6.7 times a second only while the pointer is up at a menu bar (see menuBarTick);
+        // a pointer arriving there switches it to fast at once instead of waiting for the slow tick.
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved, handler: { [weak self] _ in self?.pointerNearMenuBar() }) { dragMonitors.append(monitor) }
+        scheduleMenuBar(fast: false)
         // Entering or leaving full screen switches Space; keep checking while the Space animation settles.
         let workspace = NSWorkspace.shared.notificationCenter
         workspace.publisher(for: NSWorkspace.activeSpaceDidChangeNotification)
@@ -395,7 +417,42 @@ final class PanelManager {
     /// otherwise once a second as a fallback.
     private func menuBarsMayChange(for seconds: CFAbsoluteTime) {
         menuBarFastUntil = max(menuBarFastUntil, CFAbsoluteTimeGetCurrent() + seconds)
+        scheduleMenuBar(fast: true)
         updateMenuBars()
+    }
+
+    private var menuBarFast = true
+    private func scheduleMenuBar(fast: Bool) {
+        guard fast != menuBarFast || menuBarTimer == nil else { return }
+        menuBarFast = fast
+        menuBarTimer?.invalidate()
+        let timer = Timer(timeInterval: fast ? 0.15 : 1, repeats: true) { [weak self] _ in self?.menuBarTick() }
+        timer.tolerance = fast ? 0.03 : 0.25
+        RunLoop.main.add(timer, forMode: .common)
+        menuBarTimer = timer
+    }
+    private func pointerNearMenuBar() {
+        guard !menuBarFast else { return }
+        let mouse = NSEvent.mouseLocation
+        let near = controllers.contains { controller in
+            guard let frame = controller.screen?.frame else { return false }
+            let band = max(40, (controller.screen?.safeAreaInsets.top ?? 0) + 8)
+            return NSMouseInRect(mouse, frame, false) && mouse.y >= frame.maxY - band
+        }
+        if near { menuBarFastUntil = max(menuBarFastUntil, CFAbsoluteTimeGetCurrent() + 2); scheduleMenuBar(fast: true); menuBarTick() }
+    }
+
+    /// Starts the drag check for the length of a press (and a basket still open after it).
+    private func watchDrag() {
+        guard dragTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            if NSEvent.pressedMouseButtons != 0 { self.checkDrag() }
+            else if self.model.dragActive && !self.holdBasket { self.endDrag() }
+            else if !self.model.dragActive { self.dragTimer?.invalidate(); self.dragTimer = nil }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dragTimer = timer
     }
 
     private func menuBarTick() {
@@ -409,6 +466,8 @@ final class PanelManager {
         if nearBar { menuBarFastUntil = max(menuBarFastUntil, now + 2) }
         // A roaming controller that just moved to another screen needs that screen's state right away.
         let screens = controllers.map { $0.screen?.displayID ?? 0 }
+        // Back to the slow tick once nothing needs watching closely.
+        defer { scheduleMenuBar(fast: now < menuBarFastUntil) }
         guard now < menuBarFastUntil || now - lastMenuBarCheck >= 1 || screens != lastMenuBarScreens else { return }
         lastMenuBarScreens = screens
         updateMenuBars()

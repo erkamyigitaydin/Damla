@@ -797,7 +797,7 @@ struct HomeView: View {
                         HStack(spacing: 5) {
                             Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold))
                             if named {
-                                MarqueeText(text: outputName, width: 50, font: .system(size: 10.5, weight: .semibold, design: .rounded))
+                                MarqueeText(text: outputName, width: 50)
                                     .transition(.opacity)
                             }
                         }
@@ -974,40 +974,78 @@ struct SourceChip: View {
 }
 
 /// One line that fits a fixed width: shown as is when short, otherwise scrolling slowly right to left with a pause
-/// at the start, fading at both edges.
-struct MarqueeText: View {
+/// at the start, fading at both edges. The scroll is a Core Animation loop: a SwiftUI repeatForever animation
+/// here re-ran the whole notch window's update every frame (measured +5.7% CPU with the panel open).
+struct MarqueeText: NSViewRepresentable {
     let text: String
     let width: CGFloat
-    var font: Font = .system(size: 10.5, weight: .semibold)
-    @State private var textWidth: CGFloat = 0
-    @State private var scrolled = false
-    private let gap: CGFloat = 22
-    var body: some View {
-        let overflow = textWidth > width
-        HStack(spacing: gap) {
-            label.background(GeometryReader { proxy in
-                Color.clear.onAppear { textWidth = proxy.size.width }.onChange(of: proxy.size.width) { _, value in textWidth = value }
-            })
-            if overflow { label }
-        }
-        .offset(x: overflow && scrolled ? -(textWidth + gap) : 0)
-        .frame(width: overflow ? width : textWidth, alignment: .leading)
-        .clipped()
-        .mask(LinearGradient(stops: overflow ? [.init(color: .clear, location: 0), .init(color: .black, location: 0.04),
-                                                 .init(color: .black, location: 0.9), .init(color: .clear, location: 1)]
-                                              : [.init(color: .black, location: 0), .init(color: .black, location: 1)],
-                             startPoint: .leading, endPoint: .trailing))
-        .onChange(of: text) { _, _ in restart() }
-        .onChange(of: overflow) { _, _ in restart() }
-        .onAppear { restart() }
+    var font: NSFont = MarqueeText.defaultFont
+    static let defaultFont: NSFont = {
+        let base = NSFont.systemFont(ofSize: 10.5, weight: .semibold)
+        return base.fontDescriptor.withDesign(.rounded).flatMap { NSFont(descriptor: $0, size: 10.5) } ?? base
+    }()
+    func makeNSView(context: Context) -> MarqueeLayerView { MarqueeLayerView() }
+    func updateNSView(_ view: MarqueeLayerView, context: Context) {
+        guard view.text != text || view.maxWidth != width || view.font != font else { return }
+        view.text = text; view.maxWidth = width; view.font = font
+        view.setAccessibilityLabel(text)
+        view.install()
+        view.invalidateIntrinsicContentSize()
     }
-    private var label: some View { Text(text).font(font).lineLimit(1).fixedSize() }
-    private func restart() {
-        var reset = Transaction(); reset.disablesAnimations = true
-        withTransaction(reset) { scrolled = false }
-        guard textWidth > width else { return }
-        // About 22 points a second, after a short pause; the copy behind makes the loop seamless.
-        withAnimation(.linear(duration: Double(textWidth + gap) / 22).delay(1.6).repeatForever(autoreverses: false)) { scrolled = true }
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: MarqueeLayerView, context: Context) -> CGSize? {
+        CGSize(width: min(nsView.textSize.width, width), height: nsView.textSize.height)
+    }
+}
+
+final class MarqueeLayerView: LoopLayerView {
+    var text = ""
+    var maxWidth: CGFloat = 50
+    var font: NSFont = MarqueeText.defaultFont
+    private static let gap: CGFloat = 22, speed: CGFloat = 22, pause: Double = 1.6
+    var textSize: CGSize { (text as NSString).size(withAttributes: [.font: font]) }
+    private let strip = CALayer()
+
+    override var isFlipped: Bool { true }
+    override func install() {
+        guard let layer else { return }
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        let size = textSize
+        let overflow = size.width > maxWidth
+        strip.removeAllAnimations()
+        strip.sublayers?.forEach { $0.removeFromSuperlayer() }
+        if strip.superlayer == nil { layer.addSublayer(strip) }
+        let scale = window?.backingScaleFactor ?? 2
+        for copy in 0..<(overflow ? 2 : 1) {
+            let label = CATextLayer()
+            label.string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: NSColor.white])
+            label.contentsScale = scale
+            label.frame = CGRect(x: CGFloat(copy) * (size.width + Self.gap), y: 0, width: ceil(size.width) + 1, height: ceil(size.height))
+            strip.addSublayer(label)
+        }
+        strip.frame = CGRect(x: 0, y: 0, width: size.width * 2 + Self.gap, height: size.height)
+        layer.masksToBounds = true
+        if overflow {
+            let fade = CAGradientLayer()
+            fade.frame = CGRect(x: 0, y: 0, width: maxWidth, height: size.height)
+            fade.startPoint = CGPoint(x: 0, y: 0.5); fade.endPoint = CGPoint(x: 1, y: 0.5)
+            fade.colors = [NSColor.clear.cgColor, NSColor.black.cgColor, NSColor.black.cgColor, NSColor.clear.cgColor]
+            fade.locations = [0, 0.04, 0.9, 1]
+            layer.mask = fade
+            // Rest at the start, then one smooth pass; the copy behind makes the jump back invisible.
+            let travel = size.width + Self.gap
+            let move = Double(travel / Self.speed), total = Self.pause + move
+            let scroll = CAKeyframeAnimation(keyPath: "position.x")
+            let start = strip.frame.width / 2
+            scroll.values = [start, start, start - travel]
+            scroll.keyTimes = [0, NSNumber(value: Self.pause / total), 1]
+            scroll.duration = total
+            scroll.repeatCount = .infinity
+            scroll.isRemovedOnCompletion = false
+            strip.add(scroll, forKey: "marquee")
+        } else {
+            layer.mask = nil
+        }
+        CATransaction.commit()
     }
 }
 
