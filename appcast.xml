@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.1</title>
+      <pubDate>Sun, 27 Sep 2026 15:52:48 +0000</pubDate>
+      <sparkle:version>14</sparkle:version>
+      <sparkle:shortVersionString>0.8.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Tarayıcıdaki video artık çentikte oynuyor.</p><p>- Çentikte video: Chrome, Brave, Edge ya da Vivaldi&#x27;de video oynarken Özet&#x27;teki ⧉ düğmesine bas; video çentiğin altında oynamaya devam eder, tarayıcı arka plandayken de. Üzerine gelince duraklat, büyüt ya da sekmesine dön. Video tarayıcının kendi resim içinde resim penceresinden gelir: kırpma yok, donma yok.</p><p>- İlk kullanımda bir kurulum kartı gereken izinleri sırayla gösterir (Erişilebilirlik, Ekran Kaydı, tarayıcı denetimi ve tarayıcının &quot;Apple Events&#x27;ten JavaScript&#x27;e izin ver&quot; ayarı); verdikçe satırlar kendiliğinden tamamlanır.</p><p>- Özet: sıradaki toplantı artık ilerleme çubuğunun altında; oynatma düğmelerinin üstüne binmiyor.</p><p>- Damla kapatıldığında (zorla kapatılsa da) temizliğini yapar.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.8.1/Damla-0.8.1.dmg" length="6377970" type="application/octet-stream" sparkle:edSignature="SfSBwxoA15Sb8DWoICz3/GkvyEpJqslM4xX7yItHYxGZZNLnFy1WUPIs5pXAbudehjDtynndpFtW4r5eC6PACA=="/>
+    </item>
+    <item>
       <title>Damla 0.8.0</title>
       <pubDate>Sun, 27 Sep 2026 00:07:55 +0000</pubDate>
       <sparkle:version>13</sparkle:version>
