@@ -53,18 +53,27 @@ final class NotificationMirror: ObservableObject {
     @Published var enabled = UserDefaults.standard.object(forKey: "notificationsInNotch") as? Bool ?? true {
         didSet { UserDefaults.standard.set(enabled, forKey: "notificationsInNotch"); restart() }
     }
-    /// Hide the system banner while the notch shows its copy. Buttons and replies need it (the banner stays
-    /// alive, opened, off screen); without it the notch only shows the text and opens the app.
+    /// Hide the system banner while the notch shows its copy. Buttons and replies need it (the banner is
+    /// opened off screen when the pointer comes onto the card); without it the notch shows the text and opens the app.
     @Published var hideBanners = UserDefaults.standard.object(forKey: "hideSystemBanners") as? Bool ?? true {
         didSet { UserDefaults.standard.set(hideBanners, forKey: "hideSystemBanners") }
     }
     @Published private(set) var current: MirroredNotification?
     @Published private(set) var trusted = AXIsProcessTrusted()
-    /// A reply field is open in the notch (the banner's own text field waits off screen).
+    /// A reply is being written in the notch (the banner's own text field waits off screen): the card stays.
     @Published private(set) var replying = false
+    /// The banner came with its reply field already open (WhatsApp): the notch shows a field straight away,
+    /// which holds the card only once it is clicked into.
+    @Published private(set) var inlineReply = false
     @Published var replyText = ""
-    /// The pointer is on the card: it stays until the pointer leaves.
-    var hovering = false { didSet { if hovering != oldValue { scheduleEnd(after: hovering ? nil : 2.5) } } }
+    /// The pointer is on the card: it stays until the pointer leaves, and the banner's buttons come out.
+    var hovering = false {
+        didSet {
+            guard hovering != oldValue else { return }
+            scheduleEnd(after: hovering ? nil : 2.5)
+            if hovering { revealActions() }
+        }
+    }
     /// Whether the notch can take a notification now (not open, not hidden by a full-screen app).
     var canTakeOver: () -> Bool = { true }
     var onShow: (() -> Void)?
@@ -74,7 +83,9 @@ final class NotificationMirror: ObservableObject {
     private var centerPID: pid_t = 0
     private var banner: AXUIElement?      // the system banner behind `current`
     private var window: AXUIElement?      // Notification Center's window holding it
-    private var restoreWork: DispatchWorkItem?
+    private var detailsOpen = false       // the banner's details were opened by us (it then never times out)
+    private var leftoverWork: DispatchWorkItem?
+    private var watchdog: Timer?
     private var replyField: AXUIElement?
     private var buttonsBeforeReply: Set<String> = []
     private var seen: [String] = []        // banner ids already handled, newest last
@@ -84,7 +95,7 @@ final class NotificationMirror: ObservableObject {
 
     var cardHeight: CGFloat {
         guard let current else { return 0 }
-        return 86 + (replying || (!current.actions.isEmpty && banner != nil) ? 38 : 0)
+        return 86 + (replying || inlineReply || (!current.actions.isEmpty && banner != nil) ? 38 : 0)
     }
 
     func start() {
@@ -99,8 +110,10 @@ final class NotificationMirror: ObservableObject {
     }
 
     private func restart() {
+        restoreWindows()
         detach()
         trustTimer?.invalidate(); trustTimer = nil
+        watchdog?.invalidate(); watchdog = nil
         guard enabled else { return }
         trusted = AXIsProcessTrusted()
         MediaService.trace("notifications: trusted=\(trusted)")
@@ -124,13 +137,30 @@ final class NotificationMirror: ObservableObject {
         }
         guard AXObserverCreate(app.processIdentifier, callback, &created) == .success, let created else { return }
         let context = Unmanaged.passUnretained(self).toOpaque()
-        // A banner arriving creates the window (the first one) or changes the layout (the next ones).
-        for name in [kAXWindowCreatedNotification, kAXLayoutChangedNotification] {
+        // A banner arriving creates the window (the first one) or changes the layout (the next ones); one
+        // leaving changes the layout and destroys its element.
+        for name in [kAXWindowCreatedNotification, kAXLayoutChangedNotification, kAXUIElementDestroyedNotification] {
             AXObserverAddNotification(created, element, name as CFString, context)
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .commonModes)
         observer = created; centerApp = element; centerPID = app.processIdentifier
         MediaService.trace("notifications: watching pid \(app.processIdentifier)")
+        // Notification Center is a background agent: its relaunch posts no workspace notification. Follow it.
+        let timer = Timer(timeInterval: 10, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let pid = NSRunningApplication.runningApplications(withBundleIdentifier: Self.centerBundleID).first?.processIdentifier ?? 0
+            if pid != self.centerPID { self.restart() }
+        }
+        timer.tolerance = 3
+        RunLoop.main.add(timer, forMode: .common)
+        watchdog = timer
+    }
+
+    /// Quitting or switching off: Notification Center keeps reusing its window, so it must not stay off screen.
+    /// Moved back even with a banner in it (its glass then shows a stale backdrop until it goes).
+    func restoreWindows() {
+        guard let centerApp else { return }
+        for window in Self.children(centerApp, kAXWindowsAttribute) { Self.restore(window) }
     }
 
     private func detach() {
@@ -144,12 +174,16 @@ final class NotificationMirror: ObservableObject {
         guard enabled, let centerApp else { return }
         for window in Self.children(centerApp, kAXWindowsAttribute) {
             let banners = Self.banners(in: window)
+            // Emptied: back where it was, ready to show the next banner itself if the notch cannot.
+            if banners.isEmpty { Self.restoreIfEmpty(window); continue }
             guard let newest = banners.first, let id = Self.string(newest, "AXIdentifier"), !seen.contains(id) else { continue }
             seen.append(id); if seen.count > 50 { seen.removeFirst(seen.count - 50) }
             // The notch is busy (open, hidden by full screen, or a reply is being written): the system banner
-            // shows as usual, back on screen if an earlier one had moved the window away.
-            MediaService.trace("notifications: banner \(id) takeOver=\(canTakeOver()) replying=\(replying)")
-            guard canTakeOver(), !replying else { Self.restore(window); continue }
+            // shows as usual. Unless its window is already off screen for an earlier one: moving it back leaves
+            // the banners' glass showing a stale backdrop, so the notch takes this one too.
+            let hidden = Self.isOffScreen(window)
+            MediaService.trace("notifications: banner \(id) takeOver=\(canTakeOver()) replying=\(replying) hidden=\(hidden)")
+            guard hidden || (canTakeOver() && !replying) else { continue }
             show(newest, id: id, window: window)
         }
     }
@@ -163,31 +197,41 @@ final class NotificationMirror: ObservableObject {
         let app = BannerText.clean(BannerText.appName(description: Self.string(element, kAXDescriptionAttribute) ?? "", title: title))
         guard !title.isEmpty || !(text["body"] ?? "").isEmpty else { return }
         let bundleID = NSWorkspace.shared.runningApplications.first { $0.localizedName == app }?.bundleIdentifier ?? Self.installed[app]
-        let previous = banner
-        endReply()
+        if current != nil { finish(collapsing: true) }   // the older one goes back to timing out
         banner = element
         self.window = window
-        restoreWork?.cancel(); restoreWork = nil
         current = MirroredNotification(id: id, app: app, bundleID: bundleID, title: title, subtitle: text["subtitle"] ?? "", body: text["body"] ?? "")
-        if let previous { collapse(previous) }   // the older banner may time out now
-        if hideBanners {
-            Self.moveOffScreen(window)
-            // Opening the details reveals the app's buttons and keeps the banner alive while the notch uses it.
-            if let action = BannerText.pick(Self.actions(element), BannerText.showDetails, fallbackFirst: true),
-               !BannerText.hideDetails.contains(BannerText.actionName(action) ?? "") {
-                AXUIElementPerformAction(element, action as CFString)
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                guard let self, self.current?.id == id else { return }
-                self.current?.actions = Self.buttons(in: element).map(\.label)
-                MediaService.trace("notifications: \(app) buttons=\(self.current?.actions ?? [])")
-            }
-        }
+        // Alerts (calendar, reminders) never time out; they stay on screen, where they wait for an answer.
+        let alert = Self.windowHasAlert(window)
+        if hideBanners && !alert { Self.moveOffScreen(window) }
         onShow?()
         scheduleEnd(after: Self.showFor)
     }
 
     // MARK: What the notch does with it
+
+    /// The pointer came onto the card: open the banner's details off screen to find its buttons or reply field.
+    /// Only now, since an opened banner no longer times out by itself.
+    private func revealActions() {
+        guard hideBanners, !detailsOpen, let current, let banner, let window, Self.isOffScreen(window),
+              Self.alive(banner, id: current.id),
+              let action = BannerText.pick(Self.actions(banner), BannerText.showDetails, fallbackFirst: true),
+              !BannerText.hideDetails.contains(BannerText.actionName(action) ?? "") else { return }
+        detailsOpen = AXUIElementPerformAction(banner, action as CFString) == .success
+        let id = current.id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self, self.current?.id == id else { return }
+            if let field = Self.textField(in: banner) {
+                // Its button is the send button; the notch's field and its arrow stand in for both.
+                self.replyField = field
+                self.buttonsBeforeReply = []
+                self.inlineReply = true
+            } else {
+                self.current?.actions = Self.buttons(in: banner).map(\.label)
+            }
+            MediaService.trace("notifications: \(self.current?.app ?? "") buttons=\(Self.buttons(in: banner).map(\.label)) inline=\(self.inlineReply)")
+        }
+    }
 
     /// The card itself: the banner's default action, which opens the app at the right conversation.
     func open() {
@@ -236,6 +280,13 @@ final class NotificationMirror: ObservableObject {
         finish(collapsing: false)
     }
 
+    /// The pointer went into the reply field or typing began: hold the card until it is sent or dropped.
+    func beginReply() {
+        guard replyField != nil, !replying else { return }
+        replying = true
+        scheduleEnd(after: nil)
+    }
+
     func cancelReply() {
         endReply()
         scheduleEnd(after: 2.5)
@@ -251,7 +302,7 @@ final class NotificationMirror: ObservableObject {
     }
 
     private func endReply() {
-        replying = false; replyField = nil; replyText = ""; buttonsBeforeReply = []
+        replying = false; inlineReply = false; replyField = nil; replyText = ""; buttonsBeforeReply = []
     }
 
     private func scheduleEnd(after delay: TimeInterval?) {
@@ -262,25 +313,25 @@ final class NotificationMirror: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
-    /// Time is up (or the notification was used). A banner left opened is closed up again so it times out
-    /// into Notification Center's list like any other.
+    /// Time is up (or the notification was used). A banner we opened is closed up again so it times out into
+    /// Notification Center's list like any other.
     private func finish(collapsing: Bool) {
         endWork?.cancel(); endWork = nil
-        if collapsing, let banner, let id = current?.id, Self.alive(banner, id: id) {
+        if collapsing, detailsOpen, let banner, let id = current?.id, Self.alive(banner, id: id) {
             collapse(banner)
-            // Alerts (calendar, reminders) never time out: they go back on screen to wait for an answer there.
-            // Anything else left over after its normal lifetime comes back too, rather than hiding forever.
-            if let window {
-                let alert = Self.string(banner, kAXSubroleAttribute)?.hasPrefix("AXNotificationCenterAlert") ?? false
-                let work = DispatchWorkItem { [weak self] in
-                    guard let self, self.current == nil, !Self.banners(in: window).isEmpty else { return }
-                    Self.restore(window)
-                }
-                restoreWork = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + (alert ? 0.3 : 8), execute: work)
+            // One that still hangs on off screen well after its lifetime (a reply field keeps some banners open)
+            // is dismissed: it was seen in the notch, and a window stuck off screen would hide the next ones.
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, self.current?.id != id, Self.alive(banner, id: id),
+                      let action = BannerText.pick(Self.actions(banner), BannerText.close, fallbackFirst: false) else { return }
+                MediaService.trace("notifications: dismissing leftover \(id)")
+                AXUIElementPerformAction(banner, action as CFString)
             }
+            leftoverWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: work)
         }
         endReply()
+        detailsOpen = false
         banner = nil
         window = nil
         current = nil
@@ -288,7 +339,7 @@ final class NotificationMirror: ObservableObject {
     }
 
     private func collapse(_ element: AXUIElement) {
-        guard hideBanners, let action = Self.actions(element).first(where: { BannerText.hideDetails.contains(BannerText.actionName($0) ?? "") }) else { return }
+        guard let action = Self.actions(element).first(where: { BannerText.hideDetails.contains(BannerText.actionName($0) ?? "") }) else { return }
         AXUIElementPerformAction(element, action as CFString)
     }
 
@@ -369,20 +420,32 @@ final class NotificationMirror: ObservableObject {
     /// Notification Center draws every banner in one screen-sized window; pushing it far above the screens
     /// hides the banners while they keep working. The window is made anew for the next notification.
     private static let offScreen = CGPoint(x: 0, y: -20_000)
+    /// Where each window sat before it was moved (Notification Center reuses its window for later banners).
     private static var homes: [CFHashCode: CGPoint] = [:]
+    /// Banners drawn off screen keep a stale glass backdrop if their window comes back while they show, so the
+    /// window goes back only once it is empty (or when Damla lets go of it).
     private static func moveOffScreen(_ window: AXUIElement) {
-        var home = CGPoint.zero
-        if let value = value(window, kAXPositionAttribute), CFGetTypeID(value) == AXValueGetTypeID() {
-            AXValueGetValue(value as! AXValue, .cgPoint, &home)
-        }
-        guard home != offScreen else { return }
-        if homes.count > 20 { homes.removeAll() }
-        homes[CFHash(window)] = home
+        guard !isOffScreen(window) else { return }
+        homes[CFHash(window)] = position(window) ?? .zero
         setPosition(window, offScreen)
     }
+    private static func restoreIfEmpty(_ window: AXUIElement) {
+        guard isOffScreen(window), banners(in: window).isEmpty else { return }
+        restore(window)
+    }
     private static func restore(_ window: AXUIElement) {
-        guard let home = homes.removeValue(forKey: CFHash(window)) else { return }
-        setPosition(window, home)
+        guard isOffScreen(window) else { return }
+        setPosition(window, homes.removeValue(forKey: CFHash(window)) ?? .zero)
+    }
+    private static func position(_ window: AXUIElement) -> CGPoint? {
+        var point = CGPoint.zero
+        guard let value = value(window, kAXPositionAttribute), CFGetTypeID(value) == AXValueGetTypeID(),
+              AXValueGetValue(value as! AXValue, .cgPoint, &point) else { return nil }
+        return point
+    }
+    static func isOffScreen(_ window: AXUIElement) -> Bool { (position(window)?.y ?? 0) <= offScreen.y / 2 }
+    private static func windowHasAlert(_ window: AXUIElement) -> Bool {
+        banners(in: window).contains { string($0, kAXSubroleAttribute)?.hasPrefix("AXNotificationCenterAlert") ?? false }
     }
     private static func setPosition(_ window: AXUIElement, _ point: CGPoint) {
         var point = point
@@ -432,7 +495,7 @@ struct NotificationCard: View {
                 .onTapGesture { mirror.open() }
                 .accessibilityAddTraits(.isButton)
                 .accessibilityHint(Text("Tıkla: \(note.app) içinde aç"))
-                if mirror.replying { replyRow } else if !note.actions.isEmpty { actionRow(note) }
+                if mirror.replying || mirror.inlineReply { replyRow } else if !note.actions.isEmpty { actionRow(note) }
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 12)
@@ -469,6 +532,8 @@ struct NotificationCard: View {
             TextField("Yanıtla…", text: $mirror.replyText)
                 .textFieldStyle(.plain).font(.system(size: 12))
                 .focused($fieldFocused)
+                // The notch window does not take the keyboard by itself; a click in the field asks for it.
+                .simultaneousGesture(TapGesture().onEnded { model.requestKeyFocus?(); fieldFocused = true })
                 .onSubmit { mirror.sendReply() }
                 .padding(.horizontal, 11).frame(height: 28)
                 .background(Theme.fill, in: Capsule())
@@ -481,8 +546,12 @@ struct NotificationCard: View {
         }
         .padding(.leading, 45)
         .onAppear {
+            // After a Reply button the keyboard comes here at once; a field that came with the banner waits for a click.
+            guard mirror.replying else { return }
             model.requestKeyFocus?()
             DispatchQueue.main.async { fieldFocused = true }
         }
+        .onChange(of: fieldFocused) { _, focused in if focused { mirror.beginReply() } }
+        .onChange(of: mirror.replyText) { _, text in if !text.isEmpty { mirror.beginReply() } }
     }
 }

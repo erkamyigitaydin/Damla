@@ -853,6 +853,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.agents.decide(request, id == Self.approvalAllowKey ? .allow : .deny)
     }
     func applicationWillTerminate(_ notification: Notification) {
+        model.notifications.restoreWindows()   // Notification Center reuses its window: never leave it off screen
         model.media.restoreDucked()   // never leave the music quiet after a ducked handoff
         model.video.stop(waiting: true)   // the parked PiP window would otherwise stay under the notch on its own
         model.appVolumes.stopAll()

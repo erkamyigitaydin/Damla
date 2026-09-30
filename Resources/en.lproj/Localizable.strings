@@ -341,7 +341,7 @@
 "Kısayollar" = "Shortcuts";
 "Menü çubuğuna oturur." = "Sits in the menu bar.";
 "Menü çubuğunun altında yüzer." = "Floats below the menu bar.";
-"Boştayken gizle" = "Hide when idle";
+"Boştayken çakma çentiği gizle" = "Hide the fake notch when idle";
 "Bir şey çalmıyor, ajan çalışmıyorsa çentiksiz ekranda görünmez. İmleci götürünce açılır." = "On screens without a notch it stays out of sight while nothing plays and no agent works. Point at it to open.";
 "Onayda izin ver · reddet" = "Allow · deny an approval";
 "Onaylar" = "Approvals";

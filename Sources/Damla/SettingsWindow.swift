@@ -143,7 +143,7 @@ private struct DisplaySettings: View {
                     Text(model.externalStyle == .menuBar ? "Menü çubuğuna oturur." as LocalizedStringKey : "Menü çubuğunun altında yüzer.")
                 }
                 Toggle(isOn: $model.hideIdleNotch) {
-                    Text("Boştayken gizle")
+                    Text("Boştayken çakma çentiği gizle")
                     Text("Bir şey çalmıyor, ajan çalışmıyorsa çentiksiz ekranda görünmez. İmleci götürünce açılır.")
                 }
             }

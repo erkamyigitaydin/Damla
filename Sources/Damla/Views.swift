@@ -121,6 +121,8 @@ struct DamlaView: View {
     private var state: NotchState { model.state(for: screen.id) }
     private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
+    /// Glass surfaces: the open panel and a notification card; the closed notch and HUDs stay solid black.
+    private var glassy: Bool { open || state == .notification }
     private var video: Layout.VideoSpec? { open ? nil : model.videoSpec(on: screen.id) }
     private var slots: Int { model.compactSlots(on: screen.id) }
     /// Idle on a notchless screen: the notch draws back up into the menu bar and fades out.
@@ -149,11 +151,11 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: slots, dropping: dropping, metrics: metrics, content: model.shapeContent(state), video: video, hidden: hidden))
-        .onChange(of: open, initial: true) { _, isOpen in
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: glassy), value: Key(state: state, compact: slots, dropping: dropping, metrics: metrics, content: model.shapeContent(state), video: video, hidden: hidden))
+        .onChange(of: glassy, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
-            else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { if !model.expanded { glassVisible = false } } }
+            else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { if !model.expanded && model.notifications.current == nil { glassVisible = false } } }
         }
         .environment(\.colorScheme, .dark)
         .environment(\.controlActiveState, .active)
@@ -191,17 +193,17 @@ struct DamlaView: View {
             shape.fill(LinearGradient(stops: [
                 .init(color: .black, location: 0),
                 .init(color: .black, location: notchEdge),
-                .init(color: .black.opacity(open ? 0.78 : 1), location: notchEdge + bodyHeight * 0.20),
-                .init(color: .black.opacity(open ? 0.38 : 1), location: notchEdge + bodyHeight * 0.50),
-                .init(color: .black.opacity(open ? 0.32 : 1), location: notchEdge + bodyHeight * 0.74),
-                .init(color: .black.opacity(open ? 0 : 1), location: notchEdge + bodyHeight * 0.97),
-                .init(color: .black.opacity(open ? 0 : 1), location: 1)
+                .init(color: .black.opacity(glassy ? 0.78 : 1), location: notchEdge + bodyHeight * 0.20),
+                .init(color: .black.opacity(glassy ? 0.38 : 1), location: notchEdge + bodyHeight * 0.50),
+                .init(color: .black.opacity(glassy ? 0.32 : 1), location: notchEdge + bodyHeight * 0.74),
+                .init(color: .black.opacity(glassy ? 0 : 1), location: notchEdge + bodyHeight * 0.97),
+                .init(color: .black.opacity(glassy ? 0 : 1), location: 1)
             ], startPoint: .top, endPoint: .bottom))
             // The glass alone loses its text over a white window behind it. The open panel always carries a dark
             // veil so every page reads on any background; lyrics (long white text, tall panel) go a little deeper.
-            shape.fill(Color.black.opacity(open ? (model.tallPanel ? 0.55 : 0.45) : 0))
+            shape.fill(Color.black.opacity(open ? (model.tallPanel ? 0.55 : 0.45) : glassy ? 0.4 : 0))
                 .animation(.easeInOut(duration: 0.35), value: model.tallPanel)
-            content.shadow(color: .black.opacity(open ? 0.5 : 0), radius: 3, y: 1)
+            content.shadow(color: .black.opacity(glassy ? 0.5 : 0), radius: 3, y: 1)
             // Outside the state switch, so a HUD over the notch leaves the video playing under it.
             if let video, state == .closed || state == .hud {
                 VideoNotchView(model: model, video: model.video, media: media, size: Layout.videoSize(video, metrics, compactSlots: slots))
@@ -213,7 +215,7 @@ struct DamlaView: View {
         .overlay {
             if dropping { shape.strokeBorder(Theme.accent.opacity(0.9), lineWidth: 1.5) }
         }
-        .shadow(color: .black.opacity(open ? 0.45 : 0), radius: 24, y: 12)
+        .shadow(color: .black.opacity(glassy ? 0.45 : 0), radius: 24, y: 12)
         .contentShape(shape)
         .accessibilityAction(named: Text("Paneli aç")) {
             model.activeScreenID = screen.id
