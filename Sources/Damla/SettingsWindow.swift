@@ -98,6 +98,7 @@ private struct GeneralSettings: View {
 
 private struct PanelSettings: View {
     @ObservedObject var model: AppState
+    @AppStorage(PolaroidCard.datedKey) private var polaroidDate = true
     var body: some View {
         Form {
             Section("Sayfalar") {
@@ -115,6 +116,9 @@ private struct PanelSettings: View {
                     Text("Pano geçmişini tut")
                     Text("Parola yöneticilerinden gelenler kaydedilmez.")
                 }
+            }
+            Section("Ayna") {
+                Toggle("Polaroide tarih yaz", isOn: $polaroidDate)
             }
             NotificationSettings(mirror: model.notifications)
             Section("Hareketler") {

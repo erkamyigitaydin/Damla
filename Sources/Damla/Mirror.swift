@@ -210,7 +210,8 @@ final class MirrorAlbum: ObservableObject {
     @MainActor
     func save(_ photo: CGImage, taken: Date) -> Photo? {
         let size = CGSize(width: photo.width, height: photo.height)
-        let renderer = ImageRenderer(content: PolaroidCard(photo: NSImage(cgImage: photo, size: size), taken: taken, photoSize: size))
+        let renderer = ImageRenderer(content: PolaroidCard(photo: NSImage(cgImage: photo, size: size), taken: taken, photoSize: size,
+                                                           dated: PolaroidCard.datedSetting))
         renderer.scale = 1
         guard let image = renderer.cgImage,
               let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else { return nil }
@@ -245,6 +246,10 @@ struct PolaroidCard: View {
     let photo: NSImage
     let taken: Date
     let photoSize: CGSize
+    /// The orange stamp on the photo and the handwritten date under it; off leaves a plain cream margin.
+    var dated = true
+    static let datedKey = "mirrorDate"
+    static var datedSetting: Bool { UserDefaults.standard.object(forKey: datedKey) as? Bool ?? true }
 
     /// The whole card for a photo of this size.
     static func size(photo: CGSize) -> CGSize {
@@ -257,18 +262,21 @@ struct PolaroidCard: View {
             Image(nsImage: photo).resizable().interpolation(.high)
                 .frame(width: photoSize.width, height: h)
                 .overlay(alignment: .bottomTrailing) {
+                    if dated {
                     Text(verbatim: Self.stamp(taken))
                         .font(.system(size: h * 0.068, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
                         .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: h * 0.012)
                         .blur(radius: h * 0.0015)
                         .padding(h * 0.06)
+                    }
                 }
                 .padding(.top, h * Self.side)
             Text(verbatim: Self.caption(taken))
                 .font(.custom("Bradley Hand", size: h * 0.11).weight(.bold))
                 .foregroundStyle(Color(red: 0.19, green: 0.22, blue: 0.34).opacity(0.85))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(dated ? 1 : 0)
         }
         .frame(width: Self.size(photo: photoSize).width, height: Self.size(photo: photoSize).height)
         .background(Self.cream)
@@ -294,9 +302,9 @@ struct MirrorView: View {
     @StateObject private var album = MirrorAlbum()
     @AppStorage("mirrorLook") private var lookName = FilmLook.nostalgia.rawValue
     @AppStorage("mirrorTimer") private var useTimer = true
+    @AppStorage(PolaroidCard.datedKey) private var dated = true
     @State private var countdown: Int?
     @State private var flash = false
-    @State private var hovering = false
     @State private var frameSize = CGSize(width: 380, height: 162)
     /// The photo just taken, on its way from the viewfinder into the corner.
     @State private var flying: NSImage?
@@ -337,30 +345,17 @@ struct MirrorView: View {
                         }
                     }
                     .overlay(alignment: .topTrailing) {
-                        if showControls && camera.centerStageSupported {
-                            Button { camera.setCenterStage(!camera.centerStage) } label: {
-                                Label("Ana Sahne", systemImage: camera.centerStage ? "person.and.background.dotted" : "person.crop.rectangle")
-                                    .font(.system(size: 9.5, weight: .semibold))
-                                    .foregroundStyle(camera.centerStage ? Color.black : .white.opacity(0.9))
-                                    .padding(.horizontal, 7).padding(.vertical, 3)
-                                    .background(camera.centerStage ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(Color.black.opacity(0.35)), in: Capsule())
-                                    .contentShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(9).transition(.opacity)
-                            .help(camera.centerStage ? "Ana Sahne açık: kamera seni kadrajda tutar · kapat" : "Ana Sahne kapalı · aç")
+                        HStack(spacing: 8) {
+                            // The date the photo will carry, in the corner the controls leave free.
+                            if dated { TimelineView(.everyMinute) { context in
+                                Text(verbatim: PolaroidCard.stamp(context.date))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
+                                    .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: 2.5)
+                            } }
+                            if showControls && camera.centerStageSupported { centerStageButton.transition(.opacity) }
                         }
-                    }
-                    .overlay(alignment: .bottomTrailing) {
-                        // The date the photo will carry; the controls take its corner while the pointer is here.
-                        TimelineView(.everyMinute) { context in
-                            Text(verbatim: PolaroidCard.stamp(context.date))
-                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
-                                .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: 2.5)
-                                .padding(10)
-                        }
-                        .opacity(showControls ? 0 : 1)
+                        .padding(9)
                     }
             case .denied:
                 VStack(spacing: 8) {
@@ -382,7 +377,7 @@ struct MirrorView: View {
                     .transition(.scale.combined(with: .opacity))
             }
             if showControls {
-                // The shutter row appears over the picture only while the pointer is on it and nothing is being shot.
+                // The shutter row sits over the foot of the picture whenever nothing is being shot.
                 VStack(spacing: 0) {
                     Spacer()
                     controls.padding(.horizontal, 10).padding(.bottom, 8).padding(.top, 24)
@@ -395,12 +390,25 @@ struct MirrorView: View {
         .overlay(alignment: .bottomLeading) { corner }
         .clipShape(shape)
         .contentShape(shape)
-        .onHover { inside in withAnimation(.easeOut(duration: 0.18)) { hovering = inside } }
         .animation(.easeOut(duration: 0.18), value: countdown == nil)
         .overlay(shape.strokeBorder(.white.opacity(0.12), lineWidth: 1))
     }
 
-    private var showControls: Bool { hovering && camera.state == .running && countdown == nil && !camera.busy }
+    /// The controls stay on the picture; only a countdown or a shot in progress clears them away.
+    private var showControls: Bool { camera.state == .running && countdown == nil && !camera.busy }
+
+    private var centerStageButton: some View {
+        Button { camera.setCenterStage(!camera.centerStage) } label: {
+            Label("Ana Sahne", systemImage: camera.centerStage ? "person.and.background.dotted" : "person.crop.rectangle")
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(camera.centerStage ? Color.black : .white.opacity(0.9))
+                .padding(.horizontal, 7).padding(.vertical, 3)
+                .background(camera.centerStage ? AnyShapeStyle(Color.white.opacity(0.9)) : AnyShapeStyle(Color.black.opacity(0.35)), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(camera.centerStage ? "Ana Sahne açık: kamera seni kadrajda tutar · kapat" : "Ana Sahne kapalı · aç")
+    }
 
     private var controls: some View {
         ZStack {
