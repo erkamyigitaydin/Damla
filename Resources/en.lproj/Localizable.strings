@@ -409,6 +409,7 @@
 "Tıkla: ilgili yerde açılır. Uygulamanın düğmeleri ve yanıt da çentikte." = "Click to open where it belongs. The app's buttons and replies work from the notch too.";
 "Sistem balonunu gizle" = "Hide the system banner";
 "Bildirimi kapat" = "Dismiss notification";
-"Tıkla: %@ içinde aç" = "Click to open in %@";
 "Yanıtla…" = "Reply…";
 "Polaroide tarih yaz" = "Date on the Polaroid";
+"Tıkla: yanıtla ya da düğmeleri göster" = "Click to reply or show its buttons";
+"Uygulamada aç" = "Open in the app";
