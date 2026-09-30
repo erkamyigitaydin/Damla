@@ -16,8 +16,6 @@ struct MirroredNotification: Identifiable, Equatable {
     var arrived = Date()
     /// Seen on the Bildirimler page; it leaves the list once the page is left.
     var read = false
-    /// One conversation: the same app and the same title (a sender, a chat, a build).
-    var thread: String { app + "\u{1F}" + title }
 }
 
 /// Pure pieces of the banner reading, kept apart from Accessibility so the self-tests can check them.
@@ -235,7 +233,7 @@ final class NotificationMirror: ObservableObject {
         history.removeAll(where: \.read)
     }
     func remove(_ note: MirroredNotification) { history.removeAll { $0.id == note.id } }
-    func removeThread(of note: MirroredNotification) { history.removeAll { $0.thread == note.thread } }
+    func removeApp(of note: MirroredNotification) { history.removeAll { $0.app == note.app } }
     func clearHistory() { history.removeAll() }
 
     /// An entry on the page: the live banner still answers (the right conversation); an older one opens its app.
@@ -551,13 +549,13 @@ struct NotificationCard: View {
                     VStack(alignment: .leading, spacing: 1.5) {
                         HStack(spacing: 6) {
                             Text(verbatim: note.app).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.dim).lineLimit(1)
-                            // More unread from the same conversation wait on the Bildirimler page.
-                            let more = mirror.history.filter { $0.thread == note.thread && $0.id != note.id && !$0.read }.count
+                            // More unread from the same app wait on the Bildirimler page.
+                            let more = mirror.history.filter { $0.app == note.app && $0.id != note.id && !$0.read }.count
                             if more > 0 {
                                 Text(verbatim: "+\(more)").font(.system(size: 9.5, weight: .bold, design: .rounded)).monospacedDigit()
                                     .padding(.horizontal, 5).padding(.vertical, 1)
                                     .background(Theme.fillStrong, in: Capsule())
-                                    .help(String(localized: "Bu konuşmadan \(more) mesaj daha"))
+                                    .help(String(localized: "\(note.app) uygulamasından \(more) bildirim daha"))
                             }
                             Spacer(minLength: 4)
                             Button { mirror.close() } label: {
@@ -668,15 +666,6 @@ struct NotificationsView: View {
         let bundleID: String?
         var notes: [MirroredNotification]
         var id: String { app }
-        /// The app's conversations, the one with the newest message first; each newest-first.
-        var threads: [[MirroredNotification]] {
-            var order: [String] = [], byThread: [String: [MirroredNotification]] = [:]
-            for note in notes {
-                if byThread[note.thread] == nil { order.append(note.thread) }
-                byThread[note.thread, default: []].append(note)
-            }
-            return order.compactMap { byThread[$0] }
-        }
     }
     private var groups: [AppGroup] {
         var order: [String] = [], byApp: [String: AppGroup] = [:]
@@ -706,7 +695,7 @@ struct NotificationsView: View {
                                     appIcon(group.bundleID).frame(width: 15, height: 15)
                                     Text(verbatim: group.app).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.dim)
                                 }
-                                ForEach(group.threads, id: \.first?.thread) { thread in ThreadStack(notes: thread, mirror: mirror) }
+                                ThreadStack(notes: group.notes, mirror: mirror)
                             }
                         }
                     }
@@ -742,7 +731,7 @@ struct NotificationsView: View {
     }
 }
 
-/// A conversation on the page. One message is a plain row; more fold into a stack (the newest on top, the
+/// One app's notifications on the page. One is a plain row; more fold into a stack (the newest on top, the
 /// others as edges under it, "+N"): a click spreads it out, "Daralt" folds it again.
 private struct ThreadStack: View {
     let notes: [MirroredNotification]
@@ -807,7 +796,7 @@ private struct HistoryRow: View {
             }
             .contentShape(Rectangle())
             .onTapGesture { if let spread { spread() } else { mirror.open(note) } }
-            Button { withAnimation(Theme.quick) { stacked > 0 ? mirror.removeThread(of: note) : mirror.remove(note) } } label: {
+            Button { withAnimation(Theme.quick) { stacked > 0 ? mirror.removeApp(of: note) : mirror.remove(note) } } label: {
                 Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.dim)
                     .frame(width: 16, height: 16).background(Theme.fill, in: Circle()).contentShape(Circle())
             }
@@ -818,7 +807,7 @@ private struct HistoryRow: View {
         .padding(.horizontal, 9).padding(.vertical, 6)
         .background(Theme.fill.opacity(hovering ? 1.6 : 1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering = $0 }
-        .help(stacked > 0 ? String(localized: "\(stacked + 1) mesaj · tıkla: hepsini göster")
+        .help(stacked > 0 ? String(localized: "\(stacked + 1) bildirim · tıkla: hepsini göster")
               : note.bundleID == nil ? "" : String(localized: "Tıkla: \(note.app) uygulamasını aç"))
     }
 

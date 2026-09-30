@@ -424,5 +424,5 @@
 "Sıralamak için sürükle." = "Drag to reorder.";
 "Sıralamak için sürükle" = "Drag to reorder";
 "Daralt" = "Collapse";
-"%lld mesaj · tıkla: hepsini göster" = "%lld messages · click to show all";
-"Bu konuşmadan %lld mesaj daha" = "%lld more from this conversation";
+"%lld bildirim · tıkla: hepsini göster" = "%lld notifications · click to show all";
+"%@ uygulamasından %lld bildirim daha" = "%2$lld more from %1$@";
