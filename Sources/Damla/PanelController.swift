@@ -698,6 +698,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "tab-agents": model.select(.agents)
         case "tab-mirror": model.select(.mirror)
         case "tab-shortcuts": model.select(.shortcuts)
+        case "tab-notifications": model.select(.notifications)
         case "share": model.select(.files); model.shareFile()
         case "settings": model.openSettings()
         case "onboarding": model.startTour()

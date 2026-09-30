@@ -59,6 +59,11 @@ final class NotificationMirror: ObservableObject {
         didSet { UserDefaults.standard.set(hideBanners, forKey: "hideSystemBanners") }
     }
     @Published private(set) var current: MirroredNotification?
+    /// Everything read this session, newest first. Kept in memory only: message texts never touch the disk.
+    @Published private(set) var history: [MirroredNotification] = []
+    @Published private(set) var unread = 0
+    static let historyLimit = 60
+    var isViewing: () -> Bool = { false }
     @Published private(set) var trusted = AXIsProcessTrusted()
     /// A reply is being written in the notch (the banner's own text field waits off screen): the card stays.
     @Published private(set) var replying = false
@@ -186,26 +191,50 @@ final class NotificationMirror: ObservableObject {
             // The notch is busy (open, hidden by full screen, or a reply is being written): the system banner
             // shows as usual. Unless its window is already off screen for an earlier one: moving it back leaves
             // the banners' glass showing a stale backdrop, so the notch takes this one too.
+            guard let note = Self.read(newest, id: id) else { continue }
+            record(note)   // on the page whether or not the notch shows it
             let hidden = Self.isOffScreen(window)
             MediaService.trace("notifications: banner \(id) takeOver=\(canTakeOver()) replying=\(replying) hidden=\(hidden)")
             guard hidden || (canTakeOver() && !replying) else { continue }
-            show(newest, id: id, window: window)
+            show(note, element: newest, window: window)
         }
     }
 
-    private func show(_ element: AXUIElement, id: String, window: AXUIElement) {
+    /// The banner's text as the notch shows it; nil for an empty one.
+    private static func read(_ element: AXUIElement, id: String) -> MirroredNotification? {
         var text: [String: String] = [:]
-        for child in Self.children(element, kAXChildrenAttribute) {
-            if let key = Self.string(child, "AXIdentifier"), let value = Self.string(child, kAXValueAttribute) { text[key] = BannerText.clean(value) }
+        for child in children(element, kAXChildrenAttribute) {
+            if let key = string(child, "AXIdentifier"), let value = string(child, kAXValueAttribute) { text[key] = BannerText.clean(value) }
         }
         let title = text["title"] ?? ""
-        let app = BannerText.clean(BannerText.appName(description: Self.string(element, kAXDescriptionAttribute) ?? "", title: title))
-        guard !title.isEmpty || !(text["body"] ?? "").isEmpty else { return }
-        let bundleID = NSWorkspace.shared.runningApplications.first { $0.localizedName == app }?.bundleIdentifier ?? Self.installed[app]
+        let app = BannerText.clean(BannerText.appName(description: string(element, kAXDescriptionAttribute) ?? "", title: title))
+        guard !title.isEmpty || !(text["body"] ?? "").isEmpty else { return nil }
+        let bundleID = NSWorkspace.shared.runningApplications.first { $0.localizedName == app }?.bundleIdentifier ?? installed[app]
+        return MirroredNotification(id: id, app: app, bundleID: bundleID, title: title, subtitle: text["subtitle"] ?? "", body: text["body"] ?? "")
+    }
+
+    private func record(_ note: MirroredNotification) {
+        history.insert(note, at: 0)
+        if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
+        if !isViewing() { unread += 1 }
+    }
+
+    func markRead() { if unread != 0 { unread = 0 } }
+    func remove(_ note: MirroredNotification) { history.removeAll { $0.id == note.id } }
+    func clearHistory() { history.removeAll(); unread = 0 }
+
+    /// An entry on the page: the live banner still answers (the right conversation); an older one opens its app.
+    func open(_ note: MirroredNotification) {
+        if current?.id == note.id { open(); return }
+        guard let id = note.bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    private func show(_ note: MirroredNotification, element: AXUIElement, window: AXUIElement) {
         if current != nil { finish(collapsing: true) }   // the older one goes back to timing out
         banner = element
         self.window = window
-        current = MirroredNotification(id: id, app: app, bundleID: bundleID, title: title, subtitle: text["subtitle"] ?? "", body: text["body"] ?? "")
+        current = note
         // Alerts (calendar, reminders) never time out; they stay on screen, where they wait for an answer.
         let alert = Self.windowHasAlert(window)
         if hideBanners && !alert { Self.moveOffScreen(window) }
@@ -598,5 +627,130 @@ struct NotificationCard: View {
         }
         .onChange(of: fieldFocused) { _, focused in if focused { mirror.beginReply() } }
         .onChange(of: mirror.replyText) { _, text in if !text.isEmpty { mirror.beginReply() } }
+    }
+}
+
+// MARK: - The page
+
+/// Bildirimler: what came in this session, grouped by app (the app with the newest one first). A click opens it,
+/// the ✕ drops it. Nothing here is written to disk; it is gone when Damla quits.
+struct NotificationsView: View {
+    @ObservedObject var model: AppState
+    @ObservedObject var mirror: NotificationMirror
+
+    private struct AppGroup: Identifiable {
+        let app: String
+        let bundleID: String?
+        var notes: [MirroredNotification]
+        var id: String { app }
+    }
+    private var groups: [AppGroup] {
+        var order: [String] = [], byApp: [String: AppGroup] = [:]
+        for note in mirror.history {
+            if byApp[note.app] == nil { order.append(note.app); byApp[note.app] = AppGroup(app: note.app, bundleID: note.bundleID, notes: []) }
+            byApp[note.app]?.notes.append(note)
+        }
+        return order.compactMap { byApp[$0] }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(mirror.history.isEmpty ? String(localized: "Bu oturumda gelenler burada toplanır") : String(localized: "\(mirror.history.count) bildirim"))
+                    .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
+                Spacer()
+                if !mirror.history.isEmpty {
+                    Button("Temizle") { withAnimation(Theme.quick) { mirror.clearHistory() } }
+                        .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+                }
+            }
+            if mirror.history.isEmpty {
+                empty
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(groups) { group in
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 6) {
+                                    appIcon(group.bundleID).frame(width: 15, height: 15)
+                                    Text(verbatim: group.app).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.dim)
+                                }
+                                ForEach(group.notes) { note in HistoryRow(note: note, mirror: mirror) }
+                            }
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder private var empty: some View {
+        VStack(spacing: 8) {
+            Image(systemName: mirror.enabled && mirror.trusted ? "bell" : "bell.slash").font(.system(size: 22, weight: .light)).foregroundStyle(Theme.faint)
+            if !mirror.enabled {
+                Text("Bildirimler çentikte kapalı").font(.system(size: 11)).foregroundStyle(Theme.faint)
+                Button("Aç") { mirror.enabled = true }.font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+            } else if !mirror.trusted {
+                Text("Erişilebilirlik izni gerekli").font(.system(size: 11)).foregroundStyle(Theme.faint)
+                Button("Ayarları aç") { MediaKeyInterceptor.openAccessibilitySettings() }.font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+            } else {
+                Text("Henüz bildirim yok").font(.system(size: 11)).foregroundStyle(Theme.faint)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder private func appIcon(_ bundleID: String?) -> some View {
+        if let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().interpolation(.high)
+        } else {
+            Image(systemName: "bell.fill").font(.system(size: 9)).foregroundStyle(Theme.dim)
+        }
+    }
+}
+
+private struct HistoryRow: View {
+    let note: MirroredNotification
+    @ObservedObject var mirror: NotificationMirror
+    @State private var hovering = false
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(verbatim: note.title.isEmpty ? note.app : note.title).font(.system(size: 11.5, weight: .semibold)).lineLimit(1)
+                    Spacer(minLength: 4)
+                    TimelineView(.everyMinute) { _ in
+                        Text(verbatim: Self.age(note.arrived)).font(.system(size: 10, design: .rounded)).monospacedDigit().foregroundStyle(Theme.faint)
+                    }
+                }
+                let text = [note.subtitle, note.body].filter { !$0.isEmpty }.joined(separator: " · ")
+                if !text.isEmpty {
+                    Text(verbatim: text).font(.system(size: 11)).foregroundStyle(.white.opacity(0.72)).lineLimit(2)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { mirror.open(note) }
+            Button { withAnimation(Theme.quick) { mirror.remove(note) } } label: {
+                Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.dim)
+                    .frame(width: 16, height: 16).background(Theme.fill, in: Circle()).contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .opacity(hovering ? 1 : 0)
+            .help("Listeden kaldır")
+        }
+        .padding(.horizontal, 9).padding(.vertical, 6)
+        .background(Theme.fill.opacity(hovering ? 1.6 : 1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onHover { hovering = $0 }
+        .help(note.bundleID == nil ? "" : String(localized: "Tıkla: \(note.app) uygulamasını aç"))
+    }
+
+    /// "şimdi", "5 dk", "2 sa"
+    static func age(_ date: Date) -> String {
+        let minutes = Int(Date().timeIntervalSince(date) / 60)
+        if minutes < 1 { return String(localized: "şimdi") }
+        if minutes < 60 { return String(localized: "\(minutes) dk") }
+        return String(localized: "\(minutes / 60) sa")
     }
 }

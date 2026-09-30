@@ -277,10 +277,12 @@ struct DamlaView: View {
 
 /// A live activity the closed notch can show. Each has a glyph (identity) and a status (motion).
 enum CompactActivity: Equatable {
-    case mic, timer, meeting, agent(AgentSession), media
-    /// Left-to-right order when two share the island: mic, timer, meeting, media, the agent last.
+    case mic, timer, meeting, agent(AgentSession), media, notifications
+    /// Left-to-right order when two share the island: mic, timer, meeting, media, unread notifications, the agent last.
     var rank: Int {
-        switch self { case .mic: return 0; case .timer: return 1; case .meeting: return 2; case .media: return 3; case .agent: return 4 }
+        switch self {
+        case .mic: return 0; case .timer: return 1; case .meeting: return 2; case .media: return 3; case .notifications: return 4; case .agent: return 5
+        }
     }
 }
 
@@ -301,6 +303,7 @@ struct CompactRow: View {
             if let agent = model.agentBadge { list.append(.agent(agent)) }
             if model.mediaInNotch { list.append(.media) }
         }
+        if model.unreadInNotch { list.append(.notifications) }
         return Array(list.prefix(2)).sorted { $0.rank < $1.rank }
     }
 
@@ -345,6 +348,7 @@ struct CompactRow: View {
                 return meeting.title + (meeting.joinURL == nil ? "" : String(localized: " · tıkla: katıl"))
             case .timer: return "Odak · \(model.timeLabel)"
             case .agent(let agent): return "\(agent.provider.title) · \(agent.project) · \(agent.phase.title)"
+            case .notifications: return String(localized: "\(model.notifications.unread) yeni bildirim · tıkla: göster")
             case .media:
                 guard media.hasTrack else { return String(localized: "Müzik") }
                 let other = media.otherPlaying.map { "\n\($0.title) · \(MediaService.appName(for: $0.bundleID))" } ?? ""
@@ -373,6 +377,10 @@ struct CompactRow: View {
             AgentMascot(session: agent, size: 22, pulse: model.agentAttention)
                 .onTapGesture { model.agents.activate(agent) }
                 .help("\(agent.provider.title) · \(agent.project) · tıkla: \(agent.hostName ?? agent.provider.title)")
+        case .notifications:
+            Image(systemName: "bell.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.accent)
+                .frame(width: 22, height: 22).contentShape(Rectangle())
+                .onTapGesture { model.select(.notifications); model.activeScreenID = screenID; model.expanded = true }
         case .media:
             Group {
                 if let art = media.artwork {
@@ -409,6 +417,10 @@ struct CompactRow: View {
             Image(systemName: model.session.running ? "timer" : "pause.fill").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim)
         case .agent(let agent):
             AgentStatusMark(session: agent)
+        case .notifications:
+            Text(verbatim: "\(min(model.notifications.unread, 99))").font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                .monospacedDigit().contentTransition(.numericText())
+                .onTapGesture { model.select(.notifications); model.activeScreenID = screenID; model.expanded = true }
         case .media:
             Equalizer(playing: media.playing, color: media.accent.map { Color(nsColor: $0) } ?? .white).opacity(media.playing ? 1 : 0.55)
         }
@@ -624,6 +636,7 @@ struct ExpandedView: View {
                 case .focus: FocusView(model: model)
                 case .mirror: MirrorView()
                 case .shortcuts: ShortcutsView(shortcuts: model.shortcuts)
+                case .notifications: NotificationsView(model: model, mirror: model.notifications)
                 case .agents: AgentPanelView(service: model.agents, servers: model.devServers)
                 }
                 }
@@ -700,6 +713,9 @@ struct TabPill: View {
                         Image(systemName: tab.icon).font(.system(size: 12.5, weight: selected ? .semibold : .medium))
                             .frame(width: 34, height: 28)
                         if tab == .files, !model.files.isEmpty {
+                            Circle().fill(Theme.accent).frame(width: 5, height: 5).offset(x: -6, y: 5)
+                        }
+                        if tab == .notifications, model.notifications.unread > 0 {
                             Circle().fill(Theme.accent).frame(width: 5, height: 5).offset(x: -6, y: 5)
                         }
                         if tab == .agents, let badge = model.agentBadge {

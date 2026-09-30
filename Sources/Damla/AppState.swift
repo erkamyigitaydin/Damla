@@ -6,19 +6,20 @@ import ServiceManagement
 import UniformTypeIdentifiers
 
 enum PanelTab: String, CaseIterable, Identifiable {
-    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", mirror = "Ayna", shortcuts = "Kestirmeler", agents = "Agent’lar"   // raw values are stored settings
+    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", mirror = "Ayna", shortcuts = "Kestirmeler", notifications = "Bildirimler", agents = "Agent’lar"   // raw values are stored settings
     var id: String { rawValue }
     var title: String {
         switch self {
         case .home: return String(localized: "Özet"); case .files: return String(localized: "Dosyalar"); case .clipboard: return String(localized: "Pano")
         case .focus: return String(localized: "Odak"); case .mirror: return String(localized: "Ayna")
-        case .shortcuts: return String(localized: "Kestirmeler"); case .agents: return String(localized: "Agent’lar")
+        case .shortcuts: return String(localized: "Kestirmeler"); case .notifications: return String(localized: "Bildirimler")
+        case .agents: return String(localized: "Agent’lar")
         }
     }
     var icon: String {
         switch self {
         case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"
-        case .mirror: return "person.crop.square"; case .shortcuts: return "bolt"; case .agents: return "terminal"
+        case .mirror: return "person.crop.square"; case .shortcuts: return "bolt"; case .notifications: return "bell"; case .agents: return "terminal"
         }
     }
     /// Pages the user keeps in the panel, in the fixed order; never empty. A page added in an update starts
@@ -178,8 +179,10 @@ final class AppState: ObservableObject {
     /// On the screen showing the video, the video stands for the media and the agents stay out of its way.
     func compactSlots(on screenID: UInt32?) -> Int {
         let video = screenID.map(videoShown(on:)) ?? false
-        return min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video, mediaInNotch && !video].filter { $0 }.count)
+        return min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video, mediaInNotch && !video, unreadInNotch].filter { $0 }.count)
     }
+    /// Notifications that came while the Bildirimler page was not looked at: a bell with the count on the closed notch.
+    var unreadInNotch: Bool { notifications.unread > 0 && enabledTabs.contains(.notifications) }
     /// The track earns a place on the closed notch only while it plays (or paused a moment ago).
     var mediaInNotch: Bool { media.hasTrack && media.recentlyPlaying }
     /// Nothing to show on a screen without a physical notch: the closed notch steps out of sight (hovering the
@@ -236,6 +239,11 @@ final class AppState: ObservableObject {
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
         notifications.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        notifications.isViewing = { [weak self] in self.map { $0.expanded && $0.selectedTab == .notifications } ?? false }
+        // Looking at the page reads everything on it.
+        Publishers.CombineLatest($expanded, $selectedTab).receive(on: RunLoop.main)
+            .sink { [weak self] expanded, tab in if expanded && tab == .notifications { self?.notifications.markRead() } }
+            .store(in: &cancellables)
         notifications.start()
         monitor.onOutputs = { [weak self] outputs, current in
             guard let self else { return }
