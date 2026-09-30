@@ -655,18 +655,15 @@ struct NotificationsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(mirror.history.isEmpty ? String(localized: "Bu oturumda gelenler burada toplanır") : String(localized: "\(mirror.history.count) bildirim"))
-                    .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
-                Spacer()
-                if !mirror.history.isEmpty {
-                    Button("Temizle") { withAnimation(Theme.quick) { mirror.clearHistory() } }
-                        .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
-                }
-            }
             if mirror.history.isEmpty {
                 empty
             } else {
+                HStack {
+                    Text("\(mirror.history.count) bildirim").font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
+                    Spacer()
+                    Button("Temizle") { withAnimation(Theme.quick) { mirror.clearHistory() } }
+                        .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
+                }
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
                         ForEach(groups) { group in
