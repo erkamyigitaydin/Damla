@@ -420,3 +420,6 @@
 "Tıkla: %@ uygulamasını aç" = "Click to open %@";
 "%lld sa" = "%lld h";
 "%lld yeni bildirim · tıkla: göster" = "%lld new notifications · click to show";
+"Varsayılan sıra" = "Default order";
+"Sıralamak için sürükle." = "Drag to reorder.";
+"Sıralamak için sürükle" = "Drag to reorder";

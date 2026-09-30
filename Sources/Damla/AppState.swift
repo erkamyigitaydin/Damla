@@ -32,6 +32,19 @@ enum PanelTab: String, CaseIterable, Identifiable {
         let tabs = Set(saved.compactMap(PanelTab.init(rawValue:))).union(Set(allCases).subtracting(known))
         return tabs.isEmpty ? Set(allCases) : tabs
     }
+    /// The user's order of the pages. Pages added in an update take their place after the page they follow by
+    /// default (or first), so a saved order never loses one.
+    static func loadOrder(defaults: UserDefaults = .standard) -> [PanelTab] {
+        var order: [PanelTab] = []
+        for name in defaults.array(forKey: "tabOrder") as? [String] ?? [] {
+            if let tab = PanelTab(rawValue: name), !order.contains(tab) { order.append(tab) }
+        }
+        for (index, tab) in allCases.enumerated() where !order.contains(tab) {
+            let after = allCases[..<index].last(where: order.contains).flatMap { order.firstIndex(of: $0) }
+            order.insert(tab, at: after.map { $0 + 1 } ?? 0)
+        }
+        return order
+    }
 }
 
 struct HUDItem: Identifiable {
@@ -49,10 +62,10 @@ struct HUDItem: Identifiable {
 final class AppState: ObservableObject {
     @Published var expanded = false
     @Published var pinnedOpen = false
-    @Published var selectedTab: PanelTab = PanelTab.allCases.first(where: PanelTab.loadEnabled().contains) ?? .home {
+    @Published var selectedTab: PanelTab = PanelTab.loadOrder().first(where: PanelTab.loadEnabled().contains) ?? .home {
         willSet {
             // Which way the next page comes in: from the right when it sits to the right in the pill.
-            let from = PanelTab.allCases.firstIndex(of: selectedTab) ?? 0, to = PanelTab.allCases.firstIndex(of: newValue) ?? 0
+            let from = tabOrder.firstIndex(of: selectedTab) ?? 0, to = tabOrder.firstIndex(of: newValue) ?? 0
             if from != to { pageDirection = to > from ? 1 : -1 }
         }
     }
@@ -66,7 +79,20 @@ final class AppState: ObservableObject {
             if !enabledTabs.contains(selectedTab), let first = visibleTabs.first { selectedTab = first }
         }
     }
-    var visibleTabs: [PanelTab] { PanelTab.allCases.filter(enabledTabs.contains) }
+    /// The pages in the user's order (Settings → Sayfalar, drag to rearrange); the pill follows it.
+    @Published private(set) var tabOrder = PanelTab.loadOrder() {
+        didSet { UserDefaults.standard.set(tabOrder.map(\.rawValue), forKey: "tabOrder") }
+    }
+    var visibleTabs: [PanelTab] { tabOrder.filter(enabledTabs.contains) }
+    /// Puts a dragged page where another one is: before it when moving up, after it when moving down.
+    func moveTab(_ tab: PanelTab, to target: PanelTab) {
+        guard tab != target, let from = tabOrder.firstIndex(of: tab), let to = tabOrder.firstIndex(of: target) else { return }
+        var order = tabOrder
+        order.remove(at: from)
+        order.insert(tab, at: to)
+        tabOrder = order
+    }
+    func resetTabOrder() { tabOrder = PanelTab.allCases }
     /// Screen whose window currently shows the expanded panel (HUD and basket show on every screen).
     @Published var activeScreenID: UInt32?
     @Published var dragActive = false   // a file drag is in progress somewhere on the system

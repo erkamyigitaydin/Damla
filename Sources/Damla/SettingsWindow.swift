@@ -101,14 +101,19 @@ private struct PanelSettings: View {
     @AppStorage(PolaroidCard.datedKey) private var polaroidDate = true
     var body: some View {
         Form {
-            Section("Sayfalar") {
-                ForEach(PanelTab.allCases) { tab in
-                    let on = model.enabledTabs.contains(tab)
-                    Toggle(isOn: Binding(get: { on }, set: { model.setTab(tab, enabled: $0) })) {
-                        Label(tab.title, systemImage: tab.icon)
+            Section {
+                ForEach(model.tabOrder) { tab in TabOrderRow(tab: tab, model: model) }
+            } header: {
+                HStack {
+                    Text("Sayfalar")
+                    Spacer()
+                    if model.tabOrder != PanelTab.allCases {
+                        Button("Varsayılan sıra") { withAnimation { model.resetTabOrder() } }
+                            .buttonStyle(.link).font(.caption)
                     }
-                    .disabled(on && model.enabledTabs.count == 1)   // one page always stays
                 }
+            } footer: {
+                Text("Sıralamak için sürükle.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Dosyalar ve Pano") {
                 Toggle("Ekran görüntüleri rafa düşsün", isOn: $model.screenshotsToShelf)
@@ -377,6 +382,38 @@ private struct NotificationSettings: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// One page in Settings → Sayfalar: on/off, and dragged by its row to a new place in the pill.
+private struct TabOrderRow: View {
+    let tab: PanelTab
+    @ObservedObject var model: AppState
+    @State private var targeted = false
+    var body: some View {
+        let on = model.enabledTabs.contains(tab)
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
+                .help("Sıralamak için sürükle")
+            Toggle(isOn: Binding(get: { on }, set: { model.setTab(tab, enabled: $0) })) {
+                Label(tab.title, systemImage: tab.icon)
+            }
+            .disabled(on && model.enabledTabs.count == 1)   // one page always stays
+        }
+        .contentShape(Rectangle())
+        .draggable(tab.rawValue) {
+            Label(tab.title, systemImage: tab.icon).padding(.horizontal, 10).padding(.vertical, 5)
+                .background(.regularMaterial, in: Capsule())
+        }
+        .dropDestination(for: String.self) { items, _ in
+            guard let dragged = items.first.flatMap(PanelTab.init(rawValue:)) else { return false }
+            withAnimation(.snappy(duration: 0.25)) { model.moveTab(dragged, to: tab) }
+            return true
+        } isTargeted: { targeted = $0 }
+        .overlay(alignment: .top) {
+            // Where the page will land.
+            if targeted { Rectangle().fill(Color.accentColor).frame(height: 2).offset(y: -6).allowsHitTesting(false) }
         }
     }
 }
