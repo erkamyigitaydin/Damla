@@ -266,9 +266,12 @@ final class AppState: ObservableObject {
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
         notifications.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
         notifications.isViewing = { [weak self] in self.map { $0.expanded && $0.selectedTab == .notifications } ?? false }
-        // Looking at the page reads everything on it.
-        Publishers.CombineLatest($expanded, $selectedTab).receive(on: RunLoop.main)
-            .sink { [weak self] expanded, tab in if expanded && tab == .notifications { self?.notifications.markRead() } }
+        // Looking at the page reads everything on it; leaving it (another page, or the panel closing) clears
+        // what was read.
+        Publishers.CombineLatest($expanded, $selectedTab).removeDuplicates { $0 == $1 }.receive(on: RunLoop.main)
+            .sink { [weak self] expanded, tab in
+                if expanded && tab == .notifications { self?.notifications.markRead() } else { self?.notifications.dropRead() }
+            }
             .store(in: &cancellables)
         notifications.start()
         monitor.onOutputs = { [weak self] outputs, current in

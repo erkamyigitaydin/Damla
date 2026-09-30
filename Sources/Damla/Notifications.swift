@@ -14,6 +14,10 @@ struct MirroredNotification: Identifiable, Equatable {
     /// The banner's own buttons once its details are open (Reply, Accept, Mark as Read…), in order.
     var actions: [String] = []
     var arrived = Date()
+    /// Seen on the Bildirimler page; it leaves the list once the page is left.
+    var read = false
+    /// One conversation: the same app and the same title (a sender, a chat, a build).
+    var thread: String { app + "\u{1F}" + title }
 }
 
 /// Pure pieces of the banner reading, kept apart from Accessibility so the self-tests can check them.
@@ -61,7 +65,7 @@ final class NotificationMirror: ObservableObject {
     @Published private(set) var current: MirroredNotification?
     /// Everything read this session, newest first. Kept in memory only: message texts never touch the disk.
     @Published private(set) var history: [MirroredNotification] = []
-    @Published private(set) var unread = 0
+    var unread: Int { history.reduce(0) { $0 + ($1.read ? 0 : 1) } }
     static let historyLimit = 60
     var isViewing: () -> Bool = { false }
     @Published private(set) var trusted = AXIsProcessTrusted()
@@ -214,14 +218,25 @@ final class NotificationMirror: ObservableObject {
     }
 
     private func record(_ note: MirroredNotification) {
+        var note = note
+        note.read = isViewing()   // arriving while the page is open: seen there
         history.insert(note, at: 0)
         if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
-        if !isViewing() { unread += 1 }
     }
 
-    func markRead() { if unread != 0 { unread = 0 } }
+    /// The page is on screen: everything on it counts as seen.
+    func markRead() {
+        guard history.contains(where: { !$0.read }) else { return }
+        for index in history.indices { history[index].read = true }
+    }
+    /// The page was left: what was seen there goes; what came in since stays until it is looked at.
+    func dropRead() {
+        guard history.contains(where: \.read) else { return }
+        history.removeAll(where: \.read)
+    }
     func remove(_ note: MirroredNotification) { history.removeAll { $0.id == note.id } }
-    func clearHistory() { history.removeAll(); unread = 0 }
+    func removeThread(of note: MirroredNotification) { history.removeAll { $0.thread == note.thread } }
+    func clearHistory() { history.removeAll() }
 
     /// An entry on the page: the live banner still answers (the right conversation); an older one opens its app.
     func open(_ note: MirroredNotification) {
@@ -360,6 +375,8 @@ final class NotificationMirror: ObservableObject {
     /// Notification Center's list like any other.
     private func finish(collapsing: Bool) {
         endWork?.cancel(); endWork = nil
+        // Used from the card (opened, answered, a button, ✕): dealt with, so it does not wait on the page.
+        if !collapsing, let id = current?.id { history.removeAll { $0.id == id } }
         if collapsing, detailsOpen, let banner, let id = current?.id, Self.alive(banner, id: id) {
             collapse(banner)
             dismissLater(banner, id: id)
@@ -534,6 +551,14 @@ struct NotificationCard: View {
                     VStack(alignment: .leading, spacing: 1.5) {
                         HStack(spacing: 6) {
                             Text(verbatim: note.app).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.dim).lineLimit(1)
+                            // More unread from the same conversation wait on the Bildirimler page.
+                            let more = mirror.history.filter { $0.thread == note.thread && $0.id != note.id && !$0.read }.count
+                            if more > 0 {
+                                Text(verbatim: "+\(more)").font(.system(size: 9.5, weight: .bold, design: .rounded)).monospacedDigit()
+                                    .padding(.horizontal, 5).padding(.vertical, 1)
+                                    .background(Theme.fillStrong, in: Capsule())
+                                    .help(String(localized: "Bu konuşmadan \(more) mesaj daha"))
+                            }
                             Spacer(minLength: 4)
                             Button { mirror.close() } label: {
                                 Image(systemName: "xmark").font(.system(size: 8.5, weight: .bold)).foregroundStyle(Theme.dim)
@@ -643,6 +668,15 @@ struct NotificationsView: View {
         let bundleID: String?
         var notes: [MirroredNotification]
         var id: String { app }
+        /// The app's conversations, the one with the newest message first; each newest-first.
+        var threads: [[MirroredNotification]] {
+            var order: [String] = [], byThread: [String: [MirroredNotification]] = [:]
+            for note in notes {
+                if byThread[note.thread] == nil { order.append(note.thread) }
+                byThread[note.thread, default: []].append(note)
+            }
+            return order.compactMap { byThread[$0] }
+        }
     }
     private var groups: [AppGroup] {
         var order: [String] = [], byApp: [String: AppGroup] = [:]
@@ -672,7 +706,7 @@ struct NotificationsView: View {
                                     appIcon(group.bundleID).frame(width: 15, height: 15)
                                     Text(verbatim: group.app).font(.system(size: 10.5, weight: .semibold)).foregroundStyle(Theme.dim)
                                 }
-                                ForEach(group.notes) { note in HistoryRow(note: note, mirror: mirror) }
+                                ForEach(group.threads, id: \.first?.thread) { thread in ThreadStack(notes: thread, mirror: mirror) }
                             }
                         }
                     }
@@ -708,15 +742,59 @@ struct NotificationsView: View {
     }
 }
 
+/// A conversation on the page. One message is a plain row; more fold into a stack (the newest on top, the
+/// others as edges under it, "+N"): a click spreads it out, "Daralt" folds it again.
+private struct ThreadStack: View {
+    let notes: [MirroredNotification]
+    @ObservedObject var mirror: NotificationMirror
+    @State private var open = false
+    var body: some View {
+        if notes.count == 1 || open {
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(notes) { note in HistoryRow(note: note, mirror: mirror) }
+                if notes.count > 1 {
+                    Button { withAnimation(Theme.quick) { open = false } } label: {
+                        Label("Daralt", systemImage: "chevron.up").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
+                    }
+                    .buttonStyle(.plain).padding(.leading, 9)
+                }
+            }
+            .transition(.opacity)
+        } else if let top = notes.first {
+            HistoryRow(note: top, mirror: mirror, stacked: notes.count - 1) { withAnimation(Theme.quick) { open = true } }
+                // The folded messages peek out underneath, like a stack of cards.
+                .background(alignment: .bottom) {
+                    VStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.fill).frame(height: 10).padding(.horizontal, 7)
+                        if notes.count > 2 {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.fill.opacity(0.6)).frame(height: 6).padding(.horizontal, 14)
+                        }
+                    }
+                    .offset(y: notes.count > 2 ? 10 : 5)
+                }
+                .padding(.bottom, notes.count > 2 ? 10 : 5)
+                .transition(.opacity)
+        }
+    }
+}
+
 private struct HistoryRow: View {
     let note: MirroredNotification
     @ObservedObject var mirror: NotificationMirror
+    /// Folded messages under this one; a click then spreads the stack instead of opening.
+    var stacked = 0
+    var spread: (() -> Void)? = nil
     @State private var hovering = false
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(verbatim: note.title.isEmpty ? note.app : note.title).font(.system(size: 11.5, weight: .semibold)).lineLimit(1)
+                    if stacked > 0 {
+                        Text(verbatim: "+\(stacked)").font(.system(size: 9.5, weight: .bold, design: .rounded)).monospacedDigit()
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Theme.fillStrong, in: Capsule())
+                    }
                     Spacer(minLength: 4)
                     TimelineView(.everyMinute) { _ in
                         Text(verbatim: Self.age(note.arrived)).font(.system(size: 10, design: .rounded)).monospacedDigit().foregroundStyle(Theme.faint)
@@ -728,8 +806,8 @@ private struct HistoryRow: View {
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture { mirror.open(note) }
-            Button { withAnimation(Theme.quick) { mirror.remove(note) } } label: {
+            .onTapGesture { if let spread { spread() } else { mirror.open(note) } }
+            Button { withAnimation(Theme.quick) { stacked > 0 ? mirror.removeThread(of: note) : mirror.remove(note) } } label: {
                 Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.dim)
                     .frame(width: 16, height: 16).background(Theme.fill, in: Circle()).contentShape(Circle())
             }
@@ -740,7 +818,8 @@ private struct HistoryRow: View {
         .padding(.horizontal, 9).padding(.vertical, 6)
         .background(Theme.fill.opacity(hovering ? 1.6 : 1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onHover { hovering = $0 }
-        .help(note.bundleID == nil ? "" : String(localized: "Tıkla: \(note.app) uygulamasını aç"))
+        .help(stacked > 0 ? String(localized: "\(stacked + 1) mesaj · tıkla: hepsini göster")
+              : note.bundleID == nil ? "" : String(localized: "Tıkla: \(note.app) uygulamasını aç"))
     }
 
     /// "şimdi", "5 dk", "2 sa"

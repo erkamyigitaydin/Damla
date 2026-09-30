@@ -423,3 +423,6 @@
 "Varsayılan sıra" = "Default order";
 "Sıralamak için sürükle." = "Drag to reorder.";
 "Sıralamak için sürükle" = "Drag to reorder";
+"Daralt" = "Collapse";
+"%lld mesaj · tıkla: hepsini göster" = "%lld messages · click to show all";
+"Bu konuşmadan %lld mesaj daha" = "%lld more from this conversation";
