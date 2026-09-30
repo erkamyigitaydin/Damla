@@ -117,12 +117,14 @@ struct DamlaView: View {
     @State private var glassVisible = false
     init(model: AppState, screen: ScreenMetrics) { self.model = model; media = model.media; self.screen = screen }
 
-    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics; var content: CGFloat; var video: Layout.VideoSpec? }
+    private struct Key: Equatable { var state: NotchState; var compact: Int; var dropping: Bool; var metrics: Layout.Metrics; var content: CGFloat; var video: Layout.VideoSpec?; var hidden: Bool }
     private var state: NotchState { model.state(for: screen.id) }
     private var metrics: Layout.Metrics { screen.metrics }
     private var open: Bool { state == .expanded }
     private var video: Layout.VideoSpec? { open ? nil : model.videoSpec(on: screen.id) }
     private var slots: Int { model.compactSlots(on: screen.id) }
+    /// Idle on a notchless screen: the notch draws back up into the menu bar and fades out.
+    private var hidden: Bool { model.idleHidden(on: screen.id, physicalNotch: screen.physicalNotch) }
     private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: slots, content: model.contentHeight, video: video) }
     private var shape: NotchShape {
         let bottom: CGFloat = open ? 26 : state == .drop ? 24 : video.map { $0.large ? 22 : 18 } ?? 13
@@ -134,6 +136,8 @@ struct DamlaView: View {
     var body: some View {
         ZStack(alignment: .top) {
             surface.frame(width: size.width, height: size.height)
+                .scaleEffect(x: hidden ? 0.7 : 1, y: hidden ? 0.2 : 1, anchor: .top)
+                .opacity(hidden ? 0 : 1)
             // Always present so its top padding animates with the shape: the pill rides down with the panel.
             TabPill(model: model)
                 .opacity(open && !model.cleaning.active ? 1 : 0)
@@ -145,7 +149,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: slots, dropping: dropping, metrics: metrics, content: model.contentHeight, video: video))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: slots, dropping: dropping, metrics: metrics, content: model.contentHeight, video: video, hidden: hidden))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -288,7 +292,7 @@ struct CompactRow: View {
         if model.calendar.soon != nil { list.append(.meeting) }
         if !(screenID.map(model.videoShown(on:)) ?? false) {   // the video under this notch already says what is playing
             if let agent = model.agentBadge { list.append(.agent(agent)) }
-            if media.hasTrack { list.append(.media) }
+            if model.mediaInNotch { list.append(.media) }
         }
         return Array(list.prefix(2)).sorted { $0.rank < $1.rank }
     }

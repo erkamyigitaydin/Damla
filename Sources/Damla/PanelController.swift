@@ -21,6 +21,8 @@ final class NotchPanel: NSPanel {
 final class ScreenMetrics: ObservableObject {
     @Published var id: UInt32
     @Published var metrics: Layout.Metrics
+    /// The screen has a real notch (a fake one drawn into the menu bar also reports `hasNotch`).
+    @Published var physicalNotch = false
     init(id: UInt32, metrics: Layout.Metrics) { self.id = id; self.metrics = metrics }
 }
 
@@ -167,8 +169,10 @@ final class PanelController {
     }
 
     private func updateMousePassthrough() {
-        // No hover tolerance here: even the transparent strip below a closed notch belongs to the app behind it.
-        let ignores = concealed || !visibleRect().contains(NSEvent.mouseLocation)
+        // No hover tolerance here: even the transparent strip below a closed notch belongs to the app behind it,
+        // and so does the whole spot while an idle notch is hidden (hovering it still opens the panel).
+        let hidden = model.idleHidden(on: id, physicalNotch: screenInfo.physicalNotch)
+        let ignores = concealed || hidden || !visibleRect().contains(NSEvent.mouseLocation)
         if panel.ignoresMouseEvents != ignores { panel.ignoresMouseEvents = ignores }
     }
 
@@ -204,6 +208,7 @@ final class PanelController {
         }
         if screenInfo.id != screen.displayID { screenInfo.id = screen.displayID }
         if screenInfo.metrics != metrics { screenInfo.metrics = metrics }
+        if screenInfo.physicalNotch != physicalNotch { screenInfo.physicalNotch = physicalNotch }
     }
 
     private var topY: CGFloat {
@@ -740,7 +745,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     /// Draws the media views off screen into /tmp (for checks while the real screen is busy or protected).
-    /// Debug: an Ayna print from a drawn test picture, run through the nostalgia look, to /tmp/damla-card.png.
+    /// Debug: an Ayna photo from a drawn test picture, run through the nostalgia look, to /tmp/damla-card.png.
     @MainActor private func renderCard() {
         let size = 720
         let gradient = CIFilter(name: "CILinearGradient", parameters: [
@@ -748,7 +753,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "inputColor0": CIColor(red: 0.2, green: 0.45, blue: 0.8), "inputColor1": CIColor(red: 0.95, green: 0.75, blue: 0.45)])
         guard let base = gradient?.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: size, height: size)),
               let photo = MirrorAlbum.context.createCGImage(FilmLook.nostalgia.develop(base), from: CGRect(x: 0, y: 0, width: size, height: size)) else { return }
-        let renderer = ImageRenderer(content: PhotoCard(photo: NSImage(cgImage: photo, size: .zero), taken: Date(), width: PhotoCard.printWidth))
+        let side = CGSize(width: size, height: size)
+        let renderer = ImageRenderer(content: StampedPhoto(photo: NSImage(cgImage: photo, size: side), taken: Date(), size: side))
         renderer.scale = 2
         if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: "/tmp/damla-card.png"))

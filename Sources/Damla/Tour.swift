@@ -205,22 +205,20 @@ private struct TourPlaceholder: View {
                 VStack(alignment: .leading, spacing: 5) { bone(44, 7); bone(56, 6); HStack(spacing: 4) { circle(9); circle(9); circle(9) } }
             }
         case .mirror:
-            // An instant-film card: cream frame, the photo still undeveloped, the date stamp in its corner.
-            VStack(spacing: 0) {
-                RoundedRectangle(cornerRadius: 2).fill(Color(red: 0.86, green: 0.84, blue: 0.8))
-                    .frame(width: 66, height: 66)
-                    .overlay(alignment: .bottomTrailing) {
-                        Text(verbatim: "’26 9 27").font(.system(size: 6.5, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16)).padding(3)
-                    }
-                    .padding(.top, 6)
-                RoundedRectangle(cornerRadius: 1.5).fill(Color(red: 0.8, green: 0.78, blue: 0.74)).frame(width: 40, height: 3.5).padding(.top, 8)
-                Spacer(minLength: 0)
-            }
-            .frame(width: 78, height: 98)
-            .background(Color(red: 0.97, green: 0.95, blue: 0.9), in: RoundedRectangle(cornerRadius: 3))
-            .rotationEffect(.degrees(-5))
-            .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
+            // A wide viewfinder with the date stamp, the shutter and the last photo in its corner.
+            RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.1))
+                .frame(width: 150, height: 66)
+                .overlay(alignment: .bottomLeading) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color(red: 0.86, green: 0.84, blue: 0.8))
+                        .frame(width: 16, height: 16)
+                        .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(.white.opacity(0.8), lineWidth: 1))
+                        .padding(6)
+                }
+                .overlay(alignment: .bottom) { Circle().fill(.white.opacity(0.85)).frame(width: 14, height: 14).padding(.bottom, 6) }
+                .overlay(alignment: .bottomTrailing) {
+                    Text(verbatim: "’26 10 1").font(.system(size: 6.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16)).padding(6)
+                }
         case .pages:
             VStack(spacing: 10) {
                 HStack(spacing: 7) {

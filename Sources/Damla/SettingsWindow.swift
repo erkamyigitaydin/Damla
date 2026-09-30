@@ -141,6 +141,10 @@ private struct DisplaySettings: View {
                     Text("Çentiksiz ekranda")
                     Text(model.externalStyle == .menuBar ? "Menü çubuğuna oturur." as LocalizedStringKey : "Menü çubuğunun altında yüzer.")
                 }
+                Toggle(isOn: $model.hideIdleNotch) {
+                    Text("Boştayken gizle")
+                    Text("Bir şey çalmıyor, ajan çalışmıyorsa çentiksiz ekranda görünmez. İmleci götürünce açılır.")
+                }
             }
             .onChange(of: model.displayMode) { _, _ in model.savePreferences() }
             .onChange(of: model.externalStyle) { _, _ in model.savePreferences() }

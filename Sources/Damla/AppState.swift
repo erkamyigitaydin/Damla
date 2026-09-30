@@ -74,6 +74,10 @@ final class AppState: ObservableObject {
     @Published var displayMode = DisplayMode(rawValue: UserDefaults.standard.string(forKey: "displayMode") ?? "") ?? .all
     @Published var externalStyle = ExternalStyle(rawValue: UserDefaults.standard.string(forKey: "externalStyle") ?? "") ?? .menuBar
     @Published var hideSystemHUD = UserDefaults.standard.bool(forKey: "hideSystemHUD")
+    /// With nothing playing, no agent at work and no timer, the closed notch on a notchless screen is not drawn.
+    @Published var hideIdleNotch = UserDefaults.standard.object(forKey: "hideIdleNotch") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(hideIdleNotch, forKey: "hideIdleNotch") }
+    }
     @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
     @Published var noticeAction: (() -> Void)?
     @Published var battery = BatterySnapshot()
@@ -165,7 +169,14 @@ final class AppState: ObservableObject {
     /// On the screen showing the video, the video stands for the media and the agents stay out of its way.
     func compactSlots(on screenID: UInt32?) -> Int {
         let video = screenID.map(videoShown(on:)) ?? false
-        return min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video, media.hasTrack && !video].filter { $0 }.count)
+        return min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video, mediaInNotch && !video].filter { $0 }.count)
+    }
+    /// The track earns a place on the closed notch while it plays; with "hide when idle" off, paused too.
+    var mediaInNotch: Bool { media.hasTrack && (!hideIdleNotch || media.recentlyPlaying) }
+    /// Nothing to show on a screen without a physical notch: the closed notch steps out of sight (hovering the
+    /// spot still opens the panel). A physical notch is there anyway, so it keeps its usual shape.
+    func idleHidden(on screenID: UInt32, physicalNotch: Bool) -> Bool {
+        hideIdleNotch && !physicalNotch && state(for: screenID) == .closed && compactSlots(on: screenID) == 0 && !videoShown(on: screenID)
     }
     /// The video under the closed notch, when one is showing.
     /// Only on the screen it was started from; the other screens keep their usual notch.

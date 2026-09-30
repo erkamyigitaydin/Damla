@@ -36,7 +36,10 @@ final class MediaService: ObservableObject {
     /// Whether the shown Apple Music track is a favorite; nil for other players (Spotify has no such command).
     @Published private(set) var favorited: Bool?
     private var favoriteKey = ""
-    @Published var playing = false
+    @Published var playing = false { didSet { if playing != oldValue { followPlaying() } } }
+    /// Playing, or paused only a moment ago: the closed notch keeps the track through a skip or a gap between songs.
+    @Published private(set) var recentlyPlaying = false
+    private var quietTimer: Timer?
     @Published var duration: Double = 0
     @Published var position: Double = 0
     @Published var positionDate = Date()
@@ -78,6 +81,16 @@ final class MediaService: ObservableObject {
     /// Set while the panel is open: refresh every second. Otherwise 2 s while playing, 6 s when idle.
     var wantsFrequentUpdates = false
 
+    private func followPlaying() {
+        quietTimer?.invalidate(); quietTimer = nil
+        if playing { if !recentlyPlaying { recentlyPlaying = true }; return }
+        let timer = Timer(timeInterval: 4, repeats: false) { [weak self] _ in
+            guard let self, !self.playing, self.recentlyPlaying else { return }
+            self.recentlyPlaying = false
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        quietTimer = timer
+    }
     func start() {
         store.handoffEnabled = handoffMode != .off   // the saved choice, not the store's default
         if NowPlayingBridge.isBundled {

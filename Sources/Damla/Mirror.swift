@@ -139,17 +139,21 @@ final class MirrorCamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSa
         lock.lock(); latest = buffer; lock.unlock()
     }
 
-    /// The newest frame, mirrored like the preview and cropped to a square, in the chosen look.
-    func snapshot(look: FilmLook) -> CGImage? {
+    /// The newest frame, mirrored like the preview and cropped to the viewfinder's shape (what you see is what
+    /// you get), in the chosen look.
+    func snapshot(look: FilmLook, aspect: CGFloat) -> CGImage? {
         lock.lock(); let buffer = latest; lock.unlock()
-        guard let buffer else { return nil }
+        guard let buffer, aspect > 0 else { return nil }
         var image = CIImage(cvPixelBuffer: buffer)
         image = image.transformed(by: CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -image.extent.width, y: 0))
-        let side = min(image.extent.width, image.extent.height)
-        let square = CGRect(x: image.extent.midX - side / 2, y: image.extent.midY - side / 2, width: side, height: side)
-        image = image.cropped(to: square).transformed(by: CGAffineTransform(translationX: -square.minX, y: -square.minY))
+        let extent = image.extent
+        var crop = extent
+        if extent.width / extent.height > aspect { crop.size.width = (extent.height * aspect).rounded() }
+        else { crop.size.height = (extent.width / aspect).rounded() }
+        crop.origin = CGPoint(x: extent.midX - crop.width / 2, y: extent.midY - crop.height / 2)
+        image = image.cropped(to: crop).transformed(by: CGAffineTransform(translationX: -crop.minX, y: -crop.minY))
         image = look.develop(image)
-        return MirrorAlbum.context.createCGImage(image, from: CGRect(x: 0, y: 0, width: side, height: side))
+        return MirrorAlbum.context.createCGImage(image, from: CGRect(origin: .zero, size: crop.size))
     }
 
     deinit { if session.isRunning { session.stopRunning() } }
@@ -157,20 +161,19 @@ final class MirrorCamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSa
 
 // MARK: - Album
 
-/// Printed cards, saved as PNG files in ~/Pictures/Damla. The page shows the newest few as a pile.
+/// Photos saved as JPEG files in ~/Pictures/Damla. The page shows the newest one as a small thumbnail in the
+/// corner, like the Camera app.
 final class MirrorAlbum: ObservableObject {
-    struct Print: Identifiable, Equatable {
+    struct Photo: Identifiable, Equatable {
         let url: URL
-        let image: NSImage
+        let thumbnail: NSImage
         var id: URL { url }
-        static func == (a: Print, b: Print) -> Bool { a.url == b.url }
+        static func == (a: Photo, b: Photo) -> Bool { a.url == b.url }
     }
     static let context = CIContext()
-    static let pileSize = 5
-    @Published private(set) var prints: [Print] = []
+    static let extensions: Set<String> = ["jpg", "jpeg", "png", "heic"]
+    @Published private(set) var latest: Photo?
     @Published private(set) var total = 0
-    /// The print that just came out: it slides out of the notch and develops.
-    @Published private(set) var fresh: URL?
 
     static var folder: URL {
         let pictures = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first ?? FileManager.default.homeDirectoryForCurrentUser
@@ -180,79 +183,75 @@ final class MirrorAlbum: ObservableObject {
     func load() {
         DispatchQueue.global(qos: .userInitiated).async {
             let files = ((try? FileManager.default.contentsOfDirectory(at: Self.folder, includingPropertiesForKeys: [.creationDateKey])) ?? [])
-                .filter { $0.pathExtension.lowercased() == "png" }
-            let sorted = files.sorted {
+                .filter { Self.extensions.contains($0.pathExtension.lowercased()) }
+            let newest = files.max {
                 let a = (try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
                 let b = (try? $1.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
-                return a > b
+                return a < b
             }
-            let prints = sorted.prefix(Self.pileSize).compactMap { url in NSImage(contentsOf: url).map { Print(url: url, image: $0) } }
+            let photo = newest.flatMap { url in Self.thumbnail(of: url).map { Photo(url: url, thumbnail: $0) } }
             DispatchQueue.main.async {
-                if prints != self.prints { self.prints = prints }
+                if photo != self.latest { self.latest = photo }
                 self.total = files.count
             }
         }
     }
 
-    /// Renders the card at print resolution and puts it on top of the pile.
+    /// A small copy for the corner; the full photo is never held in memory.
+    static func thumbnail(of url: URL) -> NSImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 200,
+                kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { return nil }
+        return NSImage(cgImage: image, size: .zero)
+    }
+
+    /// Burns the date stamp in and writes the photo; the page shows it once it has flown into the corner.
     @MainActor
-    func print(_ photo: CGImage, taken: Date) -> URL? {
-        let card = PhotoCard(photo: NSImage(cgImage: photo, size: .zero), taken: taken, width: PhotoCard.printWidth)
-        let renderer = ImageRenderer(content: card)
-        renderer.scale = 3
-        guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return nil }
+    func save(_ photo: CGImage, taken: Date) -> Photo? {
+        let size = CGSize(width: photo.width, height: photo.height)
+        let renderer = ImageRenderer(content: StampedPhoto(photo: NSImage(cgImage: photo, size: size), taken: taken, size: size))
+        renderer.scale = 1
+        guard let image = renderer.cgImage,
+              let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else { return nil }
         try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let url = Self.folder.appendingPathComponent("Damla \(formatter.string(from: taken)).png")
-        guard (try? png.write(to: url)) != nil else { return nil }
-        fresh = url
-        prints.insert(Print(url: url, image: image), at: 0)
-        if prints.count > Self.pileSize { prints.removeLast(prints.count - Self.pileSize) }
-        total += 1
-        return url
+        let url = Self.folder.appendingPathComponent("Damla \(formatter.string(from: taken)).jpg")
+        guard (try? jpeg.write(to: url)) != nil, let thumbnail = Self.thumbnail(of: url) else { return nil }
+        return Photo(url: url, thumbnail: thumbnail)
     }
 
-    func settle() { fresh = nil }
+    func show(_ photo: Photo) {
+        latest = photo
+        total += 1
+    }
 
-    func trash(_ print: Print) {
-        try? FileManager.default.trashItem(at: print.url, resultingItemURL: nil)
+    func trash(_ photo: Photo) {
+        try? FileManager.default.trashItem(at: photo.url, resultingItemURL: nil)
         load()
     }
 }
 
-// MARK: - The card
+// MARK: - The photo
 
-/// An instant-film card: cream frame, square photo with an orange date stamp burnt in the corner like an old
-/// point-and-shoot, and the date written by hand in the wide bottom margin.
-struct PhotoCard: View {
-    static let printWidth: CGFloat = 300
-    static let aspect: CGFloat = 1.26
+/// The photo with an orange date stamp burnt into its corner, like an old point-and-shoot.
+struct StampedPhoto: View {
     let photo: NSImage
     let taken: Date
-    let width: CGFloat
+    let size: CGSize
     var body: some View {
-        let margin = width * 0.07, side = width * 0.86
-        VStack(spacing: 0) {
-            Image(nsImage: photo).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
-                .frame(width: side, height: side).clipped()
-                .overlay(alignment: .bottomTrailing) {
-                    Text(verbatim: PhotoCard.stamp(taken))
-                        .font(.system(size: side * 0.068, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
-                        .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: side * 0.012)
-                        .blur(radius: side * 0.0015)
-                        .padding(side * 0.05)
-                }
-                .padding(.top, margin)
-            Text(verbatim: PhotoCard.caption(taken))
-                .font(.custom("Bradley Hand", size: width * 0.072).weight(.bold))
-                .foregroundStyle(Color(red: 0.19, green: 0.22, blue: 0.34).opacity(0.85))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .frame(width: width, height: width * Self.aspect)
-        .background(Color(red: 0.97, green: 0.95, blue: 0.9), in: RoundedRectangle(cornerRadius: width * 0.025, style: .continuous))
+        let unit = min(size.width, size.height)
+        Image(nsImage: photo).resizable().interpolation(.high)
+            .frame(width: size.width, height: size.height)
+            .overlay(alignment: .bottomTrailing) {
+                Text(verbatim: Self.stamp(taken))
+                    .font(.system(size: unit * 0.068, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
+                    .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: unit * 0.012)
+                    .blur(radius: unit * 0.0015)
+                    .padding(unit * 0.06)
+            }
     }
 
     /// "'26 9 27", the way film cameras printed the date.
@@ -260,16 +259,12 @@ struct PhotoCard: View {
         let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
         return String(format: "’%02d %d %d", (parts.year ?? 0) % 100, parts.month ?? 0, parts.day ?? 0)
     }
-    /// "27 Eylül 2026 · 01:45"
-    static func caption(_ date: Date) -> String {
-        date.formatted(.dateTime.day().month(.wide).year()) + " · " + date.formatted(date: .omitted, time: .shortened)
-    }
 }
 
 // MARK: - The page
 
-/// Ayna: an instant camera in the notch. A 3-2-1 countdown, a flash, and the card prints out of the notch,
-/// developing from white as it drops onto the pile. The camera runs only while this page is on screen.
+/// Ayna: a camera in the notch. The viewfinder spans the panel; a 3-2-1 countdown, a flash, and the photo
+/// shrinks into the thumbnail in the bottom-left corner. The camera runs only while this page is on screen.
 struct MirrorView: View {
     @ObservedObject private var camera = MirrorCamera.shared
     @StateObject private var album = MirrorAlbum()
@@ -278,24 +273,33 @@ struct MirrorView: View {
     @State private var countdown: Int?
     @State private var flash = false
     @State private var hovering = false
+    @State private var frameSize = CGSize(width: 380, height: 162)
+    /// The photo just taken, on its way from the viewfinder into the corner.
+    @State private var flying: NSImage?
+    @State private var landed = false
 
     private var look: FilmLook { FilmLook(rawValue: lookName) ?? .nostalgia }
+    static let thumb: CGFloat = 40
+    static let corner: CGFloat = 16
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            viewfinder.frame(width: 160, height: 160)
-            pile.frame(maxWidth: .infinity)
+        GeometryReader { geo in
+            viewfinder
+                .onAppear { frameSize = geo.size }
+                .onChange(of: geo.size) { _, size in frameSize = size }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Wider than the other pages: the picture runs almost to the panel's edges.
+        .padding(.horizontal, -12)
         .onAppear { camera.start(); album.load() }
-        .onDisappear { camera.stop(); countdown = nil; camera.busy = false }
+        .onDisappear { camera.stop(); countdown = nil; camera.busy = false; flying = nil }
     }
 
     // Viewfinder
 
     private var viewfinder: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.black)
+        let shape = RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
+        return ZStack {
+            shape.fill(Color.black)
             switch camera.state {
             case .running:
                 CameraPreview(session: camera.session, filters: look.previewFilters())
@@ -323,13 +327,15 @@ struct MirrorView: View {
                         }
                     }
                     .overlay(alignment: .bottomTrailing) {
+                        // The date the photo will carry; the controls take its corner while the pointer is here.
                         TimelineView(.everyMinute) { context in
-                            Text(verbatim: PhotoCard.stamp(context.date))
+                            Text(verbatim: StampedPhoto.stamp(context.date))
                                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
                                 .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: 2.5)
                                 .padding(10)
                         }
+                        .opacity(showControls ? 0 : 1)
                     }
             case .denied:
                 VStack(spacing: 8) {
@@ -354,31 +360,25 @@ struct MirrorView: View {
                 // The shutter row appears over the picture only while the pointer is on it and nothing is being shot.
                 VStack(spacing: 0) {
                     Spacer()
-                    controls.padding(.horizontal, 9).padding(.bottom, 9).padding(.top, 24)
+                    controls.padding(.horizontal, 10).padding(.bottom, 8).padding(.top, 24)
                         .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
                 }
                 .transition(.opacity)
             }
             Color.white.opacity(flash ? 0.95 : 0).allowsHitTesting(false)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(alignment: .bottomLeading) { corner }
+        .clipShape(shape)
+        .contentShape(shape)
         .onHover { inside in withAnimation(.easeOut(duration: 0.18)) { hovering = inside } }
         .animation(.easeOut(duration: 0.18), value: countdown == nil)
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.12), lineWidth: 1))
+        .overlay(shape.strokeBorder(.white.opacity(0.12), lineWidth: 1))
     }
 
     private var showControls: Bool { hovering && camera.state == .running && countdown == nil && !camera.busy }
 
     private var controls: some View {
-        HStack {
-            Button { withAnimation(Theme.quick) { lookName = look.next.rawValue } } label: {
-                Image(systemName: look.icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
-                    .frame(width: 30, height: 30).contentShape(Circle())
-            }
-            .buttonStyle(GlassCircleStyle())
-            .help(String(localized: "Film görünümü: \(look.title) · değiştir"))
-            Spacer(minLength: 6)
+        ZStack {
             Button(action: shoot) {
                 ZStack {
                     Circle().fill(.white).frame(width: 34, height: 34)
@@ -390,52 +390,42 @@ struct MirrorView: View {
             .disabled(camera.state != .running || countdown != nil)
             .opacity(camera.state == .running ? 1 : 0.4)
             .help(useTimer ? "3 saniye sonra çek" : "Çek")
-            Spacer(minLength: 6)
-            Button { useTimer.toggle() } label: {
-                Image(systemName: useTimer ? "3.circle" : "bolt.fill").font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(useTimer ? Theme.accent : .white).contentTransition(.symbolEffect(.replace))
-                    .frame(width: 30, height: 30).contentShape(Circle())
+            HStack(spacing: 8) {
+                Spacer()
+                Button { withAnimation(Theme.quick) { lookName = look.next.rawValue } } label: {
+                    Image(systemName: look.icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                        .frame(width: 30, height: 30).contentShape(Circle())
+                }
+                .buttonStyle(GlassCircleStyle())
+                .help(String(localized: "Film görünümü: \(look.title) · değiştir"))
+                Button { useTimer.toggle() } label: {
+                    Image(systemName: useTimer ? "3.circle" : "bolt.fill").font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(useTimer ? Theme.accent : .white).contentTransition(.symbolEffect(.replace))
+                        .frame(width: 30, height: 30).contentShape(Circle())
+                }
+                .buttonStyle(GlassCircleStyle())
+                .help(useTimer ? "3 saniye geri sayım · kapat" : "Hemen çeker · geri sayımı aç")
             }
-            .buttonStyle(GlassCircleStyle())
-            .help(useTimer ? "3 saniye geri sayım · kapat" : "Hemen çeker · geri sayımı aç")
         }
+        .frame(height: 43)
     }
 
-    // Pile of prints
+    // The newest photo in the corner
 
-    private var pile: some View {
-        VStack(spacing: 4) {
-            ZStack(alignment: .top) {
-                if album.prints.isEmpty {
-                    VStack(spacing: 6) {
-                        Image(systemName: "photo.on.rectangle.angled").font(.system(size: 22, weight: .light)).foregroundStyle(Theme.faint)
-                        Text("Çektiklerin burada birikir").font(.system(size: 10.5)).foregroundStyle(Theme.faint).multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity).padding(.top, 40)
-                }
-                ForEach(Array(album.prints.enumerated().reversed()), id: \.element.id) { index, print in
-                    PrintView(print: print, fresh: album.fresh == print.url, album: album, onSettled: { album.settle() })
-                        .rotationEffect(.degrees(Self.tilt(print.url)))
-                        .offset(x: CGFloat(index) * 3, y: CGFloat(index) * 5)
-                        .zIndex(Double(album.prints.count - index))
-                        .transition(.printOut)
-                }
-            }
-            .frame(height: 140, alignment: .top)
-            Spacer(minLength: 0)
-            Button { NSWorkspace.shared.open(MirrorAlbum.folder) } label: {
-                Label(album.total == 0 ? String(localized: "Klasör") : String(localized: "\(album.total) fotoğraf"), systemImage: "folder")
-                    .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
-            }
-            .buttonStyle(.plain)
-            .help(MirrorAlbum.folder.path)
+    @ViewBuilder private var corner: some View {
+        if let flying {
+            // Fills the viewfinder at the flash, then shrinks into the corner.
+            Image(nsImage: flying).resizable().aspectRatio(contentMode: .fill)
+                .frame(width: landed ? Self.thumb : frameSize.width, height: landed ? Self.thumb : frameSize.height)
+                .clipShape(RoundedRectangle(cornerRadius: landed ? 9 : Self.corner, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: landed ? 9 : Self.corner, style: .continuous)
+                    .strokeBorder(.white.opacity(landed ? 0.85 : 0), lineWidth: 1.5))
+                .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+                .padding(.leading, landed ? 10 : 0).padding(.bottom, landed ? 10 : 0)
+                .allowsHitTesting(false)
+        } else if let photo = album.latest, camera.state == .running {
+            ThumbnailView(photo: photo, album: album).padding(10).transition(.opacity)
         }
-    }
-
-    /// Each print lies at its own slight angle, stable across launches.
-    static func tilt(_ url: URL) -> Double {
-        let hash = url.lastPathComponent.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xffff }
-        return Double(hash % 13) - 6
     }
 
     // Shooting
@@ -455,17 +445,22 @@ struct MirrorView: View {
     }
 
     private func take() {
-        guard let photo = camera.snapshot(look: look) else { camera.busy = false; return }
+        let aspect = frameSize.height > 0 ? frameSize.width / frameSize.height : 16 / 9
+        guard let photo = camera.snapshot(look: look, aspect: aspect) else { camera.busy = false; return }
         MirrorView.shutter?.stop(); MirrorView.shutter?.play()
         flash = true
         withAnimation(.easeOut(duration: 0.45)) { flash = false }
-        // The card prints a beat after the flash, like an instant camera ejecting it.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            withAnimation(.spring(duration: 1.1, bounce: 0.22)) {
-                _ = album.print(photo, taken: Date())
-            }
-            // Let the card land before the panel may fold away.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { camera.busy = false }
+        let saved = album.save(photo, taken: Date())
+        landed = false
+        flying = NSImage(cgImage: photo, size: .zero)
+        // A beat on the full picture after the flash, then into the corner.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.spring(duration: 0.55, bounce: 0.14)) { landed = true }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
+            if let saved { album.show(saved) }
+            flying = nil
+            camera.busy = false
         }
     }
 
@@ -473,58 +468,32 @@ struct MirrorView: View {
         ?? NSSound(named: "Tink")
 }
 
-/// One print on the pile. The fresh one develops: its photo starts as a blank cream square and comes up over a
-/// few seconds, colour last.
-private struct PrintView: View {
-    let print: MirrorAlbum.Print
-    let fresh: Bool
+/// The newest photo as a small square in the corner: click opens it, drag takes it anywhere.
+private struct ThumbnailView: View {
+    let photo: MirrorAlbum.Photo
     @ObservedObject var album: MirrorAlbum
-    let onSettled: () -> Void
-    @State private var developed = false
-    static let width: CGFloat = 92
+    @State private var hovering = false
     var body: some View {
-        let w = Self.width, margin = w * 0.07, side = w * 0.86
-        Image(nsImage: print.image).resizable().interpolation(.high)
-            .frame(width: w, height: w * PhotoCard.aspect)
-            .overlay(alignment: .top) {
-                // The undeveloped emulsion over the photo area only.
-                Rectangle().fill(Color(red: 0.93, green: 0.92, blue: 0.88))
-                    .frame(width: side, height: side).padding(.top, margin)
-                    .opacity(fresh && !developed ? 0.97 : 0)
-            }
-            .saturation(fresh && !developed ? 0.2 : 1)
-            .shadow(color: .black.opacity(0.45), radius: 6, y: 3)
-            .onAppear {
-                guard fresh else { return }
-                withAnimation(.easeIn(duration: 3.2).delay(0.8)) { developed = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4.2) { onSettled() }
-            }
-            .onTapGesture(count: 2) { NSWorkspace.shared.open(print.url) }
-            .onDrag { NSItemProvider(object: print.url as NSURL) }
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        Image(nsImage: photo.thumbnail).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
+            .frame(width: MirrorView.thumb, height: MirrorView.thumb)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(.white.opacity(hovering ? 1 : 0.85), lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+            .scaleEffect(hovering ? 1.06 : 1)
+            .animation(.easeOut(duration: 0.15), value: hovering)
+            .contentShape(shape)
+            .onHover { hovering = $0 }
+            .onTapGesture { NSWorkspace.shared.open(photo.url) }
+            .onDrag { NSItemProvider(object: photo.url as NSURL) }
             .contextMenu {
-                Button("Aç") { NSWorkspace.shared.open(print.url) }
-                Button("Finder’da göster") { NSWorkspace.shared.activateFileViewerSelecting([print.url]) }
+                Button("Aç") { NSWorkspace.shared.open(photo.url) }
+                Button("Finder’da göster") { NSWorkspace.shared.activateFileViewerSelecting([photo.url]) }
+                Button(String(localized: "Tüm fotoğraflar (\(album.total))")) { NSWorkspace.shared.open(MirrorAlbum.folder) }
                 Divider()
-                Button("Çöpe at") { album.trash(print) }
+                Button("Çöpe at") { album.trash(photo) }
             }
-            .help(String(localized: "Çift tıkla: aç · sürükle: istediğin yere bırak"))
-    }
-}
-
-/// The card slides down out of the notch, turning as it falls onto the pile.
-private struct PrintOut: ViewModifier {
-    let progress: CGFloat
-    func body(content: Content) -> some View {
-        content
-            .offset(y: (1 - progress) * -340)
-            .rotationEffect(.degrees(Double(1 - progress) * -8))
-            .opacity(progress == 0 ? 0 : 1)
-    }
-}
-private extension AnyTransition {
-    static var printOut: AnyTransition {
-        .asymmetric(insertion: .modifier(active: PrintOut(progress: 0.001), identity: PrintOut(progress: 1)),
-                    removal: .opacity.combined(with: .scale(scale: 0.9)))
+            .help(String(localized: "Tıkla: aç · sürükle: istediğin yere bırak"))
     }
 }
 
