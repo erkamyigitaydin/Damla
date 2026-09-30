@@ -747,15 +747,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Draws the media views off screen into /tmp (for checks while the real screen is busy or protected).
     /// Debug: an Ayna photo from a drawn test picture, run through the nostalgia look, to /tmp/damla-card.png.
     @MainActor private func renderCard() {
-        let size = 720
+        // The viewfinder's shape (380 × 162), at the camera's width.
+        let rect = CGRect(x: 0, y: 0, width: 1920, height: 819)
         let gradient = CIFilter(name: "CILinearGradient", parameters: [
-            "inputPoint0": CIVector(x: 0, y: 0), "inputPoint1": CIVector(x: CGFloat(size), y: CGFloat(size)),
+            "inputPoint0": CIVector(x: 0, y: 0), "inputPoint1": CIVector(x: rect.width, y: rect.height),
             "inputColor0": CIColor(red: 0.2, green: 0.45, blue: 0.8), "inputColor1": CIColor(red: 0.95, green: 0.75, blue: 0.45)])
-        guard let base = gradient?.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: size, height: size)),
-              let photo = MirrorAlbum.context.createCGImage(FilmLook.nostalgia.develop(base), from: CGRect(x: 0, y: 0, width: size, height: size)) else { return }
-        let side = CGSize(width: size, height: size)
-        let renderer = ImageRenderer(content: StampedPhoto(photo: NSImage(cgImage: photo, size: side), taken: Date(), size: side))
-        renderer.scale = 2
+        guard let base = gradient?.outputImage?.cropped(to: rect),
+              let photo = MirrorAlbum.context.createCGImage(FilmLook.nostalgia.develop(base), from: rect) else { return }
+        let renderer = ImageRenderer(content: PolaroidCard(photo: NSImage(cgImage: photo, size: rect.size), taken: Date(), photoSize: rect.size))
+        renderer.scale = 1
         if let tiff = renderer.nsImage?.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: "/tmp/damla-card.png"))
         }

@@ -209,9 +209,12 @@ private struct TourPlaceholder: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.1))
                 .frame(width: 150, height: 66)
                 .overlay(alignment: .bottomLeading) {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color(red: 0.86, green: 0.84, blue: 0.8))
-                        .frame(width: 16, height: 16)
-                        .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(.white.opacity(0.8), lineWidth: 1))
+                    // The last print, a small wide instant-film card.
+                    RoundedRectangle(cornerRadius: 1).fill(Color(red: 0.6, green: 0.58, blue: 0.55))
+                        .frame(width: 22, height: 9)
+                        .padding([.horizontal, .top], 1.5).padding(.bottom, 4.5)
+                        .background(Color(red: 0.97, green: 0.95, blue: 0.9), in: RoundedRectangle(cornerRadius: 1))
+                        .rotationEffect(.degrees(-4))
                         .padding(6)
                 }
                 .overlay(alignment: .bottom) { Circle().fill(.white.opacity(0.85)).frame(width: 14, height: 14).padding(.bottom, 6) }

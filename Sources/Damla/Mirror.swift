@@ -161,8 +161,8 @@ final class MirrorCamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSa
 
 // MARK: - Album
 
-/// Photos saved as JPEG files in ~/Pictures/Damla. The page shows the newest one as a small thumbnail in the
-/// corner, like the Camera app.
+/// Prints saved as JPEG files in ~/Pictures/Damla. The page shows the newest one as a small card in the
+/// corner, like the Camera app's thumbnail.
 final class MirrorAlbum: ObservableObject {
     struct Photo: Identifiable, Equatable {
         let url: URL
@@ -206,11 +206,11 @@ final class MirrorAlbum: ObservableObject {
         return NSImage(cgImage: image, size: .zero)
     }
 
-    /// Burns the date stamp in and writes the photo; the page shows it once it has flown into the corner.
+    /// Prints the photo as a wide instant-film card and writes it; the page shows it once it has flown into the corner.
     @MainActor
     func save(_ photo: CGImage, taken: Date) -> Photo? {
         let size = CGSize(width: photo.width, height: photo.height)
-        let renderer = ImageRenderer(content: StampedPhoto(photo: NSImage(cgImage: photo, size: size), taken: taken, size: size))
+        let renderer = ImageRenderer(content: PolaroidCard(photo: NSImage(cgImage: photo, size: size), taken: taken, photoSize: size))
         renderer.scale = 1
         guard let image = renderer.cgImage,
               let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else { return nil }
@@ -233,25 +233,45 @@ final class MirrorAlbum: ObservableObject {
     }
 }
 
-// MARK: - The photo
+// MARK: - The card
 
-/// The photo with an orange date stamp burnt into its corner, like an old point-and-shoot.
-struct StampedPhoto: View {
+/// A wide instant-film card: cream frame around the photo, exactly as the viewfinder framed it, an orange date
+/// stamp burnt into its corner like an old point-and-shoot, and the date written by hand in the wide bottom margin.
+/// The frame is measured from the photo's height, so any viewfinder shape gets the same border.
+struct PolaroidCard: View {
+    static let side: CGFloat = 0.06     // left, right and top border, per photo height
+    static let bottom: CGFloat = 0.3    // the writing margin, per photo height
+    static let cream = Color(red: 0.97, green: 0.95, blue: 0.9)
     let photo: NSImage
     let taken: Date
-    let size: CGSize
+    let photoSize: CGSize
+
+    /// The whole card for a photo of this size.
+    static func size(photo: CGSize) -> CGSize {
+        CGSize(width: photo.width + 2 * side * photo.height, height: photo.height * (1 + side + bottom))
+    }
+
     var body: some View {
-        let unit = min(size.width, size.height)
-        Image(nsImage: photo).resizable().interpolation(.high)
-            .frame(width: size.width, height: size.height)
-            .overlay(alignment: .bottomTrailing) {
-                Text(verbatim: Self.stamp(taken))
-                    .font(.system(size: unit * 0.068, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
-                    .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: unit * 0.012)
-                    .blur(radius: unit * 0.0015)
-                    .padding(unit * 0.06)
-            }
+        let h = photoSize.height
+        VStack(spacing: 0) {
+            Image(nsImage: photo).resizable().interpolation(.high)
+                .frame(width: photoSize.width, height: h)
+                .overlay(alignment: .bottomTrailing) {
+                    Text(verbatim: Self.stamp(taken))
+                        .font(.system(size: h * 0.068, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
+                        .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: h * 0.012)
+                        .blur(radius: h * 0.0015)
+                        .padding(h * 0.06)
+                }
+                .padding(.top, h * Self.side)
+            Text(verbatim: Self.caption(taken))
+                .font(.custom("Bradley Hand", size: h * 0.11).weight(.bold))
+                .foregroundStyle(Color(red: 0.19, green: 0.22, blue: 0.34).opacity(0.85))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(width: Self.size(photo: photoSize).width, height: Self.size(photo: photoSize).height)
+        .background(Self.cream)
     }
 
     /// "'26 9 27", the way film cameras printed the date.
@@ -259,12 +279,16 @@ struct StampedPhoto: View {
         let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
         return String(format: "’%02d %d %d", (parts.year ?? 0) % 100, parts.month ?? 0, parts.day ?? 0)
     }
+    /// "1 Ekim 2026 · 14:05"
+    static func caption(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.wide).year()) + " · " + date.formatted(date: .omitted, time: .shortened)
+    }
 }
 
 // MARK: - The page
 
-/// Ayna: a camera in the notch. The viewfinder spans the panel; a 3-2-1 countdown, a flash, and the photo
-/// shrinks into the thumbnail in the bottom-left corner. The camera runs only while this page is on screen.
+/// Ayna: an instant camera in the notch. The viewfinder spans the panel; a 3-2-1 countdown, a flash, and the photo
+/// shrinks into the corner, growing its cream frame on the way, as a small print in the bottom-left. The camera runs only while this page is on screen.
 struct MirrorView: View {
     @ObservedObject private var camera = MirrorCamera.shared
     @StateObject private var album = MirrorAlbum()
@@ -279,7 +303,8 @@ struct MirrorView: View {
     @State private var landed = false
 
     private var look: FilmLook { FilmLook(rawValue: lookName) ?? .nostalgia }
-    static let thumb: CGFloat = 40
+    static let thumbWidth: CGFloat = 64   // the print in the corner
+    static let thumbTilt: Double = -4
     static let corner: CGFloat = 16
 
     var body: some View {
@@ -329,7 +354,7 @@ struct MirrorView: View {
                     .overlay(alignment: .bottomTrailing) {
                         // The date the photo will carry; the controls take its corner while the pointer is here.
                         TimelineView(.everyMinute) { context in
-                            Text(verbatim: StampedPhoto.stamp(context.date))
+                            Text(verbatim: PolaroidCard.stamp(context.date))
                                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(Color(red: 1, green: 0.56, blue: 0.16))
                                 .shadow(color: Color(red: 1, green: 0.4, blue: 0.05).opacity(0.9), radius: 2.5)
@@ -414,17 +439,23 @@ struct MirrorView: View {
 
     @ViewBuilder private var corner: some View {
         if let flying {
-            // Fills the viewfinder at the flash, then shrinks into the corner.
+            // Fills the viewfinder at the flash, then shrinks into the corner as the card's frame grows around it.
+            let aspect = frameSize.height > 0 ? frameSize.width / frameSize.height : 16 / 9
+            let photoHeight = Self.thumbWidth / (aspect + 2 * PolaroidCard.side)
             Image(nsImage: flying).resizable().aspectRatio(contentMode: .fill)
-                .frame(width: landed ? Self.thumb : frameSize.width, height: landed ? Self.thumb : frameSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: landed ? 9 : Self.corner, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: landed ? 9 : Self.corner, style: .continuous)
-                    .strokeBorder(.white.opacity(landed ? 0.85 : 0), lineWidth: 1.5))
-                .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
-                .padding(.leading, landed ? 10 : 0).padding(.bottom, landed ? 10 : 0)
+                .frame(width: landed ? photoHeight * aspect : frameSize.width, height: landed ? photoHeight : frameSize.height)
+                .clipped()
+                .padding(.horizontal, landed ? photoHeight * PolaroidCard.side : 0)
+                .padding(.top, landed ? photoHeight * PolaroidCard.side : 0)
+                .padding(.bottom, landed ? photoHeight * PolaroidCard.bottom : 0)
+                .background(PolaroidCard.cream.opacity(landed ? 1 : 0))
+                .clipShape(RoundedRectangle(cornerRadius: landed ? 2 : Self.corner, style: .continuous))
+                .shadow(color: .black.opacity(0.45), radius: 4, y: 2)
+                .rotationEffect(.degrees(landed ? Self.thumbTilt : 0))
+                .padding(.leading, landed ? 11 : 0).padding(.bottom, landed ? 11 : 0)
                 .allowsHitTesting(false)
         } else if let photo = album.latest, camera.state == .running {
-            ThumbnailView(photo: photo, album: album).padding(10).transition(.opacity)
+            ThumbnailView(photo: photo, album: album).padding(11).transition(.opacity)
         }
     }
 
@@ -468,21 +499,23 @@ struct MirrorView: View {
         ?? NSSound(named: "Tink")
 }
 
-/// The newest photo as a small square in the corner: click opens it, drag takes it anywhere.
+/// The newest print, small and a little askew in the corner: click opens it, drag takes it anywhere.
 private struct ThumbnailView: View {
     let photo: MirrorAlbum.Photo
     @ObservedObject var album: MirrorAlbum
     @State private var hovering = false
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
-        Image(nsImage: photo.thumbnail).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
-            .frame(width: MirrorView.thumb, height: MirrorView.thumb)
-            .clipShape(shape)
-            .overlay(shape.strokeBorder(.white.opacity(hovering ? 1 : 0.85), lineWidth: 1.5))
-            .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
-            .scaleEffect(hovering ? 1.06 : 1)
-            .animation(.easeOut(duration: 0.15), value: hovering)
-            .contentShape(shape)
+        let size = photo.thumbnail.size
+        let width = MirrorView.thumbWidth
+        let height = size.width > 0 ? width * size.height / size.width : width
+        Image(nsImage: photo.thumbnail).resizable().interpolation(.high)
+            .frame(width: width, height: height)
+            .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+            .shadow(color: .black.opacity(0.45), radius: 4, y: 2)
+            .rotationEffect(.degrees(hovering ? 0 : MirrorView.thumbTilt))
+            .scaleEffect(hovering ? 1.08 : 1, anchor: .bottomLeading)
+            .animation(.spring(duration: 0.3, bounce: 0.3), value: hovering)
+            .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .onTapGesture { NSWorkspace.shared.open(photo.url) }
             .onDrag { NSItemProvider(object: photo.url as NSURL) }
