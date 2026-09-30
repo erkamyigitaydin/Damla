@@ -267,6 +267,13 @@ func runSelfTests() -> Int32 {
     check(lowBattery == ["Magic Mouse 9", "Magic Mouse 4", "Magic Mouse 7"], "Low battery warns at 10 % and 5 %, again only after charging")
     check(DeviceBatteryWatcher.icon(for: mouse(5)["Magic Mouse"]!, name: "Magic Mouse") == "magicmouse", "Low battery shows the device's own icon")
     check(buds?.lowest == 60 && BluetoothBattery.Levels(left: nil, right: nil, case: nil, main: 15).lowest == 15, "Lowest level drives the low-battery tint")
+    check(BannerText.appName(description: "WhatsApp, Ayşe, Yarın, geliyor musun?", title: "Ayşe") == "WhatsApp", "Banner app name read before the title")
+    check(BannerText.appName(description: "Mail, Fatura", title: "") == "Mail", "Banner app name without a title")
+    check(BannerText.clean("\u{200E}Ayşe\u{200E} ") == "Ayşe", "Invisible direction marks dropped")
+    let bannerActions = ["AXPress", "Name:Ayrıntıları Göster\nTarget:0x0\nSelector:(null)", "Name:Göster\nTarget:0x0", "Name:Kapat\nTarget:0x0"]
+    check(BannerText.pick(bannerActions, BannerText.close, fallbackFirst: false) == bannerActions[3], "Close action found by name")
+    check(BannerText.pick(["AXPress", "Name:Détails\nT", "Name:Fermer\nT"], BannerText.close, fallbackFirst: false)?.hasPrefix("Name:Fermer") == true, "Close action falls back to the last")
+    check(BannerText.pick(bannerActions, BannerText.showDetails, fallbackFirst: true) == bannerActions[1], "Details action found by name")
     runMediaSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
     runLyricsSelfTests { condition, name in check(condition, name) }

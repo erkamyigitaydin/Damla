@@ -116,6 +116,7 @@ private struct PanelSettings: View {
                     Text("Parola yöneticilerinden gelenler kaydedilmez.")
                 }
             }
+            NotificationSettings(mirror: model.notifications)
             Section("Hareketler") {
                 Toggle("Trackpad’de iki parmakla sayfa değiştir", isOn: $model.notchGestures)
             }
@@ -349,6 +350,29 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         configuration.createsNewApplicationInstance = true
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, _ in
             DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
+    }
+}
+
+/// Other apps' notifications in the notch; read from Notification Center with the Accessibility permission.
+private struct NotificationSettings: View {
+    @ObservedObject var mirror: NotificationMirror
+    var body: some View {
+        Section("Bildirimler") {
+            Toggle(isOn: $mirror.enabled) {
+                Text("Bildirimler çentikte")
+                Text("Tıkla: ilgili yerde açılır. Uygulamanın düğmeleri ve yanıt da çentikte.")
+            }
+            if mirror.enabled {
+                Toggle("Sistem balonunu gizle", isOn: $mirror.hideBanners)
+                if !mirror.trusted {
+                    LabeledContent {
+                        Button("Ayarları aç") { MediaKeyInterceptor.openAccessibilitySettings() }
+                    } label: {
+                        Label("Erişilebilirlik izni bekleniyor", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    }
+                }
+            }
         }
     }
 }

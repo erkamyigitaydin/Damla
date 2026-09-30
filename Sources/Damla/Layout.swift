@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-enum NotchState: Equatable { case closed, hud, drop, expanded }
+enum NotchState: Equatable { case closed, hud, notification, drop, expanded }
 
 enum DisplayMode: String, CaseIterable, Identifiable {
     case all = "Tümü", followMouse = "Fareyi izle", notch = "Çentikli"   // raw values are stored settings
@@ -41,6 +41,7 @@ enum Layout {
     static let notchlessTopInset: CGFloat = 6 // gap under the menu bar on screens without a notch
     static let notchlessIdleWidth: CGFloat = 92
     static let dropBandHeight: CGFloat = 104   // tray under the notch while dragging; deep enough to hit without touching the screen edge
+    static let notificationWidth: CGFloat = 392
     static let fakeNotchWidth: CGFloat = 120   // middle section of the fake notch on notchless screens
     static let fakeNotchHeight: CGFloat = 30   // fallback when the menu bar height cannot be read
 
@@ -82,6 +83,9 @@ enum Layout {
             guard let video else { return base }
             let box = videoSize(video, m, compactSlots: compactSlots)
             return CGSize(width: max(base.width, box.width + videoInset * 2), height: base.height + videoGap + box.height + videoInset)
+        case .notification:
+            // Another app's notification: the notch drops down into a card, `content` tall under the notch.
+            return CGSize(width: max(notificationWidth, m.notchWidth + compactSideSplit * 2), height: closedHeight(m) + content)
         case .drop:
             // Basket: a wider, slightly taller target that appears while a file is being dragged anywhere.
             return CGSize(width: m.notchWidth + (m.hasNotch ? hudSide * 2 : 256), height: closedHeight(m) + dropBandHeight)

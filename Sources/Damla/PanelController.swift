@@ -56,6 +56,7 @@ final class PanelController {
     /// The closed notch follows it away and comes back when the menu bar slides in.
     var menuBarHidden = false { didSet { if menuBarHidden != oldValue { updateVisibility() } } }
     private var concealed = false
+    var isConcealed: Bool { concealed }
 
     init(model: AppState, fixedScreen: NSScreen?) {
         self.model = model
@@ -105,6 +106,10 @@ final class PanelController {
             .sink { [weak self] _ in self?.chooseScreen(); self?.layout() }.store(in: &cancellables)
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [weak self] _ in self?.chooseScreen(); self?.layout() }.store(in: &cancellables)
+        // A reply sent or dropped: the app underneath gets its keyboard back.
+        model.notifications.$replying.removeDuplicates().dropFirst().filter { !$0 }.receive(on: RunLoop.main)
+            .sink { [weak self] _ in if self?.panel.isKeyWindow == true && self?.model.expanded == false { self?.panel.resignKey() } }
+            .store(in: &cancellables)
         model.$dragActive.removeDuplicates().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateLevel() }.store(in: &cancellables)
         let mouseEvents: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged,
@@ -242,7 +247,7 @@ final class PanelController {
     func visibleRect() -> NSRect {
         guard let screen else { return .zero }
         return Layout.visibleRect(state, screenInfo.metrics, compactSlots: model.compactSlots(on: id), midX: screen.frame.midX, top: topY,
-                                  content: model.contentHeight, video: state == .expanded ? nil : model.videoSpec(on: id))
+                                  content: model.shapeContent(state), video: state == .expanded ? nil : model.videoSpec(on: id))
     }
     /// The video box itself, in screen points with a top-left origin (Accessibility's), while it is drawn.
     func videoBox() -> CGRect? {
@@ -298,7 +303,11 @@ final class PanelController {
         let overVideo = videoRect()?.contains(location) ?? false
         // Only the screen showing the video owns its hover (the other screen's notch would keep clearing it).
         if model.videoShown(on: id) { model.video.setHovering(overVideo) }
+        // A notification card holds while the pointer is on it and never turns into the panel.
+        if model.notifications.current != nil { model.notifications.hovering = inside && state == .notification }
         if inside && overVideo {
+            exitedAt = nil; enteredAt = nil
+        } else if inside && state == .notification {
             exitedAt = nil; enteredAt = nil
         } else if inside {
             exitedAt = nil
@@ -376,6 +385,11 @@ final class PanelManager {
     init(model: AppState) {
         self.model = model
         model.requestKeyFocus = { [weak self] in self?.focusController?.panel.makeKeyAndOrderFront(nil) }
+        // A notification needs a notch someone can see: not open on a page, not hidden by a full-screen app.
+        model.notifications.canTakeOver = { [weak self] in
+            guard let self else { return false }
+            return !self.model.expanded && !self.model.cleaning.active && self.controllers.contains { !$0.isConcealed && !self.model.videoShown(on: $0.id) }
+        }
         model.video.dockTarget = { [weak self] in
             guard let self else { return nil }
             return self.controllers.lazy.compactMap { $0.videoBox() }.first
@@ -410,6 +424,7 @@ final class PanelManager {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             if self.model.cleaning.active { return nil }
+            if event.keyCode == 53, self.model.notifications.replying { self.model.notifications.cancelReply(); return nil }
             if event.keyCode == 53 { // Esc: Quick Look first, then the notch
                 if QuickLookController.isShowing { QLPreviewPanel.shared().orderOut(nil); return nil }
                 self.model.pinnedOpen = false; self.model.expanded = false

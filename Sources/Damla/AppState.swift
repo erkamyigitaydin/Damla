@@ -140,6 +140,7 @@ final class AppState: ObservableObject {
     var micActive: Bool { micInNotch && microphone.inUse }
     let cleaning = KeyboardCleaning()
     let agents = AgentStatusService()
+    let notifications = NotificationMirror()
     let updater = UpdateService()
     @Published private(set) var agentBadge: AgentSession?
     @Published var agentAttention = false   // brief pulse of the mascot when an agent starts waiting
@@ -162,8 +163,15 @@ final class AppState: ObservableObject {
     private var pinnedBeforeCleaning = false
 
     func state(for screenID: UInt32) -> NotchState {
-        cleaning.active || (expanded && activeScreenID == screenID) ? .expanded : dragActive ? .drop : hud != nil ? .hud : .closed
+        if cleaning.active || (expanded && activeScreenID == screenID) { return .expanded }
+        if dragActive { return .drop }
+        // A reply being written keeps its card over a volume or agent HUD.
+        // The video under the notch keeps its place; the other screens show the card.
+        if notifications.current != nil && (notifications.replying || hud == nil) && !videoShown(on: screenID) { return .notification }
+        return hud != nil ? .hud : .closed
     }
+    /// Height under the notch for a state: the page for the open panel, the card for a notification.
+    func shapeContent(_ state: NotchState) -> CGFloat { state == .notification ? notifications.cardHeight : contentHeight }
     /// Live activities the closed notch can show (focus timer, agent, media), at most two at once.
     var compactSlots: Int { compactSlots(on: nil) }
     /// On the screen showing the video, the video stands for the media and the agents stay out of its way.
@@ -226,6 +234,8 @@ final class AppState: ObservableObject {
             if self.muted != muted { self.muted = muted }
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
+        notifications.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        notifications.start()
         monitor.onOutputs = { [weak self] outputs, current in
             guard let self else { return }
             if self.outputs != outputs {

@@ -404,3 +404,10 @@
 "Reddedilmiş; Ayarlar → Otomasyon’dan aç" = "Denied; turn it on in Settings → Automation";
 "Sekmedeki videoyu bulmak için" = "To find the video in the tab";
 "Erişilebilirlik" = "Accessibility";
+"Bildirimler" = "Notifications";
+"Bildirimler çentikte" = "Notifications in the notch";
+"Tıkla: ilgili yerde açılır. Uygulamanın düğmeleri ve yanıt da çentikte." = "Click to open where it belongs. The app's buttons and replies work from the notch too.";
+"Sistem balonunu gizle" = "Hide the system banner";
+"Bildirimi kapat" = "Dismiss notification";
+"Tıkla: %@ içinde aç" = "Click to open in %@";
+"Yanıtla…" = "Reply…";

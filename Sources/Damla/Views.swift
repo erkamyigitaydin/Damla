@@ -125,9 +125,9 @@ struct DamlaView: View {
     private var slots: Int { model.compactSlots(on: screen.id) }
     /// Idle on a notchless screen: the notch draws back up into the menu bar and fades out.
     private var hidden: Bool { model.idleHidden(on: screen.id, physicalNotch: screen.physicalNotch) }
-    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: slots, content: model.contentHeight, video: video) }
+    private var size: CGSize { Layout.shapeSize(state, metrics, compactSlots: slots, content: model.shapeContent(state), video: video) }
     private var shape: NotchShape {
-        let bottom: CGFloat = open ? 26 : state == .drop ? 24 : video.map { $0.large ? 22 : 18 } ?? 13
+        let bottom: CGFloat = open ? 26 : state == .drop || state == .notification ? 24 : video.map { $0.large ? 22 : 18 } ?? 13
         return metrics.hasNotch
             ? NotchShape(topEar: Layout.ear(metrics, open: open), topRadius: 0, bottomRadius: bottom)
             : NotchShape(topEar: 0, topRadius: open ? 24 : bottom, bottomRadius: open ? 24 : bottom)
@@ -149,7 +149,7 @@ struct DamlaView: View {
                 .allowsHitTesting(open && !model.cleaning.active)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: slots, dropping: dropping, metrics: metrics, content: model.contentHeight, video: video, hidden: hidden))
+        .animation(state == .drop ? Theme.basket : Theme.motion(open: open), value: Key(state: state, compact: slots, dropping: dropping, metrics: metrics, content: model.shapeContent(state), video: video, hidden: hidden))
         .onChange(of: open, initial: true) { _, isOpen in
             // Glass is invisible under the solid black closed notch, so drop it there to spare the compositor.
             if isOpen { glassVisible = true }
@@ -219,7 +219,7 @@ struct DamlaView: View {
             model.activeScreenID = screen.id
             model.expanded = true; model.pinnedOpen = true
         }
-        .onTapGesture { if state != .expanded { model.activeScreenID = screen.id; model.expanded = true } }
+        .onTapGesture { if state != .expanded && state != .notification { model.activeScreenID = screen.id; model.expanded = true } }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $dropping) { providers in
             guard model.enabledTabs.contains(.files) else { return false }   // no shelf, no drop target
             model.activeScreenID = screen.id
@@ -255,6 +255,11 @@ struct DamlaView: View {
                 ))
         case .hud:
             if let hud = model.hud { HUDRow(hud: hud, metrics: metrics).transition(.blurReplace) }
+        case .notification:
+            NotificationCard(model: model, mirror: model.notifications)
+                .padding(.top, Layout.closedHeight(metrics))
+                .transition(.asymmetric(insertion: AnyTransition(.blurReplace).animation(.easeOut(duration: 0.25).delay(Theme.reduceMotion ? 0 : 0.08)),
+                                        removal: AnyTransition(.blurReplace).animation(.easeIn(duration: 0.14))))
         case .drop:
             DropRow(metrics: metrics, targeted: dropping, count: model.files.count, dragged: model.dragURLs).transition(.blurReplace)
         case .closed:
