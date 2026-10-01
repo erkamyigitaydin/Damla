@@ -1,11 +1,13 @@
 import AppKit
+import AVFoundation
+import EventKit
 import SwiftUI
 
 /// The first-run tour, told inside the notch itself: each step opens the page it is about, draws that page as
 /// a shimmering placeholder, says what it does in a line or two and, where a part needs one, asks for its
 /// permission right there. It replaces a separate tour window.
 enum TourStep: Int, CaseIterable {
-    case welcome, media, sound, files, agents, mirror, pages, done
+    case welcome, permissions, media, sound, files, notifications, agents, mirror, pages, done
 
     static let doneKey = "onboardingDone"
 
@@ -20,6 +22,7 @@ enum TourStep: Int, CaseIterable {
     var tab: PanelTab {
         switch self {
         case .files: return .files
+        case .notifications: return .notifications
         case .agents: return .agents
         case .mirror: return .mirror
         default: return .home
@@ -28,6 +31,8 @@ enum TourStep: Int, CaseIterable {
     var title: String {
         switch self {
         case .welcome: return String(localized: "Damla’ya hoş geldin")
+        case .permissions: return String(localized: "İzinler")
+        case .notifications: return String(localized: "Bildirimler")
         case .media: return String(localized: "Şimdi çalan")
         case .sound: return String(localized: "Ses")
         case .files: return String(localized: "Raf")
@@ -40,6 +45,8 @@ enum TourStep: Int, CaseIterable {
     var text: String {
         switch self {
         case .welcome: return String(localized: "Çentikte yaşar. İmleci çentiğe getir ya da ⌃⌥Space’e bas.")
+        case .permissions: return String(localized: "Hepsi isteğe bağlı; vermediğin izin yalnızca o özelliği kapatır. Sonra Ayarlar’dan da verebilirsin.")
+        case .notifications: return String(localized: "Gelen bildirim çentikte görünür. Tıkla: yanıtla ya da düğmesine bas. Kaçırdıkların Bildirimler sayfasında.")
         case .media: return String(localized: "Müzik, Spotify, tarayıcılar: çalan ne varsa burada. Video başlayınca müziği duraklatmak için izin ver.")
         case .sound: return String(localized: "Çıkışı değiştir, her uygulamanın sesini ayrı ayarla. Ses tuşlarının göstergesi de çentikte olabilir.")
         case .files: return String(localized: "Bir dosyayı sürüklemeye başla, çentik açılır. Bırak, sonra istediğin yere taşı.")
@@ -60,13 +67,19 @@ struct TourView: View {
 
     var body: some View {
         HStack(spacing: 18) {
-            TourPlaceholder(step: step)
-                .frame(width: 132, height: 132)
+            if step != .permissions {
+                TourPlaceholder(step: step)
+                    .frame(width: 132, height: 132)
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text(step.title).font(.system(size: 15, weight: .semibold))
-                Text(step.text).font(.system(size: 11)).foregroundStyle(Theme.dim)
-                    .fixedSize(horizontal: false, vertical: true).lineLimit(3)
-                action.padding(.top, 2)
+                if step == .permissions {
+                    PermissionList(model: model, keys: keys)
+                } else {
+                    Text(step.text).font(.system(size: 11)).foregroundStyle(Theme.dim)
+                        .fixedSize(horizontal: false, vertical: true).lineLimit(3)
+                    action.padding(.top, 2)
+                }
                 Spacer(minLength: 0)
                 HStack(spacing: 5) {
                     ForEach(TourStep.allCases, id: \.rawValue) { item in
@@ -101,7 +114,7 @@ struct TourView: View {
             }
         case .sound:
             if model.hideSystemHUD {
-                permission(keys.active, done: "Gösterge çentikte", ask: "Erişilebilirlik izni") { MediaKeyInterceptor.openAccessibilitySettings() }
+                permission(keys.active, done: "Gösterge çentikte", ask: "Erişilebilirlik izni") { Permissions.askAccessibility() }
             } else {
                 Button("Göstergeyi çentiğe al") { model.setHideSystemHUD(true) }
                     .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
@@ -126,14 +139,28 @@ struct TourView: View {
                     }
                 }
             }
+        case .notifications:
+            if model.notifications.trusted {
+                switchRow("Bildirimler çentikte", isOn: Binding(get: { model.notifications.enabled }, set: { model.notifications.enabled = $0 }))
+            } else {
+                permission(false, done: "", ask: "Erişilebilirlik izni") { Permissions.askAccessibility() }
+            }
         case .mirror:
             Button("Dene") { model.endTour(); model.select(.mirror) }
                 .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
         case .done:
-            Toggle("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                .toggleStyle(.switch).controlSize(.mini).font(.system(size: 10.5, weight: .medium))
+            switchRow("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
         default:
             EmptyView()
+        }
+    }
+
+    /// The panel's own switch (the system one turns grey inside the notch) with its label beside it.
+    private func switchRow(_ title: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 8) {
+            Toggle(title, isOn: isOn).toggleStyle(GlassSwitchStyle()).labelsHidden()
+            Text(title).font(.system(size: 10.5, weight: .medium))
+                .onTapGesture { isOn.wrappedValue.toggle() }
         }
     }
 
@@ -174,6 +201,17 @@ private struct TourPlaceholder: View {
         switch step {
         case .welcome:
             DropletMascot(phase: .done, size: 70)
+        case .permissions:
+            Image(systemName: "lock.shield").font(.system(size: 44, weight: .light)).foregroundStyle(Theme.dim)
+        case .notifications:
+            // A notification card under the notch, with a reply field.
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .top, spacing: 7) {
+                    bone(22, 22, radius: 6)
+                    VStack(alignment: .leading, spacing: 4) { bone(30, 5); bone(52, 7); bone(70, 5) }
+                }
+                capsule(96, 16)
+            }
         case .media:
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
@@ -300,6 +338,86 @@ enum AutomationPermission {
         configuration.activates = false
         NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { ask() }
+        }
+    }
+}
+
+/// The permissions Damla can use, asked for in one place on the first run. Each is optional and turns on only
+/// its own features; the list shows what is already granted.
+enum Permissions {
+    /// One permission behind three features: the volume and brightness indicator, video in the notch, notifications.
+    static func askAccessibility() {
+        if AXIsProcessTrusted() { return }
+        AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary)
+    }
+    static func openSettings(_ anchor: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") { NSWorkspace.shared.open(url) }
+    }
+}
+
+/// The İzinler step: one row per permission, with why it is needed and its state, granted ones ticked.
+private struct PermissionList: View {
+    @ObservedObject var model: AppState
+    @ObservedObject var keys: MediaKeyInterceptor
+    @ObservedObject private var calendar: CalendarService
+    @State private var accessibility = AXIsProcessTrusted()
+    @State private var camera = AVCaptureDevice.authorizationStatus(for: .video)
+    @State private var music: AutomationPermission.State = .notAsked
+
+    init(model: AppState, keys: MediaKeyInterceptor) {
+        self.model = model; self.keys = keys; calendar = model.calendar
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            row("accessibility", "Erişilebilirlik", "Ses göstergesi, video, bildirimler", granted: accessibility, denied: false) {
+                Permissions.askAccessibility()
+            }
+            row("music.note", "Müzik", "Parçayı göster, oynatmayı yönet", granted: music == .granted, denied: music == .denied) {
+                if music == .denied { Permissions.openSettings("Privacy_Automation") } else { AutomationPermission.askMusic { music = $0 } }
+            }
+            row("camera", "Kamera", "Ayna", granted: camera == .authorized, denied: camera == .denied || camera == .restricted) {
+                if camera == .notDetermined {
+                    AVCaptureDevice.requestAccess(for: .video) { _ in DispatchQueue.main.async { camera = AVCaptureDevice.authorizationStatus(for: .video) } }
+                } else { Permissions.openSettings("Privacy_Camera") }
+            }
+            row("calendar", "Takvim", "Sıradaki toplantı ve katılma bağlantısı",
+                granted: calendar.enabled && calendar.access == .fullAccess, denied: calendar.access == .denied || calendar.access == .restricted) {
+                if calendar.access == .denied || calendar.access == .restricted { Permissions.openSettings("Privacy_Calendars") }
+                else { calendar.enabled = true }   // turns the meetings on and asks
+            }
+        }
+        .onAppear(perform: refresh)
+        .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in refresh() }
+    }
+
+    private func row(_ icon: String, _ title: LocalizedStringKey, _ detail: LocalizedStringKey, granted: Bool, denied: Bool,
+                     action: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.dim).frame(width: 16)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).font(.system(size: 11, weight: .semibold))
+                Text(detail).font(.system(size: 9.5)).foregroundStyle(Theme.faint).lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            if granted {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 14)).foregroundStyle(.green)
+                    .help("İzin verildi")
+            } else {
+                Button(denied ? "Ayarları aç" : "İzin ver", action: action)
+                    .font(.system(size: 10, weight: .medium)).buttonStyle(PillStyle())
+            }
+        }
+        .frame(height: 24)
+    }
+
+    private func refresh() {
+        accessibility = AXIsProcessTrusted()
+        camera = AVCaptureDevice.authorizationStatus(for: .video)
+        calendar.refresh()
+        DispatchQueue.global().async {
+            let result = AutomationPermission.state(MusicSource.music.bundleID, ask: false)
+            DispatchQueue.main.async { if result != .notRunning || music == .notAsked { music = result } }
         }
     }
 }

@@ -712,6 +712,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "share": model.select(.files); model.shareFile()
         case "settings": model.openSettings()
         case "onboarding": model.startTour()
+        case "tour-end": model.endTour(); model.pinnedOpen = false; model.expanded = false
         case let step where step.hasPrefix("onboarding-"): model.startTour(at: Int(step.dropFirst(11)).flatMap(TourStep.init(rawValue:)) ?? .welcome)
         case let tab where tab.hasPrefix("settings-"): model.pinnedOpen = false; model.expanded = false; settings.present(tab: Int(tab.dropFirst(9)))
         case let body where body.hasPrefix("meeting:"):   // meeting:<minutes>:<link 0/1>:<title>

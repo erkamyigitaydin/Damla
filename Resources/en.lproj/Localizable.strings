@@ -426,3 +426,12 @@
 "Daralt" = "Collapse";
 "%lld bildirim · tıkla: hepsini göster" = "%lld notifications · click to show all";
 "%@ uygulamasından %lld bildirim daha" = "%2$lld more from %1$@";
+"İzinler" = "Permissions";
+"Hepsi isteğe bağlı; vermediğin izin yalnızca o özelliği kapatır. Sonra Ayarlar’dan da verebilirsin." = "All optional; skipping one only turns off its feature. You can grant them later in Settings.";
+"Gelen bildirim çentikte görünür. Tıkla: yanıtla ya da düğmesine bas. Kaçırdıkların Bildirimler sayfasında." = "Notifications show in the notch. Click to reply or use their buttons. Missed ones wait on the Notifications page.";
+"Ses göstergesi, video, bildirimler" = "Volume indicator, video, notifications";
+"Parçayı göster, oynatmayı yönet" = "Show the track, control playback";
+"Kamera" = "Camera";
+"Takvim" = "Calendar";
+"Sıradaki toplantı ve katılma bağlantısı" = "Next meeting and its join link";
+"İzin verildi" = "Granted";

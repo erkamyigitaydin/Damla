@@ -36,7 +36,7 @@
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Damla, sıradaki toplantını çentikte göstermek ve bağlantısına tek tıkla katılmanı sağlamak için takvimini okur. Takvim bu Mac’ten çıkmaz.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Damla, Ayna’da görüntünü göstermek için kamerayı yalnızca o bölme açıkken kullanır. Hiçbir şey kaydedilmez.</string>
+	<string>Damla, Ayna’da görüntünü göstermek için kamerayı yalnızca o sayfa açıkken kullanır. Fotoğraf yalnızca deklanşöre bastığında Resimler/Damla klasörüne kaydedilir.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
