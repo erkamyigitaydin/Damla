@@ -108,7 +108,7 @@ const TR = {
   'pv.cal': 'Takvimler', 'pv.cal.d': 'Sıradaki toplantın, sen açınca',
   'pv.cam': 'Kamera', 'pv.cam.d': 'Ayna sayfası, yalnızca açıkken',
 
-  'print.caption': 'Aşağı inerken taradığın desen.', 'print.alt': 'Mermer desenli bir ebru', 'print.save': 'Ebrunu kaydet',
+  'print.caption': 'Senin ebrun: tıkladığın her damla, sürüklediğin her çizgi.', 'print.alt': 'Mermer desenli bir ebru', 'print.save': 'Ebrunu kaydet',
   'fin.title': 'Kurulumu tek satır.',
   'fin.lede': "Ücretsiz, Apple tarafından imzalanmış ve onaylanmış; kendini güncel tutar. Sonra Ayarlar › Ajanlar'dan Claude Code ya da Codex'i bağla.",
   'keys.open': '<b>Aç</b><span>çentiğin üstüne gel, menü çubuğundaki damlaya tıkla ya da <kbd>⌃</kbd><kbd>⌥</kbd><kbd>Boşluk</kbd></span>',

@@ -1,6 +1,6 @@
 ---
 name: Damla
-description: The marketing site for Damla, a macOS notch app, drawn as an ebru tray of dark water that the visitor marbles.
+description: The marketing site for Damla, a macOS notch app, drawn as a sheet of ebru paper that the visitor marbles.
 colors:
   ink: "#0a0d12"
   ink-2: "#0e131a"
@@ -118,7 +118,7 @@ components:
 
 **Creative North Star: "The Ebru Tray"**
 
-Damla means drop, and the site is a tray of dark water. The ground is near-black cool ink, the same black as the notch it hangs from. Pigment lands on it only in two ways: once, when the page opens and a drop falls from the notch and is pulled into a tulip, and afterwards only when the visitor clicks. A drag combs what is there, and scrolling pulls slow tines through it. Everything else holds still. Calm water is the default state, and pigment is an event.
+Damla means drop, and the site is a sheet of ebru paper on the tray. The ground is warm cream paper (`#f2eee6`) with faint tonal ribbons; the notch and the panel hang from the top in true black, like the hardware. Until 2026-10-01 the ground was near-black ink; the owner found it too dark and chose the paper version. Pigment lands on it only in two ways: once, when the page opens and a drop falls from the notch and is pulled into a tulip, and afterwards only when the visitor clicks. A drag combs what is there; scrolling only lets the water drift a little, softly, after the page stops. Everything else holds still. Calm water is the default state, and pigment is an event.
 
 The pigments are Damla's own in-app colours, not a generic marbling palette. The agents' pale water blue leads, white is the default accent, bone is the paper, and the demo cover's coral is used sparingly. Amber means one thing, as it does in the app: something is waiting. The product appears as a faithful replica of the live panel, drawn at the app's native point size in the system font and scaled as one piece, so the page shows the real thing rather than an illustration of it.
 
@@ -247,7 +247,7 @@ The app's drop with a face. Water blue at work, a paler blue when idle, amber an
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep the ground near-black cool ink (`ink`, `ink-2`, `ink-3`) and let pigment arrive only from the opening drop or a visitor's click; a drag combs, scrolling pulls slow tines.
+- **Do** keep the ground calm cream paper (`ink`, `ink-2`, `ink-3` now hold the paper tones; text is `--text` #16191f, accents on paper use deep blue #3a5a8a) and let pigment arrive only from the opening drop or a visitor's click; a drag combs, scrolling only drifts the water (wide one-way tines, let out over a few frames).
 - **Do** lead with water blue (`water-blue`) and white (`pale-white`); keep coral to cover-tinted details and a single ring in the water.
 - **Do** use amber (`waiting-amber`) only for waiting state.
 - **Do** draw product UI at the app's native point size in the system font and scale it as one piece, matching the live app.
