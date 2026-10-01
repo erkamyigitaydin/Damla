@@ -122,7 +122,7 @@ Damla means drop, and the site is a tray of dark water. The ground is near-black
 
 The pigments are Damla's own in-app colours, not a generic marbling palette. The agents' pale water blue leads, white is the default accent, bone is the paper, and the demo cover's coral is used sparingly. Amber means one thing, as it does in the app: something is waiting. The product appears as a faithful replica of the live panel, drawn at the app's native point size in the system font and scaled as one piece, so the page shows the real thing rather than an illustration of it.
 
-The page reads as a sequence: the tray, a pinned stage where the panel melts out of the notch and turns its pages, a book of pulled ebru sheets for the smaller features, a quiet privacy statement, and a finale where the visitor's own marbling is pulled as a print. Liquid Glass lens effects were tried on this surface and rejected; so were automatic pours, a mint accent, and "demo data" disclaimers.
+The page reads as a sequence, developer first: the tray (headline about coding agents), a pinned stage where the panel melts out of the notch and turns its pages (agents, notifications, now playing, shelf, Mirror), a book of pulled ebru sheets for everything else, a quiet privacy statement, and a finale that installs in one line beside the visitor's own marbling pulled as a print. Liquid Glass lens effects were tried on this surface and rejected; so were automatic pours, a mint accent, and "demo data" disclaimers.
 
 **Key Characteristics:**
 - Near-black cool ink ground; calm until the visitor touches it.
@@ -190,7 +190,7 @@ A cool, near-monochrome night palette of ink and water blues, lit by white and b
 Full-bleed sections with a fluid side gutter (`gutter`) and content capped at 1320px (1480px for the hero and chapters). Section breathing room is tall and fluid (`section`). Text columns are held to 44–46ch.
 
 - **Hero:** a full-viewport tray; headline bottom-left and install block bottom-right in a 7fr / 5fr grid, aligned to the bottom edge, with a gradient from ink at the base so copy sits on calm water. A one-line hint sits bottom-centre until the visitor first touches the water, and is hidden on touch devices.
-- **Stage:** a tall scroll track with a pinned full-viewport stage. The panel replica sits top-centre under the notch; each chapter is a 5fr / 2.2fr / 4.4fr grid pinned to the bottom (lead left, points right), crossfading with a blur.
+- **Stage:** a tall scroll track with a pinned full-viewport stage, five chapters: agents (list, approval, question), notifications (card, reply, page), now playing, shelf, Mirror. The panel replica sits top-centre under the notch; each chapter is a 5fr / 2.2fr / 4.4fr grid pinned to the bottom (lead left, points right), crossfading with a blur.
 - **Book:** a 12-column grid where each sheet takes a different span, aspect ratio, rotation and vertical offset, so the page reads like sheets laid out to dry rather than a card grid.
 - **Privacy and finale:** two-column 5fr / 6fr and 6fr / 5fr splits.
 - **Breakpoints:** 1100px (chapters go to two columns), 900px (all splits stack, install block aligns left), 720px (single column; sheets alternate 92% / 84% widths, left and right).
@@ -206,7 +206,11 @@ Depth comes from tone and the physical metaphor more than from shadow. Sections 
 - **Panel** (`0 calc(22px * open) calc(44px * open) -14px rgba(0,0,0,.7)`): grows with how far the panel has opened.
 
 ### Named Rules
-**The No Lens Rule.** No Liquid Glass lens, refraction or frosted-glass cards on the site. The only blur is a light 6px backdrop behind the command field so the command stays legible over pigment.
+**The No Lens Rule.** No Liquid Glass lens, refraction or frosted-glass cards on the site, and no backdrop blur at all: the command field sits on near-opaque ink. Nothing blends with the moving water (the grain is a plain low-opacity layer).
+
+**The No Overlap Rule.** The panel replica is scaled from the room the tallest chapter leaves (`stage.measure()`); on very short windows the fine print steps aside (`body.tight`). Chapter copy never sits on the panel, and the opening drop lands in the free water above the hero copy.
+
+**The Bounded Water Rule.** The ebru runs off the main thread (module worker + OffscreenCanvas, `engine.js`), stops entirely while off screen, combs once per frame with the scroll distance clamped, and stays inside a vertex budget (26k) and a 1.5× / 3 MP canvas.
 
 ## Shapes
 
@@ -226,7 +230,7 @@ Quiet and solid, like a Mac control.
 - **Copy chip:** bone text on a faint bone wash; on success it fills with water blue and the text goes ink.
 
 ### Navigation
-The nav is a black notch fixed at top centre, 196px wide and 32px tall, in the system font. Its right side shows live status that follows the stage (brand wordmark, playing bars, amber waiting count, file and sound status). Opened, it springs to 480px wide with a two-column menu in Nunito 800, a TR/EN segmented pill, and the GitHub mark.
+The nav is a black notch fixed at top centre, 196px wide and 32px tall, in the system font. Its right side shows live status that follows the stage (brand wordmark, amber waiting count, unread bell and count, playing bars, file count). Opened, it springs to 480px wide with a two-column menu in Nunito 800 and a TR/EN segmented pill.
 
 ### Slip Notes
 Privacy reassurances attached to each chapter: a dashed 1px border in a palette pigment (water blue, coral or amber) at 55%, translucent ink fill, 12px radius, 0.9rem text. They state a fact; they are not callouts.
@@ -235,7 +239,7 @@ Privacy reassurances attached to each chapter: a dashed 1px border in a palette 
 The live app panel rebuilt in HTML at native size (384 × 218pt, page pill 336 × 36) with the app's system font, SF-style 1.6px line icons, glass-free translucent white controls, and the cover-tinted gradient. It is scaled as one piece with a single transform and never re-typeset at site sizes. Its pages are interactive: the track can change, the approval can be answered, the mixer moves. When the app changes, the replica follows the app.
 
 ### Pulled Sheet (signature)
-The "small things" section is a book of pulled ebru sheets at varied sizes. Each sheet is a live canvas marbled in a named traditional pattern (hatip, battal, bülbül yuvası, taraklı, neftli, somaki, gelgit, şal) using tonal blue, bone and occasional coral colour sets, held in a bone edge, rotated slightly, darkened with a light ink veil, and carrying its feature's real UI drawn at app size and scaled like the panel. The pattern name sits in faint italic under the description.
+The "everything else" section is a book of ten pulled ebru sheets at varied sizes. Each sheet is a live canvas marbled in a named traditional pattern (somaki, kumlu, gelgit, lale, hatip, battal, bülbül yuvası, taraklı, neftli, şal) using tonal blue, bone and occasional coral colour sets, held in a bone edge, rotated slightly, darkened with a light ink veil, and carrying its feature's real UI drawn at app size and scaled like the panel. The pattern name sits in faint italic under the description.
 
 ### Droplet Mascot
 The app's drop with a face. Water blue at work, a paler blue when idle, amber and waving when waiting, a smile and spark when done. It hops, sways and blinks only in those states, and goes still under Reduce Motion.

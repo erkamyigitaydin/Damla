@@ -11,7 +11,7 @@ Recorded for the design surfaces Impeccable works on (the marketing site in `doc
 ## Stack
 
 - App: Swift 6 package, built with `build.sh`, released with `release.sh` (Developer ID, notarization, Sparkle appcast, GitHub Release, Homebrew tap).
-- Website: plain static HTML/CSS/JS in `docs/`, served by GitHub Pages from `main /docs`. No build step. Chosen by the owner on 2026-09-28.
+- Website: plain static HTML/CSS/JS in `docs/`, served at https://damla.erkamaydin.com by the Cloudflare Worker in `server/feed` (static assets plus /appcast.xml, /latest.json, /download/*). No build step. The ebru runs in a module worker on an OffscreenCanvas (`docs/assets/engine.js`), with an on-page fallback.
 
 ## Users
 
@@ -19,7 +19,7 @@ Mac users with a notched MacBook (and external displays, where Damla draws its o
 
 ## Product Purpose
 
-Damla turns the MacBook notch into a small Liquid Glass hub. Hovering the notch melts a panel out of it with whatever is needed right now (now playing, sound, files, clipboard, focus, AI agents) and it slips back when the pointer leaves. Success on the website: a visitor understands this in seconds and installs it (Homebrew cask or DMG).
+Damla turns the MacBook notch into a small Liquid Glass hub, led on the website by the developer use: Claude Code and Codex sessions, approvals and questions answered from the notch. Hovering the notch melts a panel out of it with whatever is needed right now (now playing, sound, files, clipboard, focus, AI agents) and it slips back when the pointer leaves. Success on the website: a visitor understands this in seconds and installs it (Homebrew cask or DMG).
 
 ## Positioning
 
@@ -34,11 +34,11 @@ Hover the notch, click the droplet in the menu bar, or press ⌃⌥Space to open
 
 ## Capabilities and Constraints
 
-Confirmed features (from README): now playing from any app with cover-tinted panel, synced lyrics, smart handoff between players, multiple players side by side, video from Chromium browsers docked under the notch; AI agent sessions and approvals for Claude Code and Codex CLI; file shelf with Quick Look, AirDrop, image convert/compress, PDF merge; sound output switching, AirPods battery, per-app volume; next meeting countdown with one-click join; mic mute; Mirror camera; Shortcuts; low battery warnings; local dev servers; volume/brightness HUDs; clipboard history; focus timer; full-screen aware; cleaning mode; English and Turkish UI.
+Confirmed features (README and dist/notes-*.md, up to 0.8.2): notifications from other apps as a card dropping from the notch (click to reply or use its buttons, Open, ✕) and a Notifications page stacked per app, memory only; Mirror's panel-wide viewfinder that saves wide Polaroids (cream border, orange date stamp, handwritten date, optional); pages reordered by drag in Settings › General › Pages; all permissions on one tour step; now playing from any app with cover-tinted panel, synced lyrics, smart handoff between players, multiple players side by side, video from Chromium browsers docked under the notch; AI agent sessions and approvals for Claude Code and Codex CLI; file shelf with Quick Look, AirDrop, image convert/compress, PDF merge; sound output switching, AirPods battery, per-app volume; next meeting countdown with one-click join; mic mute; Mirror camera; Shortcuts; low battery warnings; local dev servers; volume/brightness HUDs; clipboard history; focus timer; full-screen aware; cleaning mode; English and Turkish UI.
 
 Constraints: macOS 26 or later. ChatGPT app permission requests cannot be answered from the notch (shown as waiting only). Signed and notarized, auto-updates via Sparkle.
 
-Install: `brew install --cask erkamyigitaydin/tap/damla` or the DMG at https://github.com/erkamyigitaydin/Damla/releases/latest.
+Install: `brew install --cask erkamyigitaydin/tap/damla` or the DMG at https://damla.erkamaydin.com/download/latest. The GitHub repository is going private: the site must not link to GitHub. Contact is mailto:erkamyigitaydin@gmail.com?subject=Damla.
 
 ## Brand Commitments
 
@@ -51,7 +51,7 @@ Install: `brew install --cask erkamyigitaydin/tap/damla` or the DMG at https://g
 
 - Screenshots made with demo data: `docs/screenshots/home.png`, `closed.png`, `agents.png`, `approval.png`, `files.png`.
 - App icon source: `Resources/MakeIcon.swift`; mascot drawing: `Sources/Damla/Mascot.swift`.
-- No testimonials, user counts, press, or ratings exist. Do not invent them. The app is free, with its source public on GitHub; the repo has no LICENSE file, so do not call it open source. No pricing.
+- No testimonials, user counts, press, or ratings exist. Do not invent them. The app is free; do not call it open source. No pricing.
 - The README screenshots in `docs/screenshots/` predate 0.7–0.8 and no longer match the UI; current feature truth is `dist/notes-*.md`. Fresh reference captures of the live panel (demo data) were taken 2026-09-28 with the `--debug` hooks.
 
 ## Product Principles

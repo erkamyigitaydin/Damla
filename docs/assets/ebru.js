@@ -1,12 +1,14 @@
 // Ebru: marbling on a canvas, done the way the craft does it. Every drop of pigment is a polygon; a new drop
 // pushes everything around it outward (area is conserved, so old drops become rings), and combs, needles and
 // swirls slide the pigment along without mixing it. The maths is Jaffer & Lu's "Mathematical Marbling".
-// All coordinates are CSS pixels; the canvas is drawn at a capped device pixel ratio.
+// All coordinates are CSS pixels; the canvas is drawn at a capped device pixel ratio. Points live in typed
+// arrays and are rebuilt through one shared scratch buffer, so a running tray makes almost no garbage. The
+// class only needs a 2D context, so it runs the same on an OffscreenCanvas in a worker (engine.js).
 
 const TAU = Math.PI * 2;
 
 export class Tray {
-  constructor(canvas, { ground = '#111a27', pixelBudget = 4.2e6, maxDpr = 2, rim = true, vertexBudget = 45000, maxDrops = 72 } = {}) {
+  constructor(canvas, { ground = '#111a27', pixelBudget = 3e6, maxDpr = 1.5, rim = true, vertexBudget = 26000, maxDrops = 64 } = {}) {
     this.vertexBudget = vertexBudget;
     this.maxDrops = maxDrops;
     this.canvas = canvas;
@@ -22,11 +24,11 @@ export class Tray {
     this.w = 0; this.h = 0;
   }
 
-  // Match the canvas to its box. Existing pigment keeps its coordinates.
+  // Match the canvas to its box (CSS pixels). Existing pigment keeps its coordinates.
   // `scale` draws a small logical tray onto a bigger canvas (a pattern keeps its grain on a large sheet).
-  resize(w = this.canvas.clientWidth, h = this.canvas.clientHeight, scale = 1) {
+  resize(w, h, scale = 1, deviceDpr = 1) {
     if (!w || !h) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr, Math.sqrt(this.pixelBudget / (w * h * scale * scale)));
+    const dpr = Math.min(deviceDpr, this.maxDpr, Math.sqrt(this.pixelBudget / (w * h * scale * scale)));
     this.dpr = Math.max(0.75, dpr) * scale;
     this.w = w; this.h = h;
     this.canvas.width = Math.round(w * this.dpr);
@@ -186,26 +188,27 @@ export class Tray {
     const W = this.w, H = this.h, M = 60;
     // Combing makes edges longer and longer; past the budget the tray trades smoothness for a steady frame.
     const load = Math.max(1, this.vertexCount() / this.vertexBudget);
-    const near = 3.2 * load, far = 28 * load, tiny = 0.7 * load;
+    const near = 3.4 * load, far = 28 * load, tiny = 0.8 * load;
     for (const d of this.drops) {
-      const p = d.pts, out = [];
-      const n = p.length;
+      const p = d.pts, n = p.length;
+      let out = need(n * 2 + 64), k = 0;
       for (let i = 0; i < n; i += 2) {
         const x = p[i], y = p[i + 1];
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
         const j = (i + 2) % n, x2 = p[j], y2 = p[j + 1];
-        if (!Number.isFinite(x2) || !Number.isFinite(y2)) { out.push(x, y); continue; }
+        if (k + 40 > out.length) out = need(out.length * 2, out, k);
+        if (!Number.isFinite(x2) || !Number.isFinite(y2)) { out[k++] = x; out[k++] = y; continue; }
         const inside = x > -M && x < W + M && y > -M && y < H + M;
-        const seg = Math.hypot(x2 - x, y2 - y);
-        if (seg < tiny && out.length > 4 && !d.blooming) continue;
-        out.push(x, y);
+        const dx = x2 - x, dy = y2 - y, seg = Math.sqrt(dx * dx + dy * dy);
+        if (seg < tiny && k > 4 && !d.blooming) continue;
+        out[k++] = x; out[k++] = y;
         const limit = inside ? near : far;
         if (seg > limit) {
-          const k = Math.min(16, Math.ceil(seg / limit));
-          for (let s = 1; s < k; s++) out.push(x + (x2 - x) * s / k, y + (y2 - y) * s / k);
+          const m = Math.min(16, Math.ceil(seg / limit));
+          for (let s = 1; s < m; s++) { out[k++] = x + dx * s / m; out[k++] = y + dy * s / m; }
         }
       }
-      d.pts = out;
+      d.pts = out.slice(0, k);
     }
     // Culling: a drop with no point inside the view is either off to one side (invisible) or covers the
     // whole view, in which case everything under it is invisible.
@@ -239,14 +242,14 @@ export class Tray {
     }
   }
 
-  vertexCount() { return this.drops.reduce((n, d) => n + d.pts.length / 2, 0); }
+  vertexCount() { let n = 0; for (const d of this.drops) n += d.pts.length; return n / 2; }
 
   render() {
     const { ctx, dpr } = this;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = this.ground;
     ctx.fillRect(0, 0, this.w, this.h);
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = 'bevel';   // a 1px hairline: round joins cost more and look the same
     for (const d of this.drops) {
       const p = d.pts;
       if (p.length < 6) continue;
@@ -268,14 +271,25 @@ export class Tray {
 }
 
 function makeDrop(x, y, r, color, finalR = r) {
-  const n = Math.max(48, Math.min(420, Math.round(TAU * finalR / 3)));
-  const pts = new Array(n * 2);
+  const n = Math.max(48, Math.min(420, Math.round(TAU * finalR / 3.2)));
+  const pts = new Float64Array(n * 2);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * TAU;
     pts[i * 2] = x + Math.cos(a) * r;
     pts[i * 2 + 1] = y + Math.sin(a) * r;
   }
   return { pts, color, rimColor: shade(color, -0.22) };
+}
+
+// One growing scratch buffer for refine(): each drop is rebuilt into it and copied out once.
+let scratch = new Float64Array(1 << 15);
+function need(size, keep = null, used = 0) {
+  if (scratch.length < size) {
+    const next = new Float64Array(Math.max(size, scratch.length * 2));
+    if (keep) next.set(keep.subarray(0, used));
+    scratch = next;
+  }
+  return scratch;
 }
 
 function lerpPath(path, t) {
@@ -338,6 +352,22 @@ export const patterns = {
     for (let y = 24; y < h; y += 46) for (let x = 26; x < w; x += 50) spots.push([x + (y / 46 % 2) * 25, y]);
     for (const [x, y] of spots) { tray.drop(x, y, 13, c[0]); tray.drop(x, y, 8, c[1]); tray.drop(x, y, 4, c[2] || c[0]); }
     for (const [x, y] of spots) tray.stylus(x, y - 14, x, y + 12, 5, 1);
+  },
+  // kumlu: sand, a fine scatter of the lightest colour over a quiet battal
+  kumlu(tray, c, rand) {
+    patterns.battal(tray, c.slice(0, -1), rand);
+    const { w, h } = tray;
+    for (let i = 0; i < 260; i++) tray.drop(rand() * w, rand() * h, 0.6 + rand() * 1.1, c[c.length - 1]);
+  },
+  // lale: rings dropped in a row and pulled into tulips by one stroke of the needle each
+  lale(tray, c, rand) {
+    patterns.battal(tray, [c[c.length - 1], c[c.length - 2]], rand);
+    const { w, h } = tray;
+    for (let x = 30; x < w; x += 58) for (let y = 34; y < h; y += 70) {
+      const cx = x + (y / 70 % 2) * 29;
+      tray.drop(cx, y, 15, c[0]); tray.drop(cx, y, 10, c[1]); tray.drop(cx, y, 5, c[0]);
+      tray.stylus(cx, y - 18, cx, y + 20, 6, 1);
+    }
   },
   neftli(tray, c, rand) {
     patterns.battal(tray, c.slice(0, -1), rand);
