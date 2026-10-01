@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.2</title>
+      <pubDate>Thu, 01 Oct 2026 10:05:05 +0000</pubDate>
+      <sparkle:version>15</sparkle:version>
+      <sparkle:shortVersionString>0.8.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Bildirimler artık çentikte.</p><p>- Bildirimler: gelen bildirim çentikte cam bir kart olarak görünür, sistem balonu gizlenir. Karta tıkla: yanıt alanı ya da uygulamanın düğmeleri açılır (WhatsApp&#x27;ta yanıt doğrudan çentikten), &quot;Aç&quot; ilgili sohbeti açar, ✕ kapatır. Erişilebilirlik izniyle çalışır; Ayarlar → Genel → Bildirimler.</p><p>- Bildirimler sayfası: bu oturumda gelenler uygulamaya göre deste olur; okunanlar sayfadan çıkınca kendiliğinden gider, okunmamışlar kapalı çentikte zil ve sayı olarak durur. Hiçbir metin diske yazılmaz.</p><p>- Ayna: vizör panel genişliğinde, fotoğraf gördüğün kadrajla çekilir ve geniş bir polaroid olarak kaydedilir; son fotoğraf sol altta küçük bir kart. Düğmeler hep görünür, tarih Ayarlar&#x27;dan kapatılabilir.</p><p>- Sayfaların sırası Ayarlar → Genel → Sayfalar&#x27;da sürükle-bırakla değişir.</p><p>- Duraklatılan parça birkaç saniye sonra kapalı çentikten düşer. Çentiksiz ekranda çakma çentik istersen boştayken gizlenir.</p><p>- İlk açılışta tüm izinler tek adımda; tanıtıma Bildirimler adımı eklendi.</p><p>- Güncellemeler artık damla.erkamaydin.com üzerinden gelir.</p>]]></description>
+      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.8.2/Damla-0.8.2.dmg" length="6785482" type="application/octet-stream" sparkle:edSignature="PCJspTpk3mtOKwV+YEXQ8ysiqlMO9V0xPQvf0sua7yhZ/KhEXEz754YUuJqmGtUfzDTOHa2l1loV9LuaqXXhCg=="/>
+    </item>
+    <item>
       <title>Damla 0.8.1</title>
       <pubDate>Sun, 27 Sep 2026 15:52:48 +0000</pubDate>
       <sparkle:version>14</sparkle:version>
