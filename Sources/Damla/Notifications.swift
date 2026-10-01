@@ -172,11 +172,30 @@ final class NotificationMirror: ObservableObject {
     /// Quitting or switching off: Notification Center keeps reusing its window, so it must not stay off screen.
     /// Moved back even with a banner in it (its glass then shows a stale backdrop until it goes).
     func restoreWindows() {
+        pendingRestore?.cancel(); pendingRestore = nil
         guard let centerApp else { return }
         for window in Self.children(centerApp, kAXWindowsAttribute) where Self.isOffScreen(window) {
             Self.banners(in: window).forEach(collapse)   // opened ones would never time out on their own
             Self.restore(window)
         }
+    }
+
+    /// A leaving banner drops out of the tree as its exit animation starts: the window still draws it sliding
+    /// away for about 0.17 s and is ordered out about 0.5 s later (measured on macOS 27). Moved back at once, the
+    /// system banner flashed on screen as the card ended; moved back after the slide, nothing shows. It has to land
+    /// before the window is ordered out, which turns its element invalid (the window would stay off screen).
+    private static let restoreDelay: TimeInterval = 0.3
+    private var pendingRestore: DispatchWorkItem?
+
+    private func restoreAfterExit(_ window: AXUIElement) {
+        guard pendingRestore == nil, Self.isOffScreen(window) else { return }
+        let work = DispatchWorkItem { [weak self] in
+            self?.pendingRestore = nil
+            if Self.position(window) == nil { MediaService.trace("notifications: window ordered out before it was restored") }
+            Self.restoreIfEmpty(window)   // a banner that came in meanwhile keeps it where it is
+        }
+        pendingRestore = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.restoreDelay, execute: work)
     }
 
     private func detach() {
@@ -190,8 +209,9 @@ final class NotificationMirror: ObservableObject {
         guard enabled, let centerApp else { return }
         for window in Self.children(centerApp, kAXWindowsAttribute) {
             let banners = Self.banners(in: window)
-            // Emptied: back where it was, ready to show the next banner itself if the notch cannot.
-            if banners.isEmpty { Self.restoreIfEmpty(window); continue }
+            // Emptied: back where it was (once the leaving banner has slid away), ready to show the next banner
+            // itself if the notch cannot.
+            if banners.isEmpty { restoreAfterExit(window); continue }
             guard let newest = banners.first, let id = Self.string(newest, "AXIdentifier"), !seen.contains(id) else { continue }
             // The shown one, relabelled on opening: follow its new name.
             if let banner, CFEqual(banner, newest) { seen.append(id); bannerID = id; continue }
