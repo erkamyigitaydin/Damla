@@ -1,0 +1,13 @@
+# Damla's update feed: serves appcast.xml (kept in the GitHub repo) and counts update checks.
+# Sparkle checks once a day per install, so the daily count of distinct installs is the active-user number.
+name = "damla-feed"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "damla-stats"
+database_id = "REPLACE_AFTER_D1_CREATE"
+
+[vars]
+APPCAST_URL = "https://raw.githubusercontent.com/erkamyigitaydin/Damla/main/appcast.xml"
