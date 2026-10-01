@@ -12,3 +12,10 @@ CREATE TABLE IF NOT EXISTS seen (
   visitor TEXT NOT NULL,
   PRIMARY KEY (day, visitor)
 );
+-- Downloads of each dmg per day (site button, Homebrew and Sparkle updates all come through here).
+CREATE TABLE IF NOT EXISTS downloads (
+  day TEXT NOT NULL,
+  file TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, file)
+);

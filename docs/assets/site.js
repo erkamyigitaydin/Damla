@@ -751,14 +751,12 @@ function copyButtons() {
 
 async function latestRelease() {
   try {
-    const r = await fetch('https://api.github.com/repos/erkamyigitaydin/Damla/releases/latest', { headers: { Accept: 'application/vnd.github+json' } });
+    // The newest release, from this site's own worker (the dmg button already points at /download/latest).
+    const r = await fetch('/latest.json');
     if (!r.ok) return;
-    const rel = await r.json();
-    const dmg = (rel.assets || []).find(a => a.name.endsWith('.dmg'));
-    if (dmg) for (const a of $$('.dmg-link')) a.href = dmg.browser_download_url;
-    const v = String(rel.tag_name || '').replace(/^v/, '');
-    if (v) for (const s of $$('.version')) s.textContent = `v${v}`;
-  } catch { /* offline: the links still point at the releases page */ }
+    const { version } = await r.json();
+    if (version) for (const s of $$('.version')) s.textContent = `v${version}`;
+  } catch { /* offline or opened from disk: the button still works */ }
 }
 
 function trayVisibility() {

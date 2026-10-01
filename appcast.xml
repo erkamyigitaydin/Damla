@@ -11,7 +11,7 @@
       <sparkle:shortVersionString>0.8.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Bildirimler artık çentikte.</p><p>- Bildirimler: gelen bildirim çentikte cam bir kart olarak görünür, sistem balonu gizlenir. Karta tıkla: yanıt alanı ya da uygulamanın düğmeleri açılır (WhatsApp&#x27;ta yanıt doğrudan çentikten), &quot;Aç&quot; ilgili sohbeti açar, ✕ kapatır. Erişilebilirlik izniyle çalışır; Ayarlar → Genel → Bildirimler.</p><p>- Bildirimler sayfası: bu oturumda gelenler uygulamaya göre deste olur; okunanlar sayfadan çıkınca kendiliğinden gider, okunmamışlar kapalı çentikte zil ve sayı olarak durur. Hiçbir metin diske yazılmaz.</p><p>- Ayna: vizör panel genişliğinde, fotoğraf gördüğün kadrajla çekilir ve geniş bir polaroid olarak kaydedilir; son fotoğraf sol altta küçük bir kart. Düğmeler hep görünür, tarih Ayarlar&#x27;dan kapatılabilir.</p><p>- Sayfaların sırası Ayarlar → Genel → Sayfalar&#x27;da sürükle-bırakla değişir.</p><p>- Duraklatılan parça birkaç saniye sonra kapalı çentikten düşer. Çentiksiz ekranda çakma çentik istersen boştayken gizlenir.</p><p>- İlk açılışta tüm izinler tek adımda; tanıtıma Bildirimler adımı eklendi.</p><p>- Güncellemeler artık damla.erkamaydin.com üzerinden gelir.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.8.2/Damla-0.8.2.dmg" length="6785482" type="application/octet-stream" sparkle:edSignature="PCJspTpk3mtOKwV+YEXQ8ysiqlMO9V0xPQvf0sua7yhZ/KhEXEz754YUuJqmGtUfzDTOHa2l1loV9LuaqXXhCg=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.2.dmg" length="6785482" type="application/octet-stream" sparkle:edSignature="PCJspTpk3mtOKwV+YEXQ8ysiqlMO9V0xPQvf0sua7yhZ/KhEXEz754YUuJqmGtUfzDTOHa2l1loV9LuaqXXhCg=="/>
     </item>
     <item>
       <title>Damla 0.8.1</title>
@@ -20,7 +20,7 @@
       <sparkle:shortVersionString>0.8.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Tarayıcıdaki video artık çentikte oynuyor.</p><p>- Çentikte video: Chrome, Brave, Edge ya da Vivaldi&#x27;de video oynarken Özet&#x27;teki ⧉ düğmesine bas; video çentiğin altında oynamaya devam eder, tarayıcı arka plandayken de. Üzerine gelince duraklat, büyüt ya da sekmesine dön. Video tarayıcının kendi resim içinde resim penceresinden gelir: kırpma yok, donma yok.</p><p>- İlk kullanımda bir kurulum kartı gereken izinleri sırayla gösterir (Erişilebilirlik, Ekran Kaydı, tarayıcı denetimi ve tarayıcının &quot;Apple Events&#x27;ten JavaScript&#x27;e izin ver&quot; ayarı); verdikçe satırlar kendiliğinden tamamlanır.</p><p>- Özet: sıradaki toplantı artık ilerleme çubuğunun altında; oynatma düğmelerinin üstüne binmiyor.</p><p>- Damla kapatıldığında (zorla kapatılsa da) temizliğini yapar.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.8.1/Damla-0.8.1.dmg" length="6377970" type="application/octet-stream" sparkle:edSignature="SfSBwxoA15Sb8DWoICz3/GkvyEpJqslM4xX7yItHYxGZZNLnFy1WUPIs5pXAbudehjDtynndpFtW4r5eC6PACA=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.1.dmg" length="6377970" type="application/octet-stream" sparkle:edSignature="SfSBwxoA15Sb8DWoICz3/GkvyEpJqslM4xX7yItHYxGZZNLnFy1WUPIs5pXAbudehjDtynndpFtW4r5eC6PACA=="/>
     </item>
     <item>
       <title>Damla 0.8.0</title>
@@ -29,7 +29,7 @@
       <sparkle:shortVersionString>0.8.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Anlık kamera, çentikten onaylar, takvim ve çok daha akıcı bir çentik.</p><p>- Ayna: çentikte anlık fotoğraf makinesi. Nostalji, siyah beyaz ve doğal film görünümleri; 3-2-1 geri sayım; tarih damgalı, krem çerçeveli kartlar çentikten basılıp banyo olur ve Resimler/Damla&#x27;ya kaydedilir. Ana Sahne açılıp kapatılabilir.</p><p>- Ajanlar: Codex CLI izinleri de çentikten onaylanır. ⌃⌥↩ izin ver, ⌃⌥⌫ reddet; &quot;Hep izin ver&quot; Claude Code&#x27;un önerdiği kuralı kaydeder. Claude Code&#x27;un seçenekli soruları çentikten yanıtlanır.</p><p>- Claude Code&#x27;un bağlam doluluğu ve 5 saatlik/haftalık kullanımı Ajanlar sayfasında; %80 ve %95&#x27;te uyarı. Açık yerel sunucular da orada: tek tıkla aç ya da durdur.</p><p>- Takvim: sıradaki toplantıya 10 dakika kala çentikte geri sayım, bağlantısı varsa tek tıkla katıl. Görüşmede mikrofon çentikte görünür, dokununca sessize alınır.</p><p>- Kestirmeler sayfası: sabitlediğin kestirmeler tek dokunuşluk düğme olur.</p><p>- Raf: yeni ekran görüntüleri kendiliğinden rafa düşer; görselleri dönüştür, küçült, sıkıştır; PDF&#x27;leri birleştir.</p><p>- Odak: süreyi halkayı kadran gibi çevirerek, yazarak ya da kaydırarak ayarla.</p><p>- Özet: ses çıkışının adı düğmede, AirPods pili çıkış listesinde; sözü olmayan şarkıda söz düğmesi gizlenir.</p><p>- İki parmakla kaydırmak sayfa değiştirir ve parmağı takip eder; sayfalar gittiğin yönden gelir, panel kapanırken çentiğe geri çekilir.</p><p>- Fare, klavye ve AirPods için düşük pil uyarısı.</p><p>- Tanıtım artık çentiğin içinde; ayarlar sadeleşti.</p><p>- Daha az işlemci: kapalı çentik boşta saniyede 36 yerine 6 kez uyanır, açık panel ~%8,6 yerine ~%1,9 kullanır.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.8.0/Damla-0.8.0.dmg" length="6106921" type="application/octet-stream" sparkle:edSignature="RqlueI/CBtkQ3oKq1yVR2Ea+3r9UEdzb+YKPyfoMd7UmkP+RJrhCFx2f08kYPf8F6bnrvxEWdVjDLmePCeA7Dg=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.0.dmg" length="6106921" type="application/octet-stream" sparkle:edSignature="RqlueI/CBtkQ3oKq1yVR2Ea+3r9UEdzb+YKPyfoMd7UmkP+RJrhCFx2f08kYPf8F6bnrvxEWdVjDLmePCeA7Dg=="/>
     </item>
     <item>
       <title>Damla 0.7.0</title>
@@ -38,7 +38,7 @@
       <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Ses kontrolü, şarkı sözleri, İngilizce arayüz ve çok daha az işlemci.</p><p>- Şarkı sözleri: sağ alttaki düğmeyle panel uzar, sözler Apple Music tarzında oynatıcının altında akar; şarkı değişince başa döner.</p><p>- Ses: çıkış aygıtı seçici (değişince HUD), Music/Spotify ve uygulama bazında ses seviyesi, sesi kısma modu.</p><p>- Çentikte kaydırma: ses seviyesini değiştir ya da parça atla.</p><p>- AirPods şarj HUD&#x27;u ve Apple Music&#x27;te favoriye ekleme.</p><p>- Vurgu rengi albüm kapağından gelir; açık panelde okunabilirlik için hafif perde.</p><p>- Yenilenen Ajanlar sayfası ve Damla maskotu.</p><p>- İlk açılış rehberi; Claude Code hook&#x27;ları artık uygulamanın içinden kurulabilir.</p><p>- İngilizce arayüz ve Ayarlar&#x27;dan dil seçimi.</p><p>- Homebrew ile kurulum: `brew install --cask erkamyigitaydin/tap/damla`.</p><p>- Kapalı çentik çok daha az işlemci kullanır (müzik + ajan çalışırken ~%15 → ~%3); menü çubuğu denetimi de artık yalnızca gerektiğinde sık çalışır.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.7.0/Damla-0.7.0.dmg" length="5102766" type="application/octet-stream" sparkle:edSignature="l5CaGz6y69bxyo5FW1/JauRSbmFkvPWdby0jaAMDvGJFT1nLLYhWjYN1sKTahO8UCnGHjxPvwNXq1jF3dcJMAw=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.7.0.dmg" length="5102766" type="application/octet-stream" sparkle:edSignature="l5CaGz6y69bxyo5FW1/JauRSbmFkvPWdby0jaAMDvGJFT1nLLYhWjYN1sKTahO8UCnGHjxPvwNXq1jF3dcJMAw=="/>
     </item>
     <item>
       <title>Damla 0.6.1</title>
@@ -47,7 +47,7 @@
       <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Sayfa seçimi ve daha akıcı ayarlar.</p><p>- Ayarlar → Panel: panelde hangi sayfaların (Özet, Dosyalar, Pano, Odak, Agent&#x27;lar) görüneceğini seç.</p><p>- Ayarlar penceresi sekme değiştirirken artık sıçramıyor.</p><p>- Safari&#x27;deki web medyası (ör. X videoları) artık Safari adı ve simgesiyle görünüyor.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.6.1/Damla-0.6.1.dmg" length="4330740" type="application/octet-stream" sparkle:edSignature="fijzgKo34lvrg58l5WIuVnLUOcz53hHDyuqlvSp/v3OVqbYQk+iKDnFFjkTbafggwcBOObgavibUxUyHaD6oCg=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.6.1.dmg" length="4330740" type="application/octet-stream" sparkle:edSignature="fijzgKo34lvrg58l5WIuVnLUOcz53hHDyuqlvSp/v3OVqbYQk+iKDnFFjkTbafggwcBOObgavibUxUyHaD6oCg=="/>
     </item>
     <item>
       <title>Damla 0.6.0</title>
@@ -56,7 +56,7 @@
       <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Claude Code izinlerini çentikten onayla.</p><p>- Claude Code bir komut çalıştırmak, dosya düzenlemek veya web&#x27;e çıkmak için izin isteyince Damla çentikte açılır; tam komutu görüp İzin ver ya da Reddet diyebilirsin.</p><p>- Terminal (veya Claude uygulaması) öndeyse çentik sormaz; süre dolarsa ya da terminalde yanıtlarsan soru orada kalır.</p><p>- İsteğe bağlıdır: onay hook&#x27;u yalnızca `install-agent-hooks.py --approvals` ile kurulur, Ayarlar → Ajanlar&#x27;dan kapatılabilir.</p><p>- Bekleme süresi 30, 60 veya 120 saniye seçilebilir.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.6.0/Damla-0.6.0.dmg" length="4307966" type="application/octet-stream" sparkle:edSignature="fGRGFEhtH9pfzxE+3SBHwMH4zBspY5orUxFNqPhPSTSh1iAJc7lbXhLRAOToqWpHWUGYoGOQQVOoeLIp0v4pAA=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.6.0.dmg" length="4307966" type="application/octet-stream" sparkle:edSignature="fGRGFEhtH9pfzxE+3SBHwMH4zBspY5orUxFNqPhPSTSh1iAJc7lbXhLRAOToqWpHWUGYoGOQQVOoeLIp0v4pAA=="/>
     </item>
     <item>
       <title>Damla 0.5.1</title>
@@ -65,7 +65,7 @@
       <sparkle:shortVersionString>0.5.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Daha sağlam medya takibi ve Intel desteği.</p><p>- Müzik videodan hemen önce duraklatıldığında bile video bitince müzik geri gelir.</p><p>- Canlı yayınların süresi doğru temizlenir; önceki parçanın süresi ekranda kalmaz.</p><p>- Şimdi Çalıyor köprüsü artık Intel Mac&#x27;lerde de çalışır (önceden yalnızca Apple Silicon).</p><p>- Güncellemeden sonra Erişilebilirlik izni korunur. Bu sürüme geçerken izni bir kez yeniden vermen gerekebilir.</p><p>- Medya kararları 30 yeni otomatik testle korunuyor.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.5.1/Damla-0.5.1.dmg" length="4173474" type="application/octet-stream" sparkle:edSignature="2Jz95C7YI6cD8kSFmjRTIAvUdeXK1CqQrh0UHfrQX/A3Gw3DSjva66XYK+U8j7YyfZiXPqLdLTaCuYVNh51PCg=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.5.1.dmg" length="4173474" type="application/octet-stream" sparkle:edSignature="2Jz95C7YI6cD8kSFmjRTIAvUdeXK1CqQrh0UHfrQX/A3Gw3DSjva66XYK+U8j7YyfZiXPqLdLTaCuYVNh51PCg=="/>
     </item>
     <item>
       <title>Damla 0.5.0</title>
@@ -74,7 +74,7 @@
       <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Birden fazla oynatıcı ve yeni ayarlar penceresi.</p><p>- Damla artık gördüğü her oynatıcıyı ayrı takip eder. Özet&#x27;in sağ altındaki ikonlara dokunarak Müzik, Spotify, Chrome, Safari… arasında geçiş yapabilirsin; çalan oynatıcının yanında yeşil nokta görünür.</p><p>- Apple Music ve Spotify arka plandayken de canlı kalır ve kumanda edilir. Arka plana düşen tarayıcı sekmesi son bilinen haliyle kalır, &quot;Oynatıcıyı aç&quot; ile ona geçebilirsin.</p><p>- Otomatik devir (varsayılan açık): tarayıcıda bir video başlayınca müzik duraklar, video durunca kaldığı yerden devam eder. İlk seferde macOS Otomasyon izni ister; Ayarlar → Medya&#x27;dan kapatılabilir.</p><p>- Duraklattığın oynatıcı ekranda kalır; macOS arkada çalan bir videoya geri döndüğünde gösterim kaymaz.</p><p>- Canlı yayınlarda ilerleme çubuğu yerine &quot;CANLI&quot; yazar.</p><p>- Ayarlar artık panelin içinde değil, normal bir macOS penceresinde: Genel, Ekran, Medya, Ajanlar, Hakkında.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.5.0/Damla-0.5.0.dmg" length="4078063" type="application/octet-stream" sparkle:edSignature="KlsVhOX/62V2oap2ZLBA70inIwxCK7eRcU16UyR3h9NX37ZlO4g/0PxiUgmjje+vCT/wXnJBNlBqPU39gUuDCw=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.5.0.dmg" length="4078063" type="application/octet-stream" sparkle:edSignature="KlsVhOX/62V2oap2ZLBA70inIwxCK7eRcU16UyR3h9NX37ZlO4g/0PxiUgmjje+vCT/wXnJBNlBqPU39gUuDCw=="/>
     </item>
     <item>
       <title>Damla 0.4.3</title>
@@ -83,7 +83,7 @@
       <sparkle:shortVersionString>0.4.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Damla kapalıyken alttaki uygulamalara tıklamayı engelleyen görünmez pencere alanı düzeltildi.</p><p>- Çentiğin altındaki Safari ve diğer uygulamaların düğmeleri yeniden tıklanabilir.</p><p>- Fare olayları Damla&#x27;nın görünen alanıyla sınırlandırılır; panel, bildirim ve dosya bırakma tepsisi değiştiğinde alan güncellenir.</p><p>- Düzeltme iki ekranda canlı olarak doğrulandı; 63 otomatik kontrol geçti.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.3/Damla-0.4.3.dmg" length="3956295" type="application/octet-stream" sparkle:edSignature="5PQ6L8wp1EtMr4LslQ4oezC/o6jCLGWtCDqlwMVPVN6NWDJ6Rdwq7eXPpH1s1tZ7WDrRaDNTjfP91+zwlLrgAQ=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.4.3.dmg" length="3956295" type="application/octet-stream" sparkle:edSignature="5PQ6L8wp1EtMr4LslQ4oezC/o6jCLGWtCDqlwMVPVN6NWDJ6Rdwq7eXPpH1s1tZ7WDrRaDNTjfP91+zwlLrgAQ=="/>
     </item>
     <item>
       <title>Damla 0.4.2</title>
@@ -92,7 +92,7 @@
       <sparkle:shortVersionString>0.4.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Tam ekranda çentik menü çubuğuyla birlikte gizleniyor.</p><p>- Tam ekran bir uygulamada kapalı çentik ve canlı etkinlikler kaybolur; fareyi üst kenara götürüp menü çubuğunu açınca geri gelir.</p><p>- Harici ekranlarda ve çentikli MacBook ekranında çalışır; her ekran ayrı değerlendirilir.</p><p>- Ses/parlaklık göstergesi, dosya sepeti ve açık panel tam ekranda da görünmeye devam eder.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.2/Damla-0.4.2.dmg" length="3949356" type="application/octet-stream" sparkle:edSignature="E8gcZgtrP1vDAXBF12mnNfWTK4GBx9CimnSklR1sIqMCtSanx9Dws5d7sYqUP1RcPqIKynn/nvxfi7XV0CMVCg=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.4.2.dmg" length="3949356" type="application/octet-stream" sparkle:edSignature="E8gcZgtrP1vDAXBF12mnNfWTK4GBx9CimnSklR1sIqMCtSanx9Dws5d7sYqUP1RcPqIKynn/nvxfi7XV0CMVCg=="/>
     </item>
     <item>
       <title>Damla 0.4.1</title>
@@ -101,7 +101,7 @@
       <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Ayarlar sayfasında satır aralıkları sıkılaştırıldı; Güncellemeler satırı eklendikten sonra alt bilgi rahat sığıyor.</p><p>Otomatik güncelleme akışının ilk gerçek testi.</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.1/Damla-0.4.1.dmg" length="3927631" type="application/octet-stream" sparkle:edSignature="oQPuoqWvwWZGz09qzEcEo+6z95yfZLBk55Pb1WkD0d4esi00pop7+nr4HEb/ErBfytau5cSyWnGxmB8JiolIAw=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.4.1.dmg" length="3927631" type="application/octet-stream" sparkle:edSignature="oQPuoqWvwWZGz09qzEcEo+6z95yfZLBk55Pb1WkD0d4esi00pop7+nr4HEb/ErBfytau5cSyWnGxmB8JiolIAw=="/>
     </item>
     <item>
       <title>Damla 0.4.0</title>
@@ -110,7 +110,7 @@
       <sparkle:shortVersionString>0.4.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
       <description><![CDATA[<p>Debug komutları: check-updates, quit</p>]]></description>
-      <enclosure url="https://github.com/erkamyigitaydin/Damla/releases/download/v0.4.0/Damla-0.4.0.dmg" length="3927736" type="application/octet-stream" sparkle:edSignature="/jkQxx9u8hDh5va+gGCtVhBz7rZPjBJfOLIZWxP+KY2gU16Gkpt6a24ujkZripzVS0EkNVhB1Hx7iZoOo2L3Bg=="/>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.4.0.dmg" length="3927736" type="application/octet-stream" sparkle:edSignature="/jkQxx9u8hDh5va+gGCtVhBz7rZPjBJfOLIZWxP+KY2gU16Gkpt6a24ujkZripzVS0EkNVhB1Hx7iZoOo2L3Bg=="/>
     </item>
   </channel>
 </rss>

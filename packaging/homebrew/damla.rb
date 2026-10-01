@@ -4,14 +4,14 @@ cask "damla" do
   version "@VERSION@"
   sha256 "@SHA256@"
 
-  url "https://github.com/erkamyigitaydin/Damla/releases/download/v#{version}/Damla-#{version}.dmg"
+  url "https://damla.erkamaydin.com/download/Damla-#{version}.dmg"
   name "Damla"
   desc "Notch companion for now playing, sound, files, clipboard, focus and agents"
-  homepage "https://github.com/erkamyigitaydin/Damla"
+  homepage "https://damla.erkamaydin.com"
 
   livecheck do
-    url :url
-    strategy :github_latest
+    url "https://damla.erkamaydin.com/appcast.xml"
+    strategy :sparkle
   end
 
   auto_updates true

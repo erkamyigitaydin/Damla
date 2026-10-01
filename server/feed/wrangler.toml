@@ -1,17 +1,24 @@
-# damla.erkamaydin.com: Damla's site (passed through from GitHub Pages) and its update feed, appcast.xml
-# (kept in the GitHub repo), where update checks are counted. Sparkle checks once a day per install, so the
-# daily count of distinct installs is the active-user number.
+# damla.erkamaydin.com: Damla's site (docs/, served as static assets), its update feed and its downloads.
+# The feed and the dmgs live in the R2 bucket damla-downloads (release.sh uploads them); update checks and
+# downloads are counted in D1. Sparkle checks once a day per install, so the daily count of distinct
+# installs is the active-user number.
 name = "damla-feed"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 workers_dev = false
 routes = [{ pattern = "damla.erkamaydin.com", custom_domain = true }]
 
+# Everything else is the site, straight from Cloudflare without running the worker.
+[assets]
+directory = "../../docs"
+binding = "ASSETS"
+run_worker_first = ["/appcast.xml", "/latest.json", "/download/*"]
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "damla-downloads"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "damla-stats"
 database_id = "eb23a17e-05b8-4ec7-b15d-fc07ec2c37c6"
-
-[vars]
-APPCAST_URL = "https://raw.githubusercontent.com/erkamyigitaydin/Damla/main/appcast.xml"
-SITE_URL = "https://erkamyigitaydin.github.io/Damla"

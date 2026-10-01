@@ -7,7 +7,9 @@
 #   zsh release.sh --no-notarize   # sign only (for a quick local check; no appcast, no release)
 #   zsh release.sh --no-publish    # everything except the appcast commit and the GitHub Release
 # Updates: the dmg is also signed with the Sparkle EdDSA key from Keychain (generate_keys) and an entry
-# is appended to appcast.xml, which is committed and pushed; the dmg becomes a GitHub Release asset.
+# is appended to appcast.xml. The dmg, appcast.xml and latest.json go to the R2 bucket behind
+# damla.erkamaydin.com (server/feed), where Sparkle, the site and Homebrew get them; the worker and the site
+# (docs/) are deployed with them. appcast.xml is also committed, and the dmg kept as a (private) GitHub Release.
 set -euo pipefail
 PROJECT_DIR="${0:A:h}"
 BUILD_DIR="${DAMLA_BUILD_DIR:-$PROJECT_DIR/.build}"
@@ -93,17 +95,26 @@ if (( PUBLISH )); then
   ED="$(printf '%s' "$SIG" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')"
   LEN="$(printf '%s' "$SIG" | sed -n 's/.*length="\([^"]*\)".*/\1/p')"
   [[ -n "$ED" && -n "$LEN" ]] || { echo "sign_update başarısız: $SIG" >&2; exit 1; }
-  URL="https://github.com/$REPO/releases/download/v$VERSION/Damla-$VERSION.dmg"
+  URL="https://damla.erkamaydin.com/download/Damla-$VERSION.dmg"
   NOTES_FILE="$PROJECT_DIR/dist/notes-$VERSION.md"
   [[ -f "$NOTES_FILE" ]] || git -C "$PROJECT_DIR" log -1 --format='%B' > "$NOTES_FILE"
   python3 "$PROJECT_DIR/scripts/appcast.py" "$PROJECT_DIR/appcast.xml" --version "$VERSION" --build "$BUILD" \
     --url "$URL" --length "$LEN" --signature "$ED" --notes "$NOTES_FILE" --min-os 26.0
-  echo "→ GitHub Release v$VERSION"
+  echo "→ damla.erkamaydin.com (R2 + worker + site)"
+  FEED="$PROJECT_DIR/server/feed"
+  R2=(npx --yes wrangler r2 object put --remote)
+  (cd "$FEED" && "${R2[@]}" "damla-downloads/Damla-$VERSION.dmg" --file "$DMG" --content-type application/x-apple-diskimage)
+  (cd "$FEED" && "${R2[@]}" "damla-downloads/appcast.xml" --file "$PROJECT_DIR/appcast.xml" --content-type application/xml)
+  printf '{"version":"%s","file":"Damla-%s.dmg"}' "$VERSION" "$VERSION" > "$DIST/latest.json"
+  (cd "$FEED" && "${R2[@]}" "damla-downloads/latest.json" --file "$DIST/latest.json" --content-type application/json)
+  (cd "$FEED" && npx --yes wrangler deploy)
+  curl -fsI "$URL" >/dev/null || { echo "dmg $URL adresinden indirilemiyor" >&2; exit 1; }
+  echo "→ GitHub Release v$VERSION (arşiv)"
   gh release create "v$VERSION" "$DMG" --repo "$REPO" --title "Damla $VERSION" --notes-file "$NOTES_FILE"
   git -C "$PROJECT_DIR" add appcast.xml
   git -C "$PROJECT_DIR" commit -q -m "appcast: $VERSION"
   git -C "$PROJECT_DIR" push -q origin main
-  echo "→ yayında: https://github.com/$REPO/releases/tag/v$VERSION"
+  echo "→ yayında: https://damla.erkamaydin.com (dmg: $URL)"
   # Homebrew: refresh the cask in the tap repository, when there is one (brew install --cask erkamyigitaydin/tap/damla).
   TAP="erkamyigitaydin/homebrew-tap"
   if gh repo view "$TAP" >/dev/null 2>&1; then
