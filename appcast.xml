@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.3</title>
+      <pubDate>Thu, 01 Oct 2026 11:57:37 +0000</pubDate>
+      <sparkle:version>16</sparkle:version>
+      <sparkle:shortVersionString>0.8.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Yeni simge, yeni maskot.</p><p>- Simge: grafit bir ekran, tepede çentik ve çentikten yeni süzülmüş Damla. Eski nane rengi damla emekli oldu.</p><p>- Ajan maskotu yeniden çizildi: daha dolgun bir damla, ışıklı gözler, mercan yanaklar. Onay beklerken kendi koluyla el sallıyor; iş bitince gülümseyip parıldıyor, hatada üzülüyor, durumu eskiyince uyuyor.</p><p>- Çalışan maskotun durağan hâlinde gözler artık açık.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.3.dmg" length="6517622" type="application/octet-stream" sparkle:edSignature="n8wJOXhqPYNS8FNzJXF7L4C2Msfa/yug53l9Hg+W/QzVcNlP+53JXUzoVhTwvi0Y7NgeHjSY+DwUcEbTllThBQ=="/>
+    </item>
+    <item>
       <title>Damla 0.8.2</title>
       <pubDate>Thu, 01 Oct 2026 10:05:05 +0000</pubDate>
       <sparkle:version>15</sparkle:version>
