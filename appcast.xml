@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.4</title>
+      <pubDate>Thu, 01 Oct 2026 15:31:46 +0000</pubDate>
+      <sparkle:version>17</sparkle:version>
+      <sparkle:shortVersionString>0.8.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Bildirimlerde küçük ama göze batan bir düzeltme.</p><p>- Çentikte gösterilen bir bildirim biterken, macOS&#x27;un kendi bildirimi sağ üst köşede bir an beliriyordu. Artık görünmüyor: bildirim yalnızca çentikte.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.4.dmg" length="6519721" type="application/octet-stream" sparkle:edSignature="+3YbvHqfrRZPtrublO9phNfoyCjlEljTRlEhZeCBNGFCM8DQUsu0QT4A7D+j3LpIEm8CBDo2oxBQE7wuavZUDQ=="/>
+    </item>
+    <item>
       <title>Damla 0.8.3</title>
       <pubDate>Thu, 01 Oct 2026 11:57:37 +0000</pubDate>
       <sparkle:version>16</sparkle:version>
