@@ -306,7 +306,7 @@ export function shade(hex, k) {
   let r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   if (k < 0) { r *= 1 + k; g *= 1 + k; b *= 1 + k; }
   else { r += (255 - r) * k; g += (255 - g) * k; b += (255 - b) * k; }
-  return `rgba(${r | 0},${g | 0},${b | 0},0.85)`;
+  return `rgba(${r | 0},${g | 0},${b | 0},0.6)`;
 }
 
 // A small seeded random generator, so a swatch looks the same every visit.

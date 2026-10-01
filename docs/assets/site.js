@@ -18,16 +18,16 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
 };
 
-const PIG = { coral: '#f4a18b', saffron: '#ffcc5c', water: '#cce3ff', pale: '#f3f6fa', sea: '#8fb3e6', indigo: '#6d7fd6', teal: '#3a5a8a', bone: '#ece9e2', deep: '#162236', night: '#111a27' };
+const PIG = { coral: '#f4a18b', saffron: '#ffcc5c', water: '#cce3ff', pale: '#fbf8f1', sea: '#8fb3e6', indigo: '#6d7fd6', teal: '#3a5a8a', abyss: '#233651', paper: '#ebe5d9' };
 
 /* ————————————————— language ————————————————— */
 
 const TR = {
   'skip': 'İçeriğe geç', 'menu': 'Menü',
   'nav.agents': 'Ajanlar', 'nav.notif': 'Bildirimler', 'nav.features': 'Müzik ve dosyalar', 'nav.more': 'Gerisi', 'nav.privacy': 'Gizlilik', 'nav.install': 'Kur',
-  'hero.kicker': 'Claude Code ve Codex CLI için',
-  'hero.title': 'Kodlama ajanların, çentikte.',
-  'hero.lede': 'Damla her Claude Code ve Codex oturumunu ekranının tepesinde gösterir. Komutları onayla, sorularını yanıtla; editörden çıkmadan. Bildirimler, müzik ve dosyalar da orada.',
+  'hero.kicker': 'Claude Code · Codex CLI · macOS 26',
+  'hero.title': 'Çentiğin, sonunda iş başında.',
+  'hero.lede': "Claude Code ve Codex'i onayla, bildirimleri yanıtla, müziğini ve dosyalarını yönet; hepsi editörden çıkmadan. Çentiğin üstüne gel, panel içinden süzülsün; uzaklaş, geri çekilsin.",
   'copy': 'Kopyala', 'download': 'Mac için indir',
   'req': 'macOS 26 ve sonrası · Apple Silicon ve Intel · Ücretsiz',
   'hero.hint': 'Suya tıkla, bir damla bırak. Sürükle, tara.',
@@ -122,7 +122,7 @@ const TR = {
 // Strings the script writes itself, in both languages.
 const DYN = {
   en: {
-    title: 'Damla · Claude Code and Codex in your notch',
+    title: 'Damla · your notch, finally at work',
     copied: 'Copied',
     waiting: s => `Waiting for approval: Bash · ${s} s · 12 calls`,
     working: 'Running: Bash · 13 calls',
@@ -139,7 +139,7 @@ const DYN = {
     shoot: on => on ? 'Take a photo in 3 seconds' : 'Take a photo',
   },
   tr: {
-    title: 'Damla · Claude Code ve Codex çentikte',
+    title: 'Damla · çentiğin, sonunda iş başında',
     copied: 'Kopyalandı',
     waiting: s => `Bash için onay bekliyor · ${s} sn · 12 çağrı`,
     working: 'Çalışıyor: Bash · 13 çağrı',
@@ -205,7 +205,7 @@ const water = {
   canvas: $('#tray'), w: innerWidth, h: innerHeight, worker: null, engine: null, queue: [], waiting: new Map(), seq: 0,
   async start() {
     this.w = document.documentElement.clientWidth; this.h = innerHeight;
-    const init = { type: 'init', w: this.w, h: this.h, dpr: devicePixelRatio || 1, ground: PIG.night };
+    const init = { type: 'init', w: this.w, h: this.h, dpr: devicePixelRatio || 1, ground: PIG.paper };
     if (canWork()) {
       try {
         this.worker = new Worker(new URL('./ebru-worker.js', import.meta.url), { type: 'module' });
@@ -277,7 +277,8 @@ function heroSequence() {
   // the rings reach 0.14 m above the centre; the needle pulls the tulip down to 0.32 m below it
   const m = Math.min(w * 0.8, 900, (room - 8) / 0.46);
   const cx = w / 2, cy = top + 0.14 * m + Math.max(0, room - 0.46 * m) / 2;
-  const seq = [PIG.water, PIG.bone, PIG.sea, PIG.coral, PIG.pale, PIG.teal, PIG.water, PIG.bone];
+  // on paper the outermost ring is the deep blue that frames the rest
+  const seq = [PIG.teal, PIG.water, PIG.sea, PIG.coral, PIG.pale, PIG.abyss, PIG.water, PIG.teal];
   let s = 3;
   const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
   seq.forEach((c, i) => {
@@ -294,7 +295,7 @@ function heroSequence() {
 }
 
 // The water is yours: a click drops pigment where you click, a drag combs it (mouse and pen; touch scrolls).
-const PALETTE = [PIG.water, PIG.bone, PIG.coral, PIG.sea, PIG.pale];
+const PALETTE = [PIG.teal, PIG.coral, PIG.sea, PIG.water, PIG.abyss];
 let paletteAt = 0;
 function stylusOnWater() {
   const zones = [$('.hero'), $('.stage-pin')];
@@ -892,7 +893,7 @@ function print() {
     const bitmap = await water.snapshot([(water.w - w) / 2, Math.max(0, (water.h - h) * 0.35), w, h], [W, H]);
     if (!bitmap) return;
     ctx.drawImage(bitmap, 0, 0); bitmap.close?.();
-    ctx.fillStyle = 'rgba(237,231,220,.72)';
+    ctx.fillStyle = 'rgba(22,25,31,.5)';
     ctx.font = '800 22px "Nunito", sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText('damla · ebru', W - 28, H - 26);
@@ -962,7 +963,7 @@ const saved = store.get('damla.lang');
 setLang(saved || ((navigator.language || '').toLowerCase().startsWith('tr') ? 'tr' : 'en'));
 
 water.start();
-water.post({ type: 'seed', tones: ['#1b2a40', PIG.deep, PIG.night, '#0f1622', '#223350', '#141d2c'] });
+water.post({ type: 'seed', tones: ['#e6dfd1', '#f1ece2', '#e2dac9', '#ede7dc', '#ddd4c2', '#efe9de'] });
 stage.measure();
 stage.update();
 trayVisibility();
