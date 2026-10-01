@@ -274,12 +274,14 @@ func runSelfTests() -> Int32 {
     check(BannerText.pick(bannerActions, BannerText.close, fallbackFirst: false) == bannerActions[3], "Close action found by name")
     check(BannerText.pick(["AXPress", "Name:Détails\nT", "Name:Fermer\nT"], BannerText.close, fallbackFirst: false)?.hasPrefix("Name:Fermer") == true, "Close action falls back to the last")
     check(BannerText.pick(bannerActions, BannerText.showDetails, fallbackFirst: true) == bannerActions[1], "Details action found by name")
-    let orderDefaults = UserDefaults(suiteName: "damla-order-test-\(UUID().uuidString)")!
+    let orderSuite = "damla-order-test-\(UUID().uuidString)", emptySuite = "damla-order-empty-\(UUID().uuidString)"
+    defer { UserDefaults.standard.removePersistentDomain(forName: orderSuite); UserDefaults.standard.removePersistentDomain(forName: emptySuite) }
+    let orderDefaults = UserDefaults(suiteName: orderSuite)!
     orderDefaults.set(["Agent’lar", "Özet", "Yok", "Özet"], forKey: "tabOrder")
     let order = PanelTab.loadOrder(defaults: orderDefaults)
     check(order.count == PanelTab.allCases.count && Set(order) == Set(PanelTab.allCases), "Saved page order keeps every page once")
     check(order.first == .agents && order[1] == .home && order[2] == .files, "Saved order kept, missing pages follow their default neighbour")
-    check(PanelTab.loadOrder(defaults: UserDefaults(suiteName: "damla-order-empty-\(UUID().uuidString)")!) == PanelTab.allCases, "No saved order is the default")
+    check(PanelTab.loadOrder(defaults: UserDefaults(suiteName: emptySuite)!) == PanelTab.allCases, "No saved order is the default")
     runMediaSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
     runLyricsSelfTests { condition, name in check(condition, name) }

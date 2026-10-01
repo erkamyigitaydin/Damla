@@ -214,7 +214,8 @@ final class AppState: ObservableObject {
     /// Nothing to show on a screen without a physical notch: the closed notch steps out of sight (hovering the
     /// spot still opens the panel). A physical notch is there anyway, so it keeps its usual shape.
     func idleHidden(on screenID: UInt32, physicalNotch: Bool) -> Bool {
-        hideIdleNotch && !physicalNotch && state(for: screenID) == .closed && compactSlots(on: screenID) == 0 && !videoShown(on: screenID)
+        // Hover is the only way back in, so the notch hides only while hovering opens the panel.
+        hideIdleNotch && automaticOpen && !physicalNotch && state(for: screenID) == .closed && compactSlots(on: screenID) == 0 && !videoShown(on: screenID)
     }
     /// The video under the closed notch, when one is showing.
     /// Only on the screen it was started from; the other screens keep their usual notch.

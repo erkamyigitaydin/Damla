@@ -95,8 +95,12 @@ final class MirrorCamera: NSObject, ObservableObject, AVCaptureVideoDataOutputSa
         }
     }
 
+    /// Bumped by every shot and by leaving the page: a countdown or shot from before checks it and stands down.
+    var shot = 0
+
     func stop() {
         wanted = false
+        shot += 1
         queue.async {
             if self.session.isRunning { self.session.stopRunning() }
             self.lock.lock(); self.latest = nil; self.lock.unlock()
@@ -206,26 +210,39 @@ final class MirrorAlbum: ObservableObject {
         return NSImage(cgImage: image, size: .zero)
     }
 
-    /// Prints the photo as a wide instant-film card and writes it; the page shows it once it has flown into the corner.
+    /// Prints the photo as a wide instant-film card. The card is drawn here (SwiftUI wants the main thread); the
+    /// JPEG, the file and the thumbnail are made in the background, so the flash and the flight never stutter.
+    /// The new photo takes the corner when it is written (the flying copy covers the corner until then).
     @MainActor
-    func save(_ photo: CGImage, taken: Date) -> Photo? {
+    func save(_ photo: CGImage, taken: Date) {
         let size = CGSize(width: photo.width, height: photo.height)
         let renderer = ImageRenderer(content: PolaroidCard(photo: NSImage(cgImage: photo, size: size), taken: taken, photoSize: size,
                                                            dated: PolaroidCard.datedSetting))
         renderer.scale = 1
-        guard let image = renderer.cgImage,
-              let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else { return nil }
-        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let url = Self.folder.appendingPathComponent("Damla \(formatter.string(from: taken)).jpg")
-        guard (try? jpeg.write(to: url)) != nil, let thumbnail = Self.thumbnail(of: url) else { return nil }
-        return Photo(url: url, thumbnail: thumbnail)
+        guard let image = renderer.cgImage else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else { return }
+            try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+            let url = Self.freeURL(taken: taken)
+            guard (try? jpeg.write(to: url, options: .withoutOverwriting)) != nil, let thumbnail = Self.thumbnail(of: url) else { return }
+            DispatchQueue.main.async { self.show(Photo(url: url, thumbnail: thumbnail)) }
+        }
     }
 
-    func show(_ photo: Photo) {
+    /// "Damla 2026-10-01 14.05.33.jpg", with " 2", " 3"… when two shots fall in the same second.
+    private static func freeURL(taken: Date) -> URL {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")   // Gregorian digits whatever the region
+        formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        let base = "Damla \(formatter.string(from: taken))"
+        var url = folder.appendingPathComponent(base + ".jpg"), n = 2
+        while FileManager.default.fileExists(atPath: url.path) { url = folder.appendingPathComponent("\(base) \(n).jpg"); n += 1 }
+        return url
+    }
+
+    private func show(_ photo: Photo) {
         latest = photo
-        total += 1
+        load()   // recounts; a load started before the shot cannot leave an old count behind
     }
 
     func trash(_ photo: Photo) {
@@ -472,24 +489,28 @@ struct MirrorView: View {
     private func shoot() {
         guard camera.state == .running, countdown == nil, !camera.busy else { return }
         camera.busy = true
-        if useTimer { tick(3) } else { take() }
+        camera.shot += 1
+        let shot = camera.shot
+        if useTimer { tick(3, shot: shot) } else { take(shot: shot) }
     }
 
-    private func tick(_ value: Int) {
+    private func tick(_ value: Int, shot: Int) {
+        guard camera.shot == shot else { return }   // the page was left: no more ticks, no photo
         guard camera.state == .running else { countdown = nil; camera.busy = false; return }
-        if value == 0 { withAnimation(.easeOut(duration: 0.15)) { countdown = nil }; take(); return }
+        if value == 0 { withAnimation(.easeOut(duration: 0.15)) { countdown = nil }; take(shot: shot); return }
         withAnimation(.spring(duration: 0.3, bounce: 0.4)) { countdown = value }
         NSSound(named: "Tink")?.play()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { tick(value - 1) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { tick(value - 1, shot: shot) }
     }
 
-    private func take() {
+    private func take(shot: Int) {
+        guard camera.shot == shot else { return }
         let aspect = frameSize.height > 0 ? frameSize.width / frameSize.height : 16 / 9
         guard let photo = camera.snapshot(look: look, aspect: aspect) else { camera.busy = false; return }
         MirrorView.shutter?.stop(); MirrorView.shutter?.play()
         flash = true
         withAnimation(.easeOut(duration: 0.45)) { flash = false }
-        let saved = album.save(photo, taken: Date())
+        album.save(photo, taken: Date())
         landed = false
         flying = NSImage(cgImage: photo, size: .zero)
         // A beat on the full picture after the flash, then into the corner.
@@ -497,7 +518,7 @@ struct MirrorView: View {
             withAnimation(.spring(duration: 0.55, bounce: 0.14)) { landed = true }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.95) {
-            if let saved { album.show(saved) }
+            guard camera.shot == shot else { return }   // left mid-flight: the page has already reset
             flying = nil
             camera.busy = false
         }

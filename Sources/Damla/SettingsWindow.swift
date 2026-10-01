@@ -411,9 +411,11 @@ private struct TabOrderRow: View {
             withAnimation(.snappy(duration: 0.25)) { model.moveTab(dragged, to: tab) }
             return true
         } isTargeted: { targeted = $0 }
-        .overlay(alignment: .top) {
-            // Where the page will land.
-            if targeted { Rectangle().fill(Color.accentColor).frame(height: 2).offset(y: -6).allowsHitTesting(false) }
+        .overlay {
+            // The page it takes the place of (it lands before it moving up, after it moving down).
+            if targeted {
+                RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 1.5).padding(-4).allowsHitTesting(false)
+            }
         }
     }
 }

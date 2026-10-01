@@ -106,6 +106,13 @@ final class PanelController {
             .sink { [weak self] _ in self?.chooseScreen(); self?.layout() }.store(in: &cancellables)
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
             .sink { [weak self] _ in self?.chooseScreen(); self?.layout() }.store(in: &cancellables)
+        // Clicking into another app while a reply waits empty drops it.
+        NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification, object: panel).receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                // Not when the keyboard only moved to the other screen's notch window (checked once it has settled).
+                DispatchQueue.main.async { if !(NSApp.keyWindow is NotchPanel) { self?.model.notifications.keyboardLeft() } }
+            }
+            .store(in: &cancellables)
         // A reply sent or dropped: the app underneath gets its keyboard back.
         model.notifications.$replying.removeDuplicates().dropFirst().filter { !$0 }.receive(on: RunLoop.main)
             .sink { [weak self] _ in if self?.panel.isKeyWindow == true && self?.model.expanded == false { self?.panel.resignKey() } }
@@ -304,7 +311,10 @@ final class PanelController {
         // Only the screen showing the video owns its hover (the other screen's notch would keep clearing it).
         if model.videoShown(on: id) { model.video.setHovering(overVideo) }
         // A notification card holds while the pointer is on it and never turns into the panel.
-        if model.notifications.current != nil { model.notifications.hovering = inside && state == .notification }
+        // Only the screen under the pointer speaks for the hover (two notch windows would flip it back and forth).
+        if model.notifications.current != nil, let screen, NSMouseInRect(location, screen.frame, false) {
+            model.notifications.hovering = inside && state == .notification
+        }
         if inside && overVideo {
             exitedAt = nil; enteredAt = nil
         } else if inside && state == .notification {
