@@ -42,7 +42,7 @@ Install: `brew install --cask erkamyigitaydin/tap/damla` or the DMG at https://d
 
 ## Brand Commitments
 
-- Name: Damla (Turkish for "drop"). The droplet is the brand: app icon is a pale mint water drop on a deep teal rounded square; the mascot is a drop with a face.
+- Name: Damla (Turkish for "drop"). The droplet is the brand, and since 2026-10-01 the mascot is the logo: the app icon is a graphite screen with the black notch at its top and the mascot (a drop with a face, at rest) just melted out of it (`Resources/MakeIcon.swift`). The old mint-drop-on-teal icon is retired.
 - Tagline in use: "Your notch, finally doing something."
 - Voice: plain, friendly, concrete, a little playful; no hype. README tone is the reference.
 - Bilingual: English and Turkish.
@@ -50,7 +50,7 @@ Install: `brew install --cask erkamyigitaydin/tap/damla` or the DMG at https://d
 ## Evidence on Hand
 
 - Screenshots made with demo data: `docs/screenshots/home.png`, `closed.png`, `agents.png`, `approval.png`, `files.png`.
-- App icon source: `Resources/MakeIcon.swift`; mascot drawing: `Sources/Damla/Mascot.swift`.
+- App icon source: `Resources/MakeIcon.swift`; mascot drawing: `Sources/Damla/Mascot.swift` (100 × 100 box geometry, shared with the site's MASCOT in `docs/assets/site.js`). Site icons (favicon-64, apple-touch-icon, icon-256) come from MakeIcon's output.
 - No testimonials, user counts, press, or ratings exist. Do not invent them. The app is free; do not call it open source. No pricing.
 - The README screenshots in `docs/screenshots/` predate 0.7–0.8 and no longer match the UI; current feature truth is `dist/notes-*.md`. Fresh reference captures of the live panel (demo data) were taken 2026-09-28 with the `--debug` hooks.
 

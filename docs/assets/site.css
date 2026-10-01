@@ -513,22 +513,31 @@ html:not(.js) .chapter { padding-top: 80px; }
 .chapter[data-chapter="notif"] { --pig: var(--deep); }
 .chapter[data-chapter="mirror"] { --pig: var(--deep); }
 
-/* ——— the droplet ——— */
+/* ——— the droplet (the app's mascot, Mascot.swift) ——— */
 .mascot { --m-color: var(--agent); overflow: visible; }
 .mascot[data-phase="waiting"] { --m-color: var(--amber); }
 .mascot[data-phase="idle"] { --m-color: #a9c7f0; }
 .mascot .m-drop { fill: var(--m-color); }
-.mascot .m-eye, .mascot .m-o, .mascot .m-smile, .mascot .m-happy path { fill: none; stroke: rgba(0,0,0,.78); stroke-width: 4; stroke-linecap: round; }
-.mascot .m-eye { fill: rgba(0,0,0,.78); stroke: none; transform-box: fill-box; transform-origin: center; }
-.mascot .m-o, .mascot .m-happy, .mascot .m-spark, .mascot .m-hand { display: none; }
-.mascot .m-spark { fill: #fff; }
-.mascot .m-hand { fill: var(--m-color); stroke: rgba(0,0,0,.35); stroke-width: 1.5; transform-box: fill-box; transform-origin: 50% 100%; }
+.mascot .m-arm path { stroke: color-mix(in srgb, var(--m-color) 94%, #000); }
+.mascot .m-arm circle { fill: var(--m-color); stroke: rgba(0,0,0,.18); stroke-width: 1.2; }
+.mascot .m-cheeks ellipse { fill: rgba(244,161,139,.55); }
+.mascot[data-phase="waiting"] .m-cheeks ellipse { fill: rgba(244,120,90,.4); }
+.mascot .m-eye ellipse, .mascot .m-happy path:last-child { fill: rgba(16,19,28,.86); }
+.mascot .m-eye circle, .mascot .m-spark path { fill: #fff; }
+.mascot .m-ink { fill: none; stroke: rgba(16,19,28,.86); stroke-width: 3.4; stroke-linecap: round; }
+.mascot .m-happy .m-ink { stroke-width: 3.8; }
+.mascot .m-eye { transform-box: fill-box; transform-origin: center; }
+.mascot .m-arm { transform-box: view-box; transform-origin: 80px 64px; transform: rotate(12deg); }
 .mascot .m-body { transform-box: view-box; transform-origin: 50% 98%; }
+.mascot .m-arm, .mascot .m-work, .mascot .m-o, .mascot .m-happy, .mascot .m-spark { display: none; }
 .mascot[data-phase="waiting"] .m-smile { display: none; }
-.mascot[data-phase="waiting"] .m-o, .mascot[data-phase="waiting"] .m-hand { display: inline; }
-.mascot[data-phase="waiting"] .m-eye { transform: translateY(-3px) scale(1.3); }
+.mascot[data-phase="waiting"] .m-o, .mascot[data-phase="waiting"] .m-arm { display: inline; }
+.mascot[data-phase="waiting"] .m-eyes { transform: translateY(-2px); }
+.mascot[data-phase="waiting"] .m-eye { transform: scale(1.19, 1.21); }
 .mascot[data-phase="waiting"] .m-body { animation: sway 1.9s ease-in-out infinite; }
-.mascot[data-phase="waiting"] .m-hand { animation: wave .9s ease-in-out infinite alternate; }
+.mascot[data-phase="waiting"] .m-arm { animation: wave .9s ease-in-out infinite alternate; }
+.mascot[data-phase="working"] .m-smile { display: none; }
+.mascot[data-phase="working"] .m-work { display: inline; }
 .mascot[data-phase="working"] .m-body { animation: hop .6s ease-in-out infinite; }
 .mascot[data-phase="working"] .m-eye { animation: blink 3.3s infinite; }
 .mascot[data-phase="done"] .m-eyes, .mascot[data-phase="done"] .m-smile { display: none; }

@@ -187,12 +187,22 @@ const t = () => DYN[lang];
 
 /* ————————————————— the droplet ————————————————— */
 
-const MASCOT = `<g class="m-body"><path class="m-drop" d="M50 2C102 50 96 98 50 98C4 98-2 50 50 2Z" stroke="rgba(255,255,255,.35)" stroke-width="2.5"/><path d="M50 2C102 50 96 98 50 98C4 98-2 50 50 2Z" fill="url(#m-shade)"/><ellipse cx="33" cy="52" rx="6.5" ry="10" transform="rotate(-25 33 52)" fill="rgba(255,255,255,.55)"/><g class="m-eyes"><ellipse class="m-eye" cx="37.5" cy="66" rx="5.5" ry="6.9"/><ellipse class="m-eye" cx="62.5" cy="66" rx="5.5" ry="6.9"/></g><path class="m-smile" d="M42 81Q50 87 58 81"/><ellipse class="m-o" cx="50" cy="83" rx="4" ry="5"/><g class="m-happy"><path d="M29 70Q36 59 43 70M57 70Q64 59 71 70"/><path d="M39 80Q50 93 61 80"/></g><path class="m-spark" d="M90 6l3.2 8.8 8.8 3.2-8.8 3.2L90 30l-3.2-8.8L78 18l8.8-3.2Z"/></g><g class="m-hand"><path d="M96 58c-5 0-8-4-8-9V35c0-2 3-2 3 0v8V26c0-2.4 3.4-2.4 3.4 0v15V23c0-2.4 3.4-2.4 3.4 0v18V26c0-2.4 3.4-2.4 3.4 0v17-5c0-2.2 3.2-2.2 3.2 0v8c0 7-4 12-8.4 12Z"/></g>`;
+const DROP = 'M55 3C61 19 86 38 86 63C86 83 70 98 50 98C30 98 14 83 14 63C14 39 40 22 55 3Z';
+// The same drop as the app (Mascot.swift) and its icon, in a 100 × 100 box: a full drop whose tip leans right,
+// lit from the top left, a curved glint, eyes with a catchlight and coral cheeks. Phases are CSS (site.css).
+const MASCOT = `<g class="m-body"><path class="m-drop" d="${DROP}"/><path d="${DROP}" fill="url(#m-light)"/><rect y="60" width="100" height="40" fill="url(#m-glow)" clip-path="url(#m-clip)"/>`
+  + `<path d="${DROP}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.6"/>`
+  + `<path d="M23.8 56.5A27 27 0 0 1 35.5 40.2" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="4.6" stroke-linecap="round"/><circle cx="29" cy="36" r="2.4" fill="rgba(255,255,255,.85)"/>`
+  + `<g class="m-cheeks"><ellipse cx="30" cy="75" rx="5.4" ry="3.2"/><ellipse cx="70" cy="75" rx="5.4" ry="3.2"/></g>`
+  + `<g class="m-eyes"><g class="m-eye"><ellipse cx="39" cy="64" rx="5.2" ry="6.6"/><circle cx="41" cy="61.2" r="1.9"/></g><g class="m-eye"><ellipse cx="61" cy="64" rx="5.2" ry="6.6"/><circle cx="63" cy="61.2" r="1.9"/></g></g>`
+  + `<path class="m-ink m-smile" d="M43 76Q50 83 57 76"/><path class="m-ink m-work" d="M46 78Q51 81 56 78"/><ellipse class="m-ink m-o" cx="50" cy="80" rx="3.6" ry="4.6"/>`
+  + `<g class="m-happy"><path class="m-ink" d="M33 66Q39 57 45 66M55 66Q61 57 67 66"/><path d="M41 76Q50 87 59 76Z"/></g>`
+  + `<g class="m-spark"><path d="M84 9Q84 18 93 18Q84 18 84 27Q84 18 75 18Q84 18 84 9Z"/><path d="M93 28.5Q93 33 97.5 33Q93 33 93 37.5Q93 33 88.5 33Q93 33 93 28.5Z"/></g><g class="m-arm"><path d="M80 64Q92 58 93 42" fill="none" stroke-width="13" stroke-linecap="round"/><circle cx="93" cy="38" r="8.5"/></g></g>`;
 function drawMascots() {
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   defs.setAttribute('width', '0'); defs.setAttribute('height', '0'); defs.setAttribute('aria-hidden', 'true');
   defs.style.position = 'absolute';
-  defs.innerHTML = '<defs><linearGradient id="m-shade" x1="0" y1="0" x2="0" y2="1"><stop offset=".35" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient></defs>';
+  defs.innerHTML = `<defs><linearGradient id="m-light" gradientUnits="userSpaceOnUse" x1="30" y1="10" x2="70" y2="100"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset=".56" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></linearGradient><radialGradient id="m-glow" gradientUnits="userSpaceOnUse" cx="50" cy="108" r="34"><stop offset=".12" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><clipPath id="m-clip"><path d="${DROP}"/></clipPath></defs>`;
   document.body.append(defs);
   for (const svg of $$('svg.mascot')) svg.innerHTML = MASCOT;
 }

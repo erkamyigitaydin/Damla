@@ -242,7 +242,7 @@ The live app panel rebuilt in HTML at native size (384 × 218pt, page pill 336 �
 The "everything else" section is a book of ten pulled ebru sheets at varied sizes. Each sheet is a live canvas marbled in a named traditional pattern (somaki, kumlu, gelgit, lale, hatip, battal, bülbül yuvası, taraklı, neftli, şal) using tonal blue, bone and occasional coral colour sets, held in a bone edge, rotated slightly, darkened with a light ink veil, and carrying its feature's real UI drawn at app size and scaled like the panel. The pattern name sits in faint italic under the description.
 
 ### Droplet Mascot
-The app's drop with a face. Water blue at work, a paler blue when idle, amber and waving when waiting, a smile and spark when done. It hops, sways and blinks only in those states, and goes still under Reduce Motion.
+The app's drop with a face, and the logo. One geometry in a 100 × 100 box, used by the app (`Mascot.swift`), the icon (`MakeIcon.swift`) and the site (`MASCOT` in `site.js`): a full drop whose tip leans a little to the right, lit from the top left with light caught at the bottom of the water, a curved glint and a dot, eyes with a white catchlight, and coral cheeks. Water blue at work, a calmer blue at rest, amber with wide eyes and a raised arm in its own colour while waiting, closed happy eyes and two sparkles when done, sad brows when failed, eyes shut (with "z z" when out of date). It hops, sways and blinks only while working or waiting, and goes still under Reduce Motion.
 
 ## Do's and Don'ts
 
