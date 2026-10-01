@@ -1,5 +1,6 @@
-// Damla update feed. Sparkle fetches /appcast.xml; the feed itself still lives in the GitHub repo
-// (release.sh keeps committing it), this worker only passes it through and counts.
+// damla.erkamaydin.com. Sparkle fetches /appcast.xml: the feed itself still lives in the GitHub repo
+// (release.sh keeps committing it), this worker passes it through and counts. Every other path is the site,
+// passed through from GitHub Pages (docs/ on main), which keeps working at its github.io address too.
 //
 // Privacy: no IP address and no identifier is stored. A visitor is a SHA-256 of a secret salt, the day,
 // the IP and the user agent; it only tells "counted already today" and is deleted after two days.
@@ -7,7 +8,7 @@
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname !== "/appcast.xml") return new Response("Not found", { status: 404 });
+    if (url.pathname !== "/appcast.xml") return site(request, url, env);
 
     const upstream = await fetch(env.APPCAST_URL, { cf: { cacheTtl: 300, cacheEverything: true } });
     const body = await upstream.text();
@@ -23,6 +24,16 @@ export default {
     });
   },
 };
+
+async function site(request, url, env) {
+  if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
+  const upstream = await fetch(env.SITE_URL + url.pathname + url.search, { redirect: "manual", cf: { cacheTtl: 300 } });
+  const headers = new Headers(upstream.headers);
+  // GitHub's redirects (/x → /x/) point at github.io; keep the visitor on this host.
+  const location = headers.get("location");
+  if (location && location.startsWith(env.SITE_URL)) headers.set("location", location.slice(env.SITE_URL.length) || "/");
+  return new Response(upstream.body, { status: upstream.status, headers });
+}
 
 async function count(env, request, agent, version) {
   const day = new Date().toISOString().slice(0, 10);
