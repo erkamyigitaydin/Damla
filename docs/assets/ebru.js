@@ -253,9 +253,13 @@ export class Tray {
     for (const d of this.drops) {
       const p = d.pts;
       if (p.length < 6) continue;
+      // The outline is drawn as curves through the midpoints of its edges, with the points as control points:
+      // wherever combing has left the points sparse, the edge still bends instead of breaking into a corner.
+      const n = p.length;
       ctx.beginPath();
-      ctx.moveTo(p[0], p[1]);
-      for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+      ctx.moveTo((p[n - 2] + p[0]) / 2, (p[n - 1] + p[1]) / 2);
+      for (let i = 0; i < n - 2; i += 2) ctx.quadraticCurveTo(p[i], p[i + 1], (p[i] + p[i + 2]) / 2, (p[i + 1] + p[i + 3]) / 2);
+      ctx.quadraticCurveTo(p[n - 2], p[n - 1], (p[n - 2] + p[0]) / 2, (p[n - 1] + p[1]) / 2);
       ctx.closePath();
       ctx.fillStyle = d.color;
       ctx.fill();

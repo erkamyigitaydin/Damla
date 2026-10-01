@@ -322,7 +322,7 @@ function stylusOnWater() {
       moved += Math.hypot(e.clientX - prev[0], e.clientY - prev[1]);
       if (moved <= 6) return;
       // Pointer events can outpace the screen; one needle stroke per frame carries the whole move.
-      if (!queued) { queued = prev; requestAnimationFrame(() => { if (queued && prev) water.post({ type: 'stylus', x0: queued[0], y0: queued[1], x1: prev[0], y1: prev[1], lambda: 18 }); queued = null; }); }
+      if (!queued) { queued = prev; requestAnimationFrame(() => { if (queued && prev) water.post({ type: 'stylus', x0: queued[0], y0: queued[1], x1: prev[0], y1: prev[1], lambda: 12 }); queued = null; }); }
       prev = [e.clientX, e.clientY];
       $('.hero').classList.add('combed');
     });
@@ -829,9 +829,9 @@ const stage = {
   },
 };
 
-/* ————————————————— scrolling combs the water ————————————————— */
+/* ————————————————— scrolling sways the water ————————————————— */
 
-// Once per frame, however many scroll events arrive: the stage follows and the water is combed by the distance.
+// Once per frame, however many scroll events arrive: the stage follows and the water sways with the page.
 let lastY = scrollY, scrollQueued = false;
 function onScroll() {
   if (scrollQueued) return;
@@ -840,9 +840,9 @@ function onScroll() {
     scrollQueued = false;
     const y = scrollY, dy = y - lastY; lastY = y;
     stage.update();
-    if (!trayLive || reduced.matches || !dy) return;
-    // A jump (a menu link, the scrollbar) combs like a fast scroll, not a tear through the water.
-    water.post({ type: 'comb', dy: clamp(dy, -90, 90), hero: y < innerHeight });
+    if (reduced.matches || !dy) return;
+    // The water sways with where the page is (engine.js); a jump lands on the same sway a slow scroll would.
+    water.post({ type: 'scroll', y });
   });
 }
 
@@ -974,6 +974,7 @@ setLang(saved || ((navigator.language || '').toLowerCase().startsWith('tr') ? 't
 
 water.start();
 water.post({ type: 'seed', tones: ['#e6dfd1', '#f1ece2', '#e2dac9', '#ede7dc', '#ddd4c2', '#efe9de'] });
+if (!reduced.matches) water.post({ type: 'scroll', y: scrollY, instant: true });
 stage.measure();
 stage.update();
 trayVisibility();

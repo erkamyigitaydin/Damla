@@ -7,10 +7,14 @@ const raf = typeof requestAnimationFrame === 'function' ? f => requestAnimationF
 
 export function createEngine(post) {
   let tray = null, live = true, looping = false, last = 0, frameNo = 0;
-  // Scrolling only drifts the water: the distance is let out a little each frame, so the pigment glides on
-  // after the page stops instead of jerking with every wheel tick. Shaping it is the visitor's job (click, drag).
-  let flowHero = 0, flowStage = 0;
-  const let_out = v => (Math.abs(v) < 0.4 ? v : v * 0.14);
+  // Scrolling only sways the water, the way a tray rocks: a soft sideways sine whose amplitude is a function of
+  // where the page is, never of how far it has travelled. A sine shear is smooth everywhere (no crease, no
+  // corner) and exactly undone by its opposite, so the water never drifts away on its own: scroll back and it
+  // is where you left it, stop and it stops. Shaping it is the visitor's job (click, drag).
+  let sway = 0, swayTo = 0;
+  const swayMax = 16;
+  const swayLength = () => Math.max(480, tray.h * 0.75);
+  const swayBy = d => tray.wave(d, swayLength(), 0.9);
   let finder = null, fctx = null, view = null;
   const work = [];                           // ms of work per frame, for the bench
 
@@ -23,11 +27,13 @@ export function createEngine(post) {
   function frame(now) {
     const t0 = performance.now();
     const dt = Math.min(48, now - last); last = now;
-    // wide, soft tines all pulling one way: the hero's water rises a little, the stage's drifts sideways and
-    // back as you scroll down and up (tines pulling against each other would tear a seam through the tulip)
-    if (flowHero) { const d = let_out(flowHero); flowHero -= d; tray.comb(0, -1, 180, 12, d * 0.045, 46); }
-    if (flowStage) { const d = let_out(flowStage); flowStage -= d; tray.comb(1, 0, 260, 17, d * 0.011, 80); }
-    const moved = tray.step(dt);
+    // the sway follows the page closely (a few frames), so it settles with the scroll instead of after it
+    let swaying = false;
+    if (sway !== swayTo) {
+      const gap = swayTo - sway, d = Math.abs(gap) < 0.05 ? gap : gap * Math.min(1, dt / 70);
+      sway += d; swayBy(d); swaying = true;
+    }
+    const moved = tray.step(dt) || swaying;
     if ((moved || tray.dirty) && live) {
       // Rebuilding edges every other frame is plenty; the frame in between only draws.
       if (!moved || ++frameNo % 2 === 0) tray.refine();
@@ -37,7 +43,7 @@ export function createEngine(post) {
     work.push(performance.now() - t0);
     if (work.length > 600) work.splice(0, 300);
     // Hidden water waits: nothing runs until it is on screen again.
-    if (live && (tray.busy || tray.dirty || flowHero || flowStage)) raf(frame);
+    if (live && (tray.busy || tray.dirty || sway !== swayTo)) raf(frame);
     else looping = false;
   }
 
@@ -82,16 +88,25 @@ export function createEngine(post) {
       }
       case 'drop': tray.drop(msg.x, msg.y, msg.r, msg.color); kick(); break;
       case 'bloom': tray.bloom(msg.x, msg.y, msg.r, msg.color, msg.ms); kick(); break;
-      case 'stylus': tray.stylus(msg.x0, msg.y0, msg.x1, msg.y1, msg.lambda); kick(); break;
+      case 'stylus': {
+        // A long move in one go would stretch edges past what refine() can follow and leave corners: the needle
+        // is drawn through in short steps, the outline filled in between them.
+        const dx = msg.x1 - msg.x0, dy = msg.y1 - msg.y0, n = Math.min(8, Math.ceil(Math.hypot(dx, dy) / 9));
+        for (let i = 0; i < n; i++) {
+          if (i) tray.refine();
+          tray.stylus(msg.x0 + dx * i / n, msg.y0 + dy * i / n, msg.x0 + dx * (i + 1) / n, msg.y0 + dy * (i + 1) / n, msg.lambda);
+        }
+        kick(); break;
+      }
       case 'needle':
         if (msg.instant) { for (let i = 1; i < msg.path.length; i++) tray.stylus(...msg.path[i - 1], ...msg.path[i], msg.lambda); tray.refine(); tray.render(); }
         else { tray.needle(msg.path, msg.ms, msg.lambda); kick(); }
         break;
-      case 'comb':
-        if (!live) break;   // water nobody sees is not combed, and owes nothing when it comes back
-        if (msg.hero) flowHero = Math.max(-500, Math.min(500, flowHero + msg.dy));
-        else flowStage = Math.max(-500, Math.min(500, flowStage + msg.dy));
-        kick(); break;
+      case 'scroll':
+        swayTo = swayMax * Math.sin(msg.y / Math.max(600, tray.h * 1.4));
+        // water nobody sees takes its place at once and comes back already there
+        if (!live || msg.instant) { swayBy(swayTo - sway); sway = swayTo; tray.dirty = true; } else kick();
+        break;
       case 'live': live = msg.on; if (live) { tray.dirty = true; kick(); } break;
       case 'finder': finder = msg.canvas; fctx = finder.getContext('2d'); break;
       case 'finderView': view = msg.rect; if (view) drawFinder(); break;
