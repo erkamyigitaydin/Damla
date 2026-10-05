@@ -51,7 +51,7 @@ const TR = {
   'notif.title': 'Bildirimler çentikten düşer.',
   'notif.body': 'Bir mesaj, bir e-posta, bir takvim uyarısı: başka uygulamaların bildirimleri köşedeki balon yerine çentiğin altında bir kart olarak gelir. Tıkla: yanıtla ya da düğmelerini kullan; ✕ ile kapat.',
   'notif.p1': '<b>Olduğun yerden yanıtla.</b> WhatsApp mesajını editörden çıkmadan yanıtla; Aç seni sohbete götürür. Paneldeki karta tıkla.',
-  'notif.p2': '<b>Kaçırdıkların bekler.</b> Bildirimler sayfası bu oturumda gelenleri uygulamaya göre deste yapar; okunmamışlar çentikte zil ve sayı olarak durur.',
+  'notif.p2': '<b>Kaçırdıkların bir saat bekler.</b> Bildirimler sayfası son bir saatte gelenleri uygulamaya göre deste yapar, sonra bırakır; hiçbir şey birikmez, kapalı çentik sessiz kalır.',
   'notif.slip': 'Yalnızca bellekte tutulur. Diske hiçbir şey yazılmaz; Damla kapanınca gider.',
 
   'np.in': '8 dk', 'np.meeting': 'Tasarım incelemesi', 'np.speakers': 'Hoparlör',

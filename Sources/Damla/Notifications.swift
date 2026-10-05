@@ -61,10 +61,13 @@ final class NotificationMirror: ObservableObject {
         didSet { UserDefaults.standard.set(hideBanners, forKey: "hideSystemBanners") }
     }
     @Published private(set) var current: MirroredNotification?
-    /// Everything read this session, newest first. Kept in memory only: message texts never touch the disk.
+    /// What came in the last hour, newest first, for the Bildirimler page. Kept in memory only: message texts
+    /// never touch the disk. Older ones leave on their own, so the page never has to be cleared by hand.
     @Published private(set) var history: [MirroredNotification] = []
     var unread: Int { history.reduce(0) { $0 + ($1.read ? 0 : 1) } }
     static let historyLimit = 60
+    static let keepFor: TimeInterval = 60 * 60
+    private var expiry: Timer?
     var isViewing: () -> Bool = { false }
     @Published private(set) var trusted = AXIsProcessTrusted()
     /// A reply is being written in the notch (the banner's own text field waits off screen): the card stays.
@@ -118,15 +121,20 @@ final class NotificationMirror: ObservableObject {
             .sink { [weak self] _ in self?.restart() }   // Notification Center restarted: follow the new process
             .store(in: &cancellables)
         Self.indexApplications()
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in self?.expire() }
+        timer.tolerance = 10
+        RunLoop.main.add(timer, forMode: .common)
+        expiry = timer
         restart()
     }
 
     private func restart() {
+        if current != nil { finish(collapsing: true) }   // switched off (or Notification Center gone): the card ends now
         restoreWindows()
         detach()
         trustTimer?.invalidate(); trustTimer = nil
         watchdog?.invalidate(); watchdog = nil
-        guard enabled else { return }
+        guard enabled else { history.removeAll(); return }   // off: the page empties with it
         trusted = AXIsProcessTrusted()
         MediaService.trace("notifications: trusted=\(trusted)")
         guard trusted else {
@@ -246,11 +254,21 @@ final class NotificationMirror: ObservableObject {
     }
 
     private func record(_ note: MirroredNotification) {
+        expire()
         guard !history.contains(where: { $0.id == note.id }) else { return }
         var note = note
         note.read = isViewing()   // arriving while the page is open: seen there
         history.insert(note, at: 0)
         if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
+    }
+
+    /// The page keeps an hour: what is older leaves on its own. The one on the card stays until the card is done.
+    static func pruned(_ history: [MirroredNotification], now: Date = Date(), except id: String? = nil) -> [MirroredNotification] {
+        history.filter { $0.id == id || now.timeIntervalSince($0.arrived) < keepFor }
+    }
+    private func expire() {
+        let kept = Self.pruned(history, except: current?.id)
+        if kept.count != history.count { history = kept }
     }
 
     /// The page is on screen: everything on it counts as seen.
@@ -725,8 +743,8 @@ struct NotificationCard: View {
 
 // MARK: - The page
 
-/// Bildirimler: what came in this session, grouped by app (the app with the newest one first). A click opens it,
-/// the ✕ drops it. Nothing here is written to disk; it is gone when Damla quits.
+/// Bildirimler: what came in the last hour, grouped by app (the app with the newest one first). A click opens it,
+/// the ✕ drops it; the rest leaves on its own. Nothing here is written to disk; it is gone when Damla quits.
 struct NotificationsView: View {
     @ObservedObject var model: AppState
     @ObservedObject var mirror: NotificationMirror
@@ -751,8 +769,9 @@ struct NotificationsView: View {
             if mirror.history.isEmpty {
                 empty
             } else {
-                HStack {
+                HStack(spacing: 4) {
                     Text("\(mirror.history.count) bildirim").font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
+                    Text("· son bir saat").font(.system(size: 10.5)).foregroundStyle(Theme.faint)
                     Spacer()
                     Button("Temizle") { withAnimation(Theme.quick) { mirror.clearHistory() } }
                         .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
@@ -786,7 +805,7 @@ struct NotificationsView: View {
                 Text("Erişilebilirlik izni gerekli").font(.system(size: 11)).foregroundStyle(Theme.faint)
                 Button("Ayarları aç") { MediaKeyInterceptor.openAccessibilitySettings() }.font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
             } else {
-                Text("Henüz bildirim yok").font(.system(size: 11)).foregroundStyle(Theme.faint)
+                Text("Son bir saatte bildirim gelmedi").font(.system(size: 11)).foregroundStyle(Theme.faint)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

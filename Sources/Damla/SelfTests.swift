@@ -274,6 +274,10 @@ func runSelfTests() -> Int32 {
     check(BannerText.pick(bannerActions, BannerText.close, fallbackFirst: false) == bannerActions[3], "Close action found by name")
     check(BannerText.pick(["AXPress", "Name:Détails\nT", "Name:Fermer\nT"], BannerText.close, fallbackFirst: false)?.hasPrefix("Name:Fermer") == true, "Close action falls back to the last")
     check(BannerText.pick(bannerActions, BannerText.showDetails, fallbackFirst: true) == bannerActions[1], "Details action found by name")
+    let staleNote = MirroredNotification(id: "old", app: "Mail", bundleID: nil, title: "Eski", subtitle: "", body: "", arrived: Date(timeIntervalSinceNow: -3700))
+    let freshNote = MirroredNotification(id: "new", app: "Mail", bundleID: nil, title: "Yeni", subtitle: "", body: "", arrived: Date(timeIntervalSinceNow: -60))
+    check(NotificationMirror.pruned([freshNote, staleNote]).map(\.id) == ["new"], "Notifications older than an hour leave the page")
+    check(NotificationMirror.pruned([freshNote, staleNote], except: "old").count == 2, "The notification on the card stays past the hour")
     let orderSuite = "damla-order-test-\(UUID().uuidString)", emptySuite = "damla-order-empty-\(UUID().uuidString)"
     defer { UserDefaults.standard.removePersistentDomain(forName: orderSuite); UserDefaults.standard.removePersistentDomain(forName: emptySuite) }
     let orderDefaults = UserDefaults(suiteName: orderSuite)!

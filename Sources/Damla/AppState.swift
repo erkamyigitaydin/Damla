@@ -83,7 +83,8 @@ final class AppState: ObservableObject {
     @Published private(set) var tabOrder = PanelTab.loadOrder() {
         didSet { UserDefaults.standard.set(tabOrder.map(\.rawValue), forKey: "tabOrder") }
     }
-    var visibleTabs: [PanelTab] { tabOrder.filter(enabledTabs.contains) }
+    /// The Bildirimler page goes with the notifications switch (Ayarlar → Genel): off, it has nothing to show.
+    var visibleTabs: [PanelTab] { tabOrder.filter { enabledTabs.contains($0) && ($0 != .notifications || notifications.enabled) } }
     /// Puts a dragged page where another one is: before it when moving up, after it when moving down.
     func moveTab(_ tab: PanelTab, to target: PanelTab) {
         guard tab != target, let from = tabOrder.firstIndex(of: tab), let to = tabOrder.firstIndex(of: target) else { return }
@@ -205,10 +206,8 @@ final class AppState: ObservableObject {
     /// On the screen showing the video, the video stands for the media and the agents stay out of its way.
     func compactSlots(on screenID: UInt32?) -> Int {
         let video = screenID.map(videoShown(on:)) ?? false
-        return min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video, mediaInNotch && !video, unreadInNotch].filter { $0 }.count)
+        return min(2, [micActive, session.hasStarted, calendar.soon != nil, agentBadge != nil && !video, mediaInNotch && !video].filter { $0 }.count)
     }
-    /// Notifications that came while the Bildirimler page was not looked at: a bell with the count on the closed notch.
-    var unreadInNotch: Bool { notifications.unread > 0 && enabledTabs.contains(.notifications) }
     /// The track earns a place on the closed notch only while it plays (or paused a moment ago).
     var mediaInNotch: Bool { media.hasTrack && media.recentlyPlaying }
     /// Nothing to show on a screen without a physical notch: the closed notch steps out of sight (hovering the
@@ -272,6 +271,13 @@ final class AppState: ObservableObject {
         Publishers.CombineLatest($expanded, $selectedTab).removeDuplicates { $0 == $1 }.receive(on: RunLoop.main)
             .sink { [weak self] expanded, tab in
                 if expanded && tab == .notifications { self?.notifications.markRead() } else { self?.notifications.dropRead() }
+            }
+            .store(in: &cancellables)
+        // Notifications switched off take their page out of the pill; a panel open on it moves on.
+        notifications.$enabled.removeDuplicates().dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, !self.visibleTabs.contains(self.selectedTab), let first = self.visibleTabs.first else { return }
+                self.selectedTab = first
             }
             .store(in: &cancellables)
         notifications.start()
@@ -518,7 +524,7 @@ final class AppState: ObservableObject {
         pageDirection = (tour?.rawValue ?? -1) < step.rawValue ? 1 : -1
         tour = step
         // The pill points at the page the step is about, when that page is switched on.
-        if enabledTabs.contains(step.tab) { selectedTab = step.tab } else if let first = visibleTabs.first { selectedTab = first }
+        if visibleTabs.contains(step.tab) { selectedTab = step.tab } else if let first = visibleTabs.first { selectedTab = first }
     }
 
     func select(_ tab: PanelTab) {

@@ -406,8 +406,9 @@
 "Erişilebilirlik" = "Accessibility";
 "Bildirimler" = "Notifications";
 "Bildirimler çentikte" = "Notifications in the notch";
-"Tıkla: ilgili yerde açılır. Uygulamanın düğmeleri ve yanıt da çentikte." = "Click to open where it belongs. The app's buttons and replies work from the notch too.";
+"Kart olarak çentikten iner; tıkla: ilgili yerde açılır, düğmeleri ve yanıt çentikte. Kapalıyken Damla bildirimlere hiç dokunmaz." = "Drops from the notch as a card; click to open it where it belongs, with its buttons and reply in the notch. Off, Damla leaves notifications alone.";
 "Sistem balonunu gizle" = "Hide the system banner";
+"Bildirimler kapalı; Genel’den aç." = "Notifications are off; turn them on in General.";
 "Bildirimi kapat" = "Dismiss notification";
 "Yanıtla…" = "Reply…";
 "Polaroide tarih yaz" = "Date on the Polaroid";
@@ -416,10 +417,10 @@
 "%lld bildirim" = "%lld notifications";
 "Bildirimler çentikte kapalı" = "Notifications in the notch are off";
 "Erişilebilirlik izni gerekli" = "Accessibility permission needed";
-"Henüz bildirim yok" = "No notifications yet";
+"Son bir saatte bildirim gelmedi" = "No notifications in the last hour";
+"· son bir saat" = "· last hour";
 "Tıkla: %@ uygulamasını aç" = "Click to open %@";
 "%lld sa" = "%lld h";
-"%lld yeni bildirim · tıkla: göster" = "%lld new notifications · click to show";
 "Varsayılan sıra" = "Default order";
 "Sıralamak için sürükle." = "Drag to reorder.";
 "Sıralamak için sürükle" = "Drag to reorder";

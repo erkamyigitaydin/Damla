@@ -77,6 +77,7 @@ private struct GeneralSettings: View {
                 }
             }
             MeetingSettings(model: model, calendar: model.calendar)
+            NotificationSettings(mirror: model.notifications)
             Section("Kısayollar") {
                 shortcut("Paneli aç veya kapat", "⌃ ⌥ Space")
                 shortcut("Onayda izin ver · reddet", "⌃ ⌥ ↩ · ⌃ ⌥ ⌫")
@@ -125,7 +126,6 @@ private struct PanelSettings: View {
             Section("Ayna") {
                 Toggle("Polaroide tarih yaz", isOn: $polaroidDate)
             }
-            NotificationSettings(mirror: model.notifications)
             Section("Hareketler") {
                 Toggle("Trackpad’de iki parmakla sayfa değiştir", isOn: $model.notchGestures)
             }
@@ -364,13 +364,14 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 }
 
 /// Other apps' notifications in the notch; read from Notification Center with the Accessibility permission.
+/// Off, nothing is read and the Bildirimler page leaves the pill (the page itself is switched in Panel → Sayfalar).
 private struct NotificationSettings: View {
     @ObservedObject var mirror: NotificationMirror
     var body: some View {
         Section("Bildirimler") {
             Toggle(isOn: $mirror.enabled) {
                 Text("Bildirimler çentikte")
-                Text("Tıkla: ilgili yerde açılır. Uygulamanın düğmeleri ve yanıt da çentikte.")
+                Text("Kart olarak çentikten iner; tıkla: ilgili yerde açılır, düğmeleri ve yanıt çentikte. Kapalıyken Damla bildirimlere hiç dokunmaz.")
             }
             if mirror.enabled {
                 Toggle("Sistem balonunu gizle", isOn: $mirror.hideBanners)
@@ -393,13 +394,15 @@ private struct TabOrderRow: View {
     @State private var targeted = false
     var body: some View {
         let on = model.enabledTabs.contains(tab)
+        let unavailable = tab == .notifications && !model.notifications.enabled   // its own switch is in Genel
         HStack(spacing: 10) {
             Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
                 .help("Sıralamak için sürükle")
-            Toggle(isOn: Binding(get: { on }, set: { model.setTab(tab, enabled: $0) })) {
+            Toggle(isOn: Binding(get: { on && !unavailable }, set: { model.setTab(tab, enabled: $0) })) {
                 Label(tab.title, systemImage: tab.icon)
+                if unavailable { Text("Bildirimler kapalı; Genel’den aç.") }
             }
-            .disabled(on && model.enabledTabs.count == 1)   // one page always stays
+            .disabled(unavailable || (on && model.enabledTabs.count == 1))   // one page always stays
         }
         .contentShape(Rectangle())
         .draggable(tab.rawValue) {
