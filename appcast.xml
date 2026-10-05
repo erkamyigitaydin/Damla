@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.5</title>
+      <pubDate>Mon, 05 Oct 2026 16:48:32 +0000</pubDate>
+      <sparkle:version>18</sparkle:version>
+      <sparkle:shortVersionString>0.8.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Bildirimler sadeleşti.</p><p>- Kapalı çentikte artık zil ve sayı yok: bildirim kart olarak gelir, birkaç saniye sonra gider.</p><p>- Bildirimler sayfası yalnızca son bir saati tutar; eskiyenler kendiliğinden gider, elle temizlemek gerekmez.</p><p>- Ayarlar → Genel&#x27;de tek anahtar: &quot;Bildirimler çentikte&quot; kapalıyken Damla bildirimlere hiç dokunmaz, sayfa da kapsülden kalkar.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.5.dmg" length="6525472" type="application/octet-stream" sparkle:edSignature="zazx6+LPyu+JQgnuAVo61HvZSMp1tUPyvuMRiDCGO4Y9vs9QAfpkd7jXgzg3EU/gqX6ZyC1ssky+f/M6EHkgAA=="/>
+    </item>
+    <item>
       <title>Damla 0.8.4</title>
       <pubDate>Thu, 01 Oct 2026 15:31:46 +0000</pubDate>
       <sparkle:version>17</sparkle:version>
