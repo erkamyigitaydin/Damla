@@ -44,7 +44,8 @@ enum TourStep: Int, CaseIterable {
     }
     var text: String {
         switch self {
-        case .welcome: return String(localized: "Çentikte yaşar. İmleci çentiğe getir ya da ⌃⌥Space’e bas.")
+        // The shortcut can be changed, so it is named after a colon instead of carrying a Turkish suffix.
+        case .welcome: return String(localized: "Çentikte yaşar. İmleci çentiğe getir ya da kısayola bas: \(HotKey.load().display)")
         case .permissions: return String(localized: "Hepsi isteğe bağlı; vermediğin izin yalnızca o özelliği kapatır. Sonra Ayarlar’dan da verebilirsin.")
         case .notifications: return String(localized: "Gelen bildirim çentikte görünür. Tıkla: yanıtla ya da düğmesine bas. Kaçırdıkların Bildirimler sayfasında.")
         case .media: return String(localized: "Müzik, Spotify, tarayıcılar: çalan ne varsa burada. Video başlayınca müziği duraklatmak için izin ver.")

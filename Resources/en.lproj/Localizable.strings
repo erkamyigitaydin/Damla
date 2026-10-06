@@ -388,7 +388,7 @@
 "Müzik, Spotify, tarayıcılar: çalan ne varsa burada. Video başlayınca müziği duraklatmak için izin ver." = "Music, Spotify, browsers: whatever plays shows up here. Allow access so music can pause when a video starts.";
 "Müzik’i kontrol edebilir" = "Can control Music";
 "Raf" = "Shelf";
-"Çentikte yaşar. İmleci çentiğe getir ya da ⌃⌥Space’e bas." = "It lives in the notch. Move the pointer up there or press ⌃⌥Space.";
+"Çentikte yaşar. İmleci çentiğe getir ya da kısayola bas: %@" = "It lives in the notch. Move the pointer up there or press %@.";
 "Çıkışı değiştir, her uygulamanın sesini ayrı ayarla. Ses tuşlarının göstergesi de çentikte olabilir." = "Switch outputs and set each app’s volume. The volume keys’ indicator can live in the notch too.";
 "Şimdi çalan" = "Now playing";
 
