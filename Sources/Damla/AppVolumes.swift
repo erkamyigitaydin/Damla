@@ -55,6 +55,15 @@ final class AppVolumeController: ObservableObject {
         apply(id)
     }
 
+    /// A tap on the app's icon: down to 0, and back to where it was (kept across launches, like the levels).
+    func toggleMute(_ id: String) {
+        var before = (UserDefaults.standard.dictionary(forKey: "appVolumesBeforeMute") as? [String: Double]) ?? [:]
+        let current = level(id)
+        if current > 0 { before[id] = current; setLevel(id, 0) }
+        else { setLevel(id, before.removeValue(forKey: id) ?? 100) }
+        UserDefaults.standard.set(before, forKey: "appVolumesBeforeMute")
+    }
+
     /// Rebuilds every tap on the new default output (AirPods connected, speakers picked…).
     func outputChanged() {
         for tap in taps.values { tap.invalidate() }

@@ -72,7 +72,7 @@ Start dragging a file anywhere and the notch opens into a drop zone. Park files 
 
 ### And more
 
-- **Sound, your way.** Switch outputs, see your AirPods' battery (each bud and the case) when they connect and right in the output list, and set the volume of each app separately.
+- **Sound, your way.** Switch outputs, see your AirPods' battery (each bud and the case) when they connect and right in the output list, and set the volume of each app, and of each browser tab, separately on the Sound page.
 - **Swipe between pages.** With the panel open, swipe left or right with two fingers on the trackpad.
 - **Your next meeting** counts down in the notch from ten minutes before, and one click joins the Zoom, Meet, Teams, Webex or FaceTime call (off until you turn it on).
 - **Microphone in use?** The notch shows it during calls, and a tap mutes it for every app at once.
@@ -100,7 +100,8 @@ On first launch a short tour plays right inside the notch, one feature at a time
 |---|---|
 | Automation (Music, Spotify) | Controlling Apple Music and Spotify in the background, and their volume |
 | Accessibility | Damla's own volume/brightness indicators and Cleaning mode |
-| System audio recording | Per-app volume in the mixer. Nothing is recorded or sent anywhere |
+| System audio recording | Per-app volume on the Sound page. Nothing is recorded or sent anywhere |
+| Automation (browsers) | Per-tab volume on the Sound page, through the page’s own player |
 | Calendars | Your next meeting in the notch, once you turn it on |
 | Camera | The Mirror page, only while it's open |
 

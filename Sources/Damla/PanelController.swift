@@ -691,7 +691,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "hud-airpods": model.showDeviceHUD("airpods.pro", "AirPods Pro", detail: "S %80 · Sa %75 · K %60")
         case "hud-battery": model.showHUD("battery.100percent.bolt", "Şarja bağlandı", 0.8)
         case "tab-home": model.select(.home)
-        case "mixer": model.select(.home); model.homePane = .levels
+        case "mixer": model.select(.home); model.showSound()
+        case "mixer-pane": model.select(.home); model.homePane = .levels
+        case "tab-sound": model.select(.sound)
         case "outputs": model.select(.home); model.homePane = .outputs
         case "lyrics": model.select(.home); model.homePane = .player; model.lyricsExpanded = true
         case "sources": model.select(.home); model.homePane = .sources

@@ -79,7 +79,7 @@ const TR = {
   'book.lede': "Damla'nın sessiz işleri, her biri tarayıcında canlı çizilen bir ebru kâğıdının üstünde. Ebru ustaları desenlerine ad verir; adları her birinin altında.",
   'b.servers.t': 'Yerel sunucular', 'b.servers.d': "Mac'inde çalışan her geliştirme sunucusu ve veritabanı; açmak ya da durdurmak tek tık.",
   'v.srv': 'Yerel sunucular · 3', 'v.stop': 'Durdur',
-  'b.sound.t': 'Ses, senin ayarınla', 'b.sound.d': 'Çıkışı tek dokunuşla değiştir, AirPods’un her kulaklığının ve kutusunun şarjını gör, her uygulamaya kendi ses seviyesini ver. Sesi çentikte kaydırarak değiştir.',
+  'b.sound.t': 'Ses, senin ayarınla', 'b.sound.d': 'Çıkışı tek dokunuşla değiştir, AirPods’un her kulaklığının ve kutusunun şarjını gör, her uygulamaya, hatta her tarayıcı sekmesine kendi ses seviyesini ver. Sesi çentikte kaydırarak değiştir.',
   'snd.output': 'Ses çıkışı', 'snd.mbp': 'MacBook Pro Hoparlörü', 'snd.volume': 'Ses seviyesi', 'snd.system': 'Sistem',
   'v.pods': 'S %80 · Sa %75 · K %60',
   'b.clip.t': 'Pano geçmişi', 'b.clip.d': 'Kopyaladıklarını ara ve sabitle. Sen açana kadar kapalı.',

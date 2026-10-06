@@ -6,11 +6,12 @@ import ServiceManagement
 import UniformTypeIdentifiers
 
 enum PanelTab: String, CaseIterable, Identifiable {
-    case home = "Özet", files = "Dosyalar", clipboard = "Pano", focus = "Odak", mirror = "Ayna", shortcuts = "Kestirmeler", notifications = "Bildirimler", agents = "Agent’lar"   // raw values are stored settings
+    case home = "Özet", sound = "Ses", files = "Dosyalar", clipboard = "Pano", focus = "Odak", mirror = "Ayna", shortcuts = "Kestirmeler", notifications = "Bildirimler", agents = "Agent’lar"   // raw values are stored settings
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .home: return String(localized: "Özet"); case .files: return String(localized: "Dosyalar"); case .clipboard: return String(localized: "Pano")
+        case .home: return String(localized: "Özet"); case .sound: return String(localized: "Ses sayfası", defaultValue: "Ses")
+        case .files: return String(localized: "Dosyalar"); case .clipboard: return String(localized: "Pano")
         case .focus: return String(localized: "Odak"); case .mirror: return String(localized: "Ayna")
         case .shortcuts: return String(localized: "Kestirmeler"); case .notifications: return String(localized: "Bildirimler")
         case .agents: return String(localized: "Agent’lar")
@@ -18,7 +19,7 @@ enum PanelTab: String, CaseIterable, Identifiable {
     }
     var icon: String {
         switch self {
-        case .home: return "square.grid.2x2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"
+        case .home: return "square.grid.2x2"; case .sound: return "speaker.wave.2"; case .files: return "tray"; case .clipboard: return "doc.on.clipboard"; case .focus: return "timer"
         case .mirror: return "person.crop.square"; case .shortcuts: return "bolt"; case .notifications: return "bell"; case .agents: return "terminal"
         }
     }
@@ -28,7 +29,7 @@ enum PanelTab: String, CaseIterable, Identifiable {
         guard let saved = defaults.array(forKey: "enabledTabs") as? [String] else { return Set(allCases) }
         // Settings saved before "knownTabs" existed knew every page except the ones added since.
         let known = (defaults.array(forKey: "knownTabs") as? [String]).map { Set($0.compactMap(PanelTab.init(rawValue:))) }
-            ?? Set(allCases).subtracting([.mirror, .shortcuts])
+            ?? Set(allCases).subtracting([.mirror, .shortcuts, .sound])
         let tabs = Set(saved.compactMap(PanelTab.init(rawValue:))).union(Set(allCases).subtracting(known))
         return tabs.isEmpty ? Set(allCases) : tabs
     }
@@ -178,6 +179,7 @@ final class AppState: ObservableObject {
     @Published var recordingHotKey = false
     let media = MediaService()
     let appVolumes = AppVolumeController()
+    let browserTabs = BrowserTabVolumes()
     let lyrics = LyricsService()
     let monitor = SystemMonitor()
     let deviceBatteries = DeviceBatteryWatcher()
@@ -573,6 +575,11 @@ final class AppState: ObservableObject {
         endTour()   // picking a page from the pill means the user has taken over
         selectedTab = tab
         if tab == .clipboard { requestKeyFocus?() }
+    }
+    /// The level capsule on Özet: the Ses page when it is in the pill, the same view as a pane when it is off.
+    func showSound() {
+        if visibleTabs.contains(.sound) { withAnimation(Theme.page) { select(.sound) } }
+        else { withAnimation(Theme.quick) { homePane = .levels } }
     }
     /// Reads the Bluetooth outputs' batteries again; one system_profiler run covers every device.
     func refreshOutputBatteries() {

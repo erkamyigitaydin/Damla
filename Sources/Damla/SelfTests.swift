@@ -255,8 +255,18 @@ func runSelfTests() -> Int32 {
     tabDefaults.set(["Özet", "Odak"], forKey: "enabledTabs")
     let upgraded = PanelTab.loadEnabled(defaults: tabDefaults)
     tabDefaults.set(PanelTab.allCases.map(\.rawValue), forKey: "knownTabs")
-    check(upgraded == [.home, .focus, .mirror, .shortcuts] && PanelTab.loadEnabled(defaults: tabDefaults) == [.home, .focus],
+    check(upgraded == [.home, .sound, .focus, .mirror, .shortcuts] && PanelTab.loadEnabled(defaults: tabDefaults) == [.home, .focus],
           "A page added in an update starts on; one the user turned off stays off")
+    check(PanelTab.loadOrder(defaults: tabDefaults).firstIndex(of: .sound) == 1, "The Ses page takes its place right after Özet in a saved order")
+    let sep = "\u{1F}"
+    let probe = "2\(sep)17\(sep)35\(sep)youtube.com\(sep)Rick Astley - Never Gonna Give You Up \n2\(sep)9\(sep)100\(sep)twitch.tv\(sep)xQc\nbroken line\n"
+    let chrome = BrowserTabVolumes.parse(probe, browser: "com.google.Chrome")
+    let safari = BrowserTabVolumes.parse("!Allow JavaScript from Apple Events is off\n", browser: "com.apple.Safari")
+    check(chrome.error == nil && chrome.tabs.count == 2 && chrome.tabs[0].ref == "tab id 17 of window id 2" && chrome.tabs[0].volume == 35
+          && chrome.tabs[0].title == "Rick Astley - Never Gonna Give You Up" && chrome.tabs[1].host == "twitch.tv" && chrome.tabs[1].id == "com.google.Chrome|2|9"
+          && safari.tabs.isEmpty && safari.error?.contains("JavaScript") == true
+          && BrowserTabVolumes.parse("1\(sep)3\(sep)80\(sep)a.com\(sep)A\n", browser: "com.apple.Safari").tabs.first?.ref == "tab 3 of window id 1",
+          "Tab probe rows parse into tabs; the error line and Safari's tab references are kept apart")
     let shelfFolder = FileManager.default.temporaryDirectory.appendingPathComponent("Damla-shelf-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: shelfFolder, withIntermediateDirectories: true)
     let png = shelfFolder.appendingPathComponent("foto.png")
@@ -309,7 +319,7 @@ func runSelfTests() -> Int32 {
     orderDefaults.set(["Agent’lar", "Özet", "Yok", "Özet"], forKey: "tabOrder")
     let order = PanelTab.loadOrder(defaults: orderDefaults)
     check(order.count == PanelTab.allCases.count && Set(order) == Set(PanelTab.allCases), "Saved page order keeps every page once")
-    check(order.first == .agents && order[1] == .home && order[2] == .files, "Saved order kept, missing pages follow their default neighbour")
+    check(order.first == .agents && order[1] == .home && order[2] == .sound && order[3] == .files, "Saved order kept, missing pages follow their default neighbour")
     check(PanelTab.loadOrder(defaults: UserDefaults(suiteName: emptySuite)!) == PanelTab.allCases, "No saved order is the default")
     let keySuite = "damla-hotkey-test-\(UUID().uuidString)"
     defer { UserDefaults.standard.removePersistentDomain(forName: keySuite) }

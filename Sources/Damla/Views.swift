@@ -635,10 +635,11 @@ struct ExpandedView: View {
                             HomeView(model: model, media: model.media, lyrics: model.lyrics)
                         }
                     case .outputs: OutputsView(model: model)
-                    case .levels: MixerView(model: model, media: model.media, apps: model.appVolumes)
+                    case .levels: SoundView(model: model, media: model.media, apps: model.appVolumes, tabs: model.browserTabs, asPane: true)
                     case .sources: SourcesView(model: model, media: model.media)
                     case .videoSetup: VideoSetupView(model: model, setup: model.videoSetup)
                     }
+                case .sound: SoundView(model: model, media: model.media, apps: model.appVolumes, tabs: model.browserTabs)
                 case .files: ShelfView(model: model)
                 case .clipboard: ClipboardView(model: model)
                 case .focus: FocusView(model: model)
@@ -856,42 +857,35 @@ struct HomeView: View {
             // Two columns matching the row above: under the artwork the sound controls (output, level); under
             // the text the transport, centred on the progress line, with a running timer at its right end.
             HStack(spacing: 14) {
-                HStack(spacing: 6) {
-                    // Plain buttons: a SwiftUI Menu would flatten these labels to their first text.
-                    // The output's name rides in the capsule, scrolling when it is too long. When the timer or a
-                    // meeting takes the space to the right, only the icon stays.
-                    let named = !model.session.hasStarted && meetingInTransport == nil
-                    Button { withAnimation(Theme.quick) { model.homePane = .outputs } } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold))
-                            if named {
-                                MarqueeText(text: outputName, width: 50)
-                                    .transition(.opacity)
-                            }
+                // One capsule for the sound: the output's icon and name (scrolling when it is too long), then the
+                // level, and a tap opens the Ses page where both are set. When the timer or a meeting takes the
+                // space to the right, the name steps out and the icon and level stay.
+                // A plain button: a SwiftUI Menu would flatten this label to its first text.
+                let named = !model.session.hasStarted && meetingInTransport == nil
+                Button { model.showSound() } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: outputIcon).font(.system(size: 10.5, weight: .semibold))
+                        if named {
+                            MarqueeText(text: outputName, width: 50)
+                                .transition(.opacity)
                         }
-                        .foregroundStyle(.white).padding(.horizontal, named ? 8 : 0).frame(minWidth: 28, minHeight: 28)
-                        .glassLook(AnyShape(Capsule()))
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .help(outputHelp)
-                    .animation(Theme.quick, value: named)
-                    if let volume = model.volume {
-                        Button { withAnimation(Theme.quick) { model.homePane = .levels } } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: model.muted ? "speaker.slash.fill" : volume < 0.34 ? "speaker.wave.1.fill" : "speaker.wave.2.fill")
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text(model.muted ? "0" : "\(Int(volume * 100))")
+                        if let volume = model.volume {
+                            if named { Text(verbatim: "·").font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.dim).transition(.opacity) }
+                            if model.muted {
+                                Image(systemName: "speaker.slash.fill").font(.system(size: 10, weight: .semibold))
+                            } else {
+                                Text("\(Int(volume * 100))")
                                     .font(.system(size: 10.5, weight: .semibold, design: .rounded)).monospacedDigit()
                             }
-                            .foregroundStyle(.white).padding(.horizontal, 8).frame(height: 28)
-                            .glassLook(AnyShape(Capsule()))
-                            .contentShape(Capsule())
                         }
-                        .buttonStyle(.plain)
-                        .help("Ses seviyesi · sistem ve uygulama sesleri")
                     }
+                    .foregroundStyle(.white).padding(.horizontal, 8).frame(minWidth: 28, minHeight: 28)
+                    .glassLook(AnyShape(Capsule()))
+                    .contentShape(Capsule())
                 }
+                .buttonStyle(.plain)
+                .help(soundHelp)
+                .animation(Theme.quick, value: named)
                 .fixedSize()   // may reach past the cover's column into the empty start of the transport zone
                 .frame(width: Self.art, alignment: .leading)
                 .zIndex(1)
@@ -984,10 +978,11 @@ struct HomeView: View {
             }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().help(media.source.rawValue)
         }
     }
-    private var outputHelp: String {
+    private var soundHelp: String {
         let name = model.outputs.first { $0.id == model.currentOutput }?.name ?? "—"
-        guard let battery = model.currentOutputBattery else { return String(localized: "Ses çıkışı: \(name) · değiştir") }
-        return String(localized: "Ses çıkışı: \(name) (\(battery.summary)) · değiştir")
+        let level = model.muted ? String(localized: "Ses kapalı") : String(localized: "Ses \(Int((model.volume ?? 0) * 100))")
+        guard let battery = model.currentOutputBattery else { return String(localized: "\(name) · \(level) · ses sayfasını aç") }
+        return String(localized: "\(name) (\(battery.summary)) · \(level) · ses sayfasını aç")
     }
     private var outputIcon: String {
         model.outputs.first(where: { $0.id == model.currentOutput })?.icon ?? "hifispeaker"

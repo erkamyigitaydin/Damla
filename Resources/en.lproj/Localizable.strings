@@ -1,5 +1,6 @@
 /* Damla — English. Keys are the Turkish source strings; generated from the compiler's localized-strings output. */
 
+"%@ (%@) · %@ · ses sayfasını aç" = "%@ (%@) · %@ · open the Sound page";
 "%@ aracını kullanmak istiyor" = "wants to use %@";
 "%@ açık değil." = "%@ is not open.";
 "%@ bir JSON nesnesi değil" = "%@ is not a JSON object";
@@ -12,6 +13,7 @@
 "%@ uygulamasına git" = "Go to %@";
 "%@ uygulamasını aç" = "Open %@";
 "%@ · %@" = "%@ · %@";
+"%@ · %@ · ses sayfasını aç" = "%@ · %@ · open the Sound page";
 "%@ · %@ · tıkla: %@" = "%@ · %@ · click: %@";
 "%@ · arka planda" = "%@ · in the background";
 "%@ · uygulamayı aç" = "%@ · open the app";
@@ -92,12 +94,14 @@
 "Favorilerden çıkar" = "Remove from Favorites";
 "Favorilere ekle" = "Add to Favorites";
 "Finder’da göster" = "Show in Finder";
+"Geliştirici → Apple Events’ten JavaScript’e İzin Ver" = "Develop → Allow JavaScript from Apple Events";
 "Genel" = "General";
 "Geçmiş · %lld" = "History · %lld";
 "Giriş öğesi onay bekliyor · Sistem Ayarları'nı aç" = "Login item needs approval · open System Settings";
 "Girişte başlat" = "Launch at login";
 "Girişte başlatma ayarlanamadı: %@" = "Couldn’t set launch at login: %@";
 "Görsel" = "Image";
+"Görünüm → Geliştirici → Apple Events’ten JavaScript’e izin ver" = "View → Developer → Allow JavaScript from Apple Events";
 "Gösterilen ekranlar" = "Screens";
 "Güncel" = "Up to date";
 "Güncel değil" = "Out of date";
@@ -173,16 +177,19 @@
 "Sabitle" = "Pin";
 "Sabitlemeyi kaldır" = "Unpin";
 "Sayfalar" = "Pages";
+"Sekme sesleri için: %@ → %@" = "Tab volumes need: %@ → %@";
 "Seni bekliyor" = "Waiting for you";
 "Ses" = "Volume";
+"Ses %lld" = "Volume %lld";
 "Ses kapalı" = "Muted";
+"Ses sayfası" = "Sound";
 "Ses seviyesi" = "Volume";
 "Ses seviyesi · sistem ve uygulama sesleri" = "Volume · system and app levels";
 "Ses çalan uygulamalar burada görünür; her birinin sesini ayrı ayarlayabilirsin." = "Apps playing sound show up here; set each one’s volume separately.";
 "Ses çıkışı" = "Sound output";
-"Ses çıkışı: %@ · değiştir" = "Sound output: %@ · change";
-"Ses çıkışı: %@ (%@) · değiştir" = "Sound output: %@ (%@) · change";
+"Sesi aç" = "Unmute";
 "Sesini kıs" = "Turn it down";
+"Sessize al" = "Mute";
 "Seçili dosyayı paylaş" = "Share the selected file";
 "Sistem" = "System";
 "Sonraki" = "Next";
@@ -288,6 +295,7 @@
 "%lld gün önce" = "%lld days ago";
 "Claude kullanımı %%%lld" = "Claude usage %lld%%";
 "%@ sıfırlanır" = "resets at %@";
+"Ses çalan uygulamalar ve tarayıcı sekmeleri burada görünür; her birinin sesini ayrı ayarlayabilirsin." = "Apps and browser tabs playing sound show up here; set each one’s volume separately.";
 "bağlam %%%lld" = "context %lld%%";
 "5 sa %%%lld" = "5h %lld%%";
 "%%%lld" = "%lld%%";
@@ -372,6 +380,7 @@
 "Onaylar" = "Approvals";
 "Parola yöneticilerinden gelenler kaydedilmez." = "Anything from a password manager is skipped.";
 "Ses kısılır, video bitince geri gelir." = "Turns down, then comes back up.";
+"Ses seviyesi · sistem, uygulama ve sekme sesleri" = "Volume · system, app and tab levels";
 "Ses ve parlaklık göstergesi çentikte" = "Volume and brightness in the notch";
 "Sorunun sahibi uygulama öndeyse çentik sormaz." = "The notch stays quiet when the asking app is in front.";
 "Takvim izni kapalı" = "Calendar access is off";

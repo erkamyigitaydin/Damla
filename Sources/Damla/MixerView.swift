@@ -2,62 +2,178 @@ import SwiftUI
 import AppKit
 import CoreAudio
 
-/// How loud each source is: the system volume and one level per player Damla can reach. Opened from the level
-/// on Özet; lives inside the panel (no popover over a screen-saver-level window).
-struct MixerView: View {
+/// The Ses page: the system level, then one level per source Damla can reach: Music and Spotify over Apple
+/// Events, any other app through a process tap, and under a browser each tab that plays, through the page's own
+/// media elements. The output sits in the header; a tap on it lists the outputs in place. The same view is the
+/// pane Özet's level capsule opens when the page is switched off.
+struct SoundView: View {
     @ObservedObject var model: AppState
     @ObservedObject var media: MediaService
     @ObservedObject var apps: AppVolumeController
+    @ObservedObject var tabs: BrowserTabVolumes
+    /// Opened from Özet: a back arrow leads to the player.
+    var asPane = false
+    @State private var choosingOutput = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PaneHeader(title: Text("Ses seviyesi")) { withAnimation(Theme.quick) { model.homePane = .player } }
-            ScrollView {
-                VStack(spacing: 7) {
-                    MixerRow(icon: Image(systemName: model.muted ? "speaker.slash.fill" : "speaker.wave.2.fill"), name: String(localized: "Sistem"),
-                             value: Double(model.volume ?? 0) * 100) { SystemMonitor.setVolume(Float($0 / 100)) }
-                    ForEach(media.scriptablePlayers, id: \.self) { id in
-                        MixerRow(icon: MediaService.icon(for: id).map { Image(nsImage: $0) } ?? Image(systemName: "music.note"),
-                                 name: MediaService.appName(for: id), value: media.appVolumes[id] ?? 0) { media.setAppVolume(id, $0) }
-                            .opacity(media.appVolumes[id] == nil ? 0.5 : 1)
+            PageHeader(title: Text(choosingOutput ? String(localized: "Ses çıkışı") : PanelTab.sound.title), back: back) {
+                if !choosingOutput { outputChip }
+            }
+            if choosingOutput {
+                OutputList(model: model) { withAnimation(Theme.quick) { choosingOutput = false } }
+                    .transition(.opacity)
+            } else {
+                levels.transition(.opacity)
+            }
+        }
+        .onAppear { media.refreshAppVolumes(); apps.setWatching(true); tabs.setWatching(true); tabs.watch(apps.apps.map(\.id)) }
+        .onDisappear { apps.setWatching(false); tabs.setWatching(false) }
+        .onChange(of: apps.apps) { _, found in tabs.watch(found.map(\.id)) }
+    }
+
+    private var back: (() -> Void)? {
+        guard asPane || choosingOutput else { return nil }
+        return { withAnimation(Theme.quick) { if choosingOutput { choosingOutput = false } else { model.homePane = .player } } }
+    }
+
+    /// The current output, short ("Hoparlör", "AirPods Pro"); a tap shows every output to pick from.
+    private var outputChip: some View {
+        let output = model.outputs.first { $0.id == model.currentOutput }
+        return Button { withAnimation(Theme.quick) { choosingOutput = true } } label: {
+            HStack(spacing: 5) {
+                Image(systemName: output?.icon ?? "hifispeaker").font(.system(size: 10, weight: .semibold))
+                Text(output.map { AudioOutput.shortName($0.name, transport: $0.transport) } ?? String(localized: "Ses çıkışı"))
+                    .font(.system(size: 10.5, weight: .medium)).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 7.5, weight: .bold)).foregroundStyle(Theme.dim)
+            }
+            .foregroundStyle(.white).padding(.leading, 9).padding(.trailing, 8).frame(height: 24).frame(maxWidth: 150)
+            .glassLook(AnyShape(Capsule()))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(Text("Ses çıkışı: \(output?.name ?? "—") · değiştir"))
+    }
+
+    private var levels: some View {
+        ScrollView {
+            VStack(spacing: 7) {
+                SoundRow(icon: .symbol(model.muted ? "speaker.slash.fill" : "speaker.wave.2.fill"), name: String(localized: "Sistem"),
+                         value: model.muted ? 0 : Double(model.volume ?? 0) * 100,
+                         onChange: { level in
+                             SystemMonitor.setVolume(Float(level / 100))
+                             if model.muted && level > 0 { SystemMonitor.setMute(false) }
+                         },
+                         onMute: { SystemMonitor.setMute(!model.muted) })
+                ForEach(media.scriptablePlayers, id: \.self) { id in
+                    SoundRow(icon: .app(id), name: MediaService.appName(for: id), value: media.appVolumes[id] ?? 0,
+                             onChange: { media.setAppVolume(id, $0) }, onMute: { media.toggleAppMute(id) })
+                        .opacity(media.appVolumes[id] == nil ? 0.5 : 1)
+                }
+                ForEach(apps.apps) { app in
+                    SoundRow(icon: .app(app.id), name: app.name, quiet: !app.playing, value: apps.level(app.id),
+                             onChange: { apps.setLevel(app.id, $0) }, onMute: { apps.toggleMute(app.id) })
+                    ForEach(tabs.tabs[app.id] ?? []) { tab in
+                        SoundRow(icon: .symbol("globe"), name: tab.title.isEmpty ? tab.host : tab.title, indent: true, value: tab.volume,
+                                 onChange: { tabs.setVolume(tab, $0) }, onMute: { tabs.toggleMute(tab) })
+                            .help(Text(verbatim: tab.title.isEmpty ? tab.host : "\(tab.host) · \(tab.title)"))
                     }
-                    ForEach(apps.apps) { app in
-                        MixerRow(icon: MediaService.icon(for: app.id).map { Image(nsImage: $0) } ?? Image(systemName: "app"),
-                                 name: app.name, value: apps.level(app.id)) { apps.setLevel(app.id, $0) }
-                            .opacity(app.playing ? 1 : 0.6)
+                    if tabs.javaScriptOff.contains(app.id) {
+                        hint(Text("Sekme sesleri için: \(shortName(app.id)) → \(BrowserTabVolumes.menuPath(app.id))"), action: Text("Aç")) {
+                            tabs.enableJavaScript(app.id)
+                        }
                     }
-                    if apps.permissionDenied {
-                        Button { AppVolumeController.openPermissionSettings() } label: {
-                            Label("Uygulama sesleri için “Sistem sesi kaydı” izni gerekli · ayarları aç", systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.amber).lineLimit(2)
-                        }.buttonStyle(.plain)
-                    }
-                    if media.scriptablePlayers.isEmpty && apps.apps.isEmpty {
-                        Text("Ses çalan uygulamalar burada görünür; her birinin sesini ayrı ayarlayabilirsin.")
-                            .font(.system(size: 10.5)).foregroundStyle(Theme.faint).frame(maxWidth: .infinity, alignment: .leading)
+                    if tabs.automationDenied.contains(app.id) {
+                        hint(Text("\(shortName(app.id)) için otomasyon izni kapalı · Sistem Ayarları → Gizlilik → Otomasyon"), action: Text("Ayarlar")) {
+                            BrowserTabVolumes.openAutomationSettings()
+                        }
                     }
                 }
+                if apps.permissionDenied {
+                    Button { AppVolumeController.openPermissionSettings() } label: {
+                        Label("Uygulama sesleri için “Sistem sesi kaydı” izni gerekli · ayarları aç", systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.amber).lineLimit(2)
+                    }.buttonStyle(.plain)
+                }
+                if media.scriptablePlayers.isEmpty && apps.apps.isEmpty {
+                    Text("Ses çalan uygulamalar ve tarayıcı sekmeleri burada görünür; her birinin sesini ayrı ayarlayabilirsin.")
+                        .font(.system(size: 10.5)).foregroundStyle(Theme.faint).frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 2)
+                }
             }
-            .scrollIndicators(.hidden)
+            .animation(Theme.quick, value: apps.apps)
+            .animation(Theme.quick, value: tabs.tabs)
         }
-        .onAppear { media.refreshAppVolumes(); apps.setWatching(true) }
-        .onDisappear { apps.setWatching(false) }
+        .scrollIndicators(.hidden)
+    }
+
+    /// "Chrome" rather than "Google Chrome": it has to fit a line.
+    private func shortName(_ bundleID: String) -> String {
+        let name = MediaService.appName(for: bundleID)
+        return name.hasPrefix("Google ") ? String(name.dropFirst(7)) : name.hasPrefix("Microsoft ") ? String(name.dropFirst(10)) : name
+    }
+
+    /// A one-time setup step under a browser's row, with the button that takes care of it.
+    private func hint(_ text: Text, action: Text, perform: @escaping () -> Void) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9.5, weight: .semibold))
+            text.font(.system(size: 10, weight: .medium)).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: perform) { action.font(.system(size: 10, weight: .semibold)) }.buttonStyle(PillStyle())
+        }
+        .foregroundStyle(Theme.amber)
+        .padding(.leading, 14)
     }
 }
 
-struct MixerRow: View {
-    let icon: Image
+/// One level: the source's icon (a tap mutes it and brings it back), its name, the slider and the number. A tab
+/// row sits indented under its browser; the name column shrinks by the indent so the sliders stay in one column.
+struct SoundRow: View {
+    enum Icon { case symbol(String), app(String) }
+    let icon: Icon
     let name: String
+    var indent = false
+    /// The app is open but silent right now.
+    var quiet = false
     let value: Double          // 0–100
     let onChange: (Double) -> Void
+    let onMute: () -> Void
+    @State private var hoveringIcon = false
+
     var body: some View {
         HStack(spacing: 9) {
-            icon.resizable().scaledToFit().frame(width: 16, height: 16).foregroundStyle(Theme.dim)
-            Text(name).font(.system(size: 11, weight: .medium)).lineLimit(1).frame(width: 100, alignment: .leading)
+            Button(action: onMute) {
+                iconView
+                    .frame(width: 16, height: 16)
+                    .opacity(value <= 0 ? 0.35 : 1)
+                    .padding(3)
+                    .background(Circle().fill(Theme.fillStrong).opacity(hoveringIcon ? 1 : 0))
+                    .padding(-3)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hoveringIcon = $0 }
+            .animation(.easeOut(duration: 0.12), value: hoveringIcon)
+            .help(value <= 0 ? "Sesi aç" : "Sessize al")
+            .accessibilityLabel(Text(value <= 0 ? "Sesi aç" : "Sessize al"))
+            .padding(.leading, indent ? 14 : 0)
+            Text(name).font(.system(size: 11, weight: .medium)).lineLimit(1)
+                .foregroundStyle(quiet ? Theme.dim : .white)
+                .frame(width: indent ? 86 : 100, alignment: .leading)
             LevelSlider(value: value, onChange: onChange)
             Text("\(Int(value.rounded()))").font(.system(size: 10, weight: .medium, design: .rounded)).monospacedDigit()
                 .foregroundStyle(Theme.faint).frame(width: 24, alignment: .trailing)
         }
         .frame(height: 22)
+    }
+
+    @ViewBuilder private var iconView: some View {
+        switch icon {
+        case .symbol(let name):
+            Image(systemName: name).font(.system(size: indent ? 11 : 13, weight: .medium)).foregroundStyle(Theme.dim)
+        case .app(let bundleID):
+            if let image = MediaService.icon(for: bundleID) { Image(nsImage: image).resizable().scaledToFit() }
+            else { Image(systemName: "app").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.dim) }
+        }
     }
 }
 
@@ -90,40 +206,51 @@ struct LevelSlider: View {
     }
 }
 
-/// Where sound goes: every output device, the current one marked; a tap switches and returns to the player.
+/// Where sound goes, as a pane on Özet: every output device, the current one marked; a tap switches and
+/// returns to the player.
 struct OutputsView: View {
     @ObservedObject var model: AppState
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             PaneHeader(title: Text("Ses çıkışı")) { withAnimation(Theme.quick) { model.homePane = .player } }
-            ScrollView {
-                VStack(spacing: 4) {
-                    ForEach(model.outputs) { output in
-                        let chosen = output.id == model.currentOutput
-                        Button {
-                            AudioOutputs.setDefault(output.id)
-                            withAnimation(Theme.quick) { model.homePane = .player }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: output.icon).font(.system(size: 13, weight: .medium)).frame(width: 20)
-                                    .foregroundStyle(chosen ? Theme.accent : Theme.dim)
-                                Text(output.name).font(.system(size: 11.5, weight: chosen ? .semibold : .medium)).lineLimit(1)
-                                Spacer(minLength: 6)
-                                if output.isBluetooth, let battery = model.outputBatteries[output.name] {
-                                    BatteryLabel(levels: battery)
-                                }
-                                if chosen { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.accent) }
+            OutputList(model: model) { withAnimation(Theme.quick) { model.homePane = .player } }
+        }
+    }
+}
+
+/// The output devices, the current one marked (with its battery when it is Bluetooth); a tap switches and
+/// calls `picked`.
+struct OutputList: View {
+    @ObservedObject var model: AppState
+    let picked: () -> Void
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 4) {
+                ForEach(model.outputs) { output in
+                    let chosen = output.id == model.currentOutput
+                    Button {
+                        AudioOutputs.setDefault(output.id)
+                        picked()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: output.icon).font(.system(size: 13, weight: .medium)).frame(width: 20)
+                                .foregroundStyle(chosen ? Theme.accent : Theme.dim)
+                            Text(output.name).font(.system(size: 11.5, weight: chosen ? .semibold : .medium)).lineLimit(1)
+                            Spacer(minLength: 6)
+                            if output.isBluetooth, let battery = model.outputBatteries[output.name] {
+                                BatteryLabel(levels: battery)
                             }
-                            .padding(.horizontal, 10).frame(height: 32)
-                            .background(chosen ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            if chosen { Image(systemName: "checkmark").font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.accent) }
                         }
-                        .buttonStyle(.plain)
+                        .padding(.horizontal, 10).frame(height: 32)
+                        .background(chosen ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     }
+                    .buttonStyle(.plain)
                 }
             }
-            .scrollIndicators(.hidden)
         }
+        .scrollIndicators(.hidden)
         .onAppear { model.refreshOutputBatteries() }
     }
 }

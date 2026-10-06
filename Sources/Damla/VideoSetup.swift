@@ -156,14 +156,14 @@ final class VideoSetup: ObservableObject {
         }
     }
 
-    private static func checked(_ item: AXUIElement) -> Bool {
+    static func checked(_ item: AXUIElement) -> Bool {
         var mark: AnyObject?
         AXUIElementCopyAttributeValue(item, "AXMenuItemMarkChar" as CFString, &mark)
         return !((mark as? String) ?? "").isEmpty
     }
 
     /// The menu item whose title names both JavaScript and Apple Events: brand names, kept in every language.
-    private static func findMenuItem(pid: pid_t) -> (item: AXUIElement, path: [String])? {
+    static func findMenuItem(pid: pid_t) -> (item: AXUIElement, path: [String])? {
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 1)
         func attr(_ e: AXUIElement, _ name: String) -> AnyObject? { var v: AnyObject?; AXUIElementCopyAttributeValue(e, name as CFString, &v); return v }

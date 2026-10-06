@@ -65,6 +65,8 @@ final class MediaService: ObservableObject {
     @Published private(set) var appVolumes: [String: Double] = [:]
     /// Volumes to put back once a ducked handoff ends (or Damla quits).
     private var duckedVolumes: [String: Int] = [:]
+    /// Volumes to put back when the player's icon is tapped again in the mixer.
+    private var volumesBeforeMute: [String: Double] = [:]
     private var volumeWork: [String: DispatchWorkItem] = [:]
     var onNotice: ((String) -> Void)?
     let bridge = NowPlayingBridge()
@@ -383,6 +385,13 @@ final class MediaService: ObservableObject {
                 }
             }
         }
+    }
+
+    /// A tap on the player's icon: down to 0, and back to where it was.
+    func toggleAppMute(_ id: String) {
+        let current = appVolumes[id] ?? 0
+        if current > 0 { volumesBeforeMute[id] = current; setAppVolume(id, 0) }
+        else { setAppVolume(id, volumesBeforeMute.removeValue(forKey: id) ?? 100) }
     }
 
     /// Slider moves arrive many times a second; the player gets the last one after a short pause.
