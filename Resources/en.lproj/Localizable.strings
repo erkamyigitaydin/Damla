@@ -75,6 +75,7 @@
 "Dosya düzenliyor" = "Editing a file";
 "Dosya ekle" = "Add files";
 "Dosya okuyor" = "Reading a file";
+"Dosya" = "File";
 "Dosyalar" = "Files";
 "Dosyaları buraya bırak" = "Drop files here";
 "Duraklat" = "Pause";
@@ -298,6 +299,7 @@
 "Tarayıcıda aç: localhost:%lld" = "Open in browser: localhost:%lld";
 "Etkinlik" = "Event";
 "şimdi" = "now";
+"dün" = "yesterday";
 "1 dk sonra başlıyor" = "Starts in 1 min";
 "1 dk sonra · çentikten katıl" = "In 1 min · join from the notch";
 "Mikrofon kapalı · tıkla: aç" = "Microphone muted · click to unmute";
@@ -329,9 +331,8 @@
 "Bitti" = "Done";
 "Çalışmadı" = "Didn’t run";
 "Çalıştır: %@" = "Run: %@";
-"Sık kullandıklarını sabitle; burada tek dokunuşluk düğme olurlar." = "Pin the ones you use most; they become one-tap buttons here.";
-"Tüm kestirmeler" = "All shortcuts";
 "Kestirme bulunamadı. Kestirmeler uygulamasında oluşturduklarının hepsi burada görünür." = "No shortcuts found. Everything you make in the Shortcuts app shows up here.";
+"Eşleşen kestirme yok" = "No matching shortcuts";
 "Üste sabitle" = "Pin to top";
 "Nostalji" = "Nostalgia";
 "Siyah beyaz" = "Black & white";
@@ -445,6 +446,7 @@
 "· son bir saat" = "· last hour";
 "Tıkla: %@ uygulamasını aç" = "Click to open %@";
 "%lld sa" = "%lld h";
+"%lld g" = "%lld d";
 "Varsayılan sıra" = "Default order";
 "Sıralamak için sürükle." = "Drag to reorder.";
 "Sıralamak için sürükle" = "Drag to reorder";

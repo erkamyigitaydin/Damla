@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The user's Apple Shortcuts, run from the notch. Pinned ones sit on top as buttons; the full list (read from the
-/// `shortcuts` command) lets you pin more.
+/// The user's Apple Shortcuts (read from the `shortcuts` command), run from the notch; pinned ones lead the grid.
 final class ShortcutsService: ObservableObject {
     static let pinnedKey = "pinnedShortcuts"
     @Published private(set) var all: [String] = []
@@ -16,14 +15,21 @@ final class ShortcutsService: ObservableObject {
     func load() {
         DispatchQueue.global(qos: .userInitiated).async {
             let names = Self.execute(["list"]).output
-                .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                .split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && !Self.isAutomation($0) }
             DispatchQueue.main.async {
                 self.all = names
                 self.loaded = true
-                // A pinned shortcut that was renamed or deleted has nothing left to run.
-                if !names.isEmpty { self.pinned.removeAll { !names.contains($0) } }
+                // A pinned shortcut that was renamed or deleted has nothing left to run; nor has an automation.
+                self.pinned.removeAll { Self.isAutomation($0) || (!names.isEmpty && !names.contains($0)) }
             }
         }
+    }
+
+    /// Personal automations are listed as "Automation <UUID>": they run on their own trigger and their names say
+    /// nothing, so they stay out of the grid.
+    static func isAutomation(_ name: String) -> Bool {
+        let parts = name.split(separator: " ", maxSplits: 1)
+        return parts.count == 2 && parts[0].caseInsensitiveCompare("Automation") == .orderedSame && UUID(uuidString: String(parts[1])) != nil
     }
 
     func togglePin(_ name: String) {
@@ -55,39 +61,32 @@ final class ShortcutsService: ObservableObject {
     }
 }
 
+/// A search on top and the shortcuts as a three-column grid of one-tap buttons, pinned ones first: about ten fit
+/// at once where the old list showed four.
 struct ShortcutsView: View {
     @ObservedObject var shortcuts: ShortcutsService
+    /// The notch panel takes the keyboard only when asked; a click in the search field asks.
+    var requestKeyFocus: (() -> Void)?
+    @State private var search = ""
+    @FocusState private var searching: Bool
+
+    /// Pinned ones lead even before the list has loaded (or if it failed), so they stay one tap away.
+    private var ordered: [String] { shortcuts.pinned + shortcuts.all.filter { !shortcuts.pinned.contains($0) } }
+    private var shown: [String] { search.isEmpty ? ordered : ordered.filter { $0.localizedCaseInsensitiveContains(search) } }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !shortcuts.pinned.isEmpty {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 6) {
-                        ForEach(shortcuts.pinned, id: \.self) { name in
-                            Button { shortcuts.run(name) } label: {
-                                HStack(spacing: 5) {
-                                    if shortcuts.running.contains(name) { ProgressView().controlSize(.mini) }
-                                    else { Image(systemName: "bolt.fill").font(.system(size: 9.5, weight: .bold)) }
-                                    Text(name).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-                                }
-                            }
-                            .buttonStyle(PillStyle(accent: true))
-                            .help(String(localized: "Çalıştır: \(name)"))
-                        }
-                    }
-                }
-                .scrollIndicators(.hidden)
-            }
-            Text(shortcuts.pinned.isEmpty ? "Sık kullandıklarını sabitle; burada tek dokunuşluk düğme olurlar." : "Tüm kestirmeler")
-                .font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
-            if !shortcuts.loaded {
+            PageHeader(title: Text("Kestirmeler"), detail: shortcuts.loaded ? Text("\(ordered.count)") : nil) { searchField }
+            if !shortcuts.loaded && ordered.isEmpty {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if shortcuts.all.isEmpty {
-                Text("Kestirme bulunamadı. Kestirmeler uygulamasında oluşturduklarının hepsi burada görünür.")
-                    .font(.system(size: 11)).foregroundStyle(Theme.faint).frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if ordered.isEmpty || shown.isEmpty {
+                Text(ordered.isEmpty ? "Kestirme bulunamadı. Kestirmeler uygulamasında oluşturduklarının hepsi burada görünür." : "Eşleşen kestirme yok")
+                    .font(.system(size: 11)).foregroundStyle(Theme.faint).multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(shortcuts.all, id: \.self) { name in ShortcutRow(name: name, shortcuts: shortcuts) }
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                        ForEach(shown, id: \.self) { name in ShortcutTile(name: name, shortcuts: shortcuts) }
                     }
                 }
                 .scrollIndicators(.hidden)
@@ -96,36 +95,59 @@ struct ShortcutsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { shortcuts.load() }
     }
+
+    private var searchField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass").font(.system(size: 10, weight: .medium)).foregroundStyle(Theme.dim)
+            TextField("Ara", text: $search).textFieldStyle(.plain).font(.system(size: 11.5))
+                .focused($searching)
+                .simultaneousGesture(TapGesture().onEnded { requestKeyFocus?(); searching = true })
+            if !search.isEmpty { IconButton(icon: "xmark.circle.fill", label: "Temizle", size: 18) { search = "" } }
+        }
+        .padding(.leading, 9).padding(.trailing, 3).frame(width: 160, height: 24).background(Theme.fill, in: Capsule())
+    }
 }
 
-private struct ShortcutRow: View {
+/// One shortcut: a tap runs it. Pinned ones carry a filled accent bolt and an outline; the pin shows on hover
+/// and in the context menu.
+private struct ShortcutTile: View {
     let name: String
     @ObservedObject var shortcuts: ShortcutsService
     @State private var hovering = false
     var body: some View {
         let pinned = shortcuts.pinned.contains(name)
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             Button { shortcuts.run(name) } label: {
-                HStack(spacing: 8) {
-                    if shortcuts.running.contains(name) { ProgressView().controlSize(.mini).frame(width: 14) }
-                    else { Image(systemName: "bolt").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.dim).frame(width: 14) }
-                    Text(name).font(.system(size: 11.5, weight: .medium)).lineLimit(1)
-                    Spacer(minLength: 4)
+                HStack(spacing: 5) {
+                    if shortcuts.running.contains(name) { ProgressView().controlSize(.mini).frame(width: 12) }
+                    else {
+                        Image(systemName: pinned ? "bolt.fill" : "bolt").font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(pinned ? Theme.accent : Theme.dim).frame(width: 12)
+                    }
+                    Text(name).font(.system(size: 11, weight: .medium)).lineLimit(1)
+                    Spacer(minLength: 0)
                 }
-                .contentShape(Rectangle())
+                .padding(.leading, 8).padding(.trailing, hovering ? 2 : 8).frame(maxHeight: .infinity).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help(String(localized: "Çalıştır: \(name)"))
-            Button { shortcuts.togglePin(name) } label: {
-                Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(pinned ? Theme.accent : Theme.dim).frame(width: 22, height: 22).contentShape(Rectangle())
+            if hovering {
+                Button { shortcuts.togglePin(name) } label: {
+                    Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 9.5, weight: .semibold))
+                        .foregroundStyle(pinned ? Theme.accent : Theme.dim).frame(width: 22).frame(maxHeight: .infinity).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(pinned ? "Sabitlemeyi kaldır" : "Üste sabitle")
             }
-            .buttonStyle(.plain)
-            .opacity(pinned || hovering ? 1 : 0.35)
-            .help(pinned ? "Sabitlemeyi kaldır" : "Üste sabitle")
         }
-        .padding(.horizontal, 8).frame(height: 30)
+        .frame(height: 30)
         .background(hovering ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            if pinned { RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(.white.opacity(0.22), lineWidth: 0.5) }
+        }
         .onHover { hovering = $0 }
+        .contextMenu {
+            Button(pinned ? "Sabitlemeyi kaldır" : "Üste sabitle") { shortcuts.togglePin(name) }
+        }
     }
 }

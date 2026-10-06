@@ -643,7 +643,7 @@ struct ExpandedView: View {
                 case .clipboard: ClipboardView(model: model)
                 case .focus: FocusView(model: model)
                 case .mirror: MirrorView()
-                case .shortcuts: ShortcutsView(shortcuts: model.shortcuts)
+                case .shortcuts: ShortcutsView(shortcuts: model.shortcuts, requestKeyFocus: model.requestKeyFocus)
                 case .notifications: NotificationsView(model: model, mirror: model.notifications)
                 case .agents: AgentPanelView(service: model.agents, servers: model.devServers)
                 }
@@ -1339,13 +1339,18 @@ struct FileTile: View {
 
 // MARK: - Clipboard
 
+/// Search on top, the type chips under it, then the cards: two short rows leave the cards 100 pt of the page's
+/// 162, where one row could not hold five chips and a usable search field.
 struct ClipboardView: View {
     @ObservedObject var model: AppState
     @State private var search = ""
+    @State private var filter = ClipFilter.all
     @State private var copied: UUID?
-    var entries: [ClipEntry] { model.clips.filter { search.isEmpty || $0.title.localizedCaseInsensitiveContains(search) } }
+    var entries: [ClipEntry] {
+        model.clips.filter { filter.matches($0) && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)) }
+    }
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             if !model.clipboardEnabled, model.clips.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "doc.on.clipboard").font(.system(size: 26, weight: .ultraLight)).foregroundStyle(Theme.dim)
@@ -1353,15 +1358,23 @@ struct ClipboardView: View {
                     Button("Pano geçmişini aç") { model.toggleClipboard(true) }.font(.system(size: 11, weight: .medium)).buttonStyle(PillStyle(accent: true))
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dim)
                     TextField("Ara", text: $search).textFieldStyle(.plain).font(.system(size: 11.5)).onTapGesture { model.requestKeyFocus?() }
-                    if !search.isEmpty { IconButton(icon: "xmark.circle.fill", label: "Temizle") { search = "" } }
+                    if !search.isEmpty { IconButton(icon: "xmark.circle.fill", label: "Temizle", size: 20) { search = "" } }
                     IconButton(icon: model.clipboardEnabled ? "record.circle" : "pause.circle", label: model.clipboardEnabled ? "Kaydı duraklat" : "Kaydı sürdür",
-                               tint: model.clipboardEnabled ? Theme.accent : Theme.dim) { model.toggleClipboard(!model.clipboardEnabled) }
-                }.padding(.horizontal, 10).frame(height: 28).background(Theme.fill, in: Capsule())
+                               tint: model.clipboardEnabled ? Theme.accent : Theme.dim, size: 20) { model.toggleClipboard(!model.clipboardEnabled) }
+                }.padding(.leading, 10).padding(.trailing, 3).frame(height: 26).background(Theme.fill, in: Capsule())
+                HStack(spacing: 4) {
+                    ForEach(ClipFilter.allCases, id: \.self) { option in
+                        Button(option.title) { filter = option }.buttonStyle(ChipStyle(selected: filter == option))
+                            .accessibilityAddTraits(filter == option ? .isSelected : [])
+                    }
+                    Spacer(minLength: 0)
+                }
+                .animation(Theme.quick, value: filter)
                 if entries.isEmpty {
-                    Image(systemName: search.isEmpty ? "doc.on.clipboard" : "magnifyingglass").font(.system(size: 24, weight: .ultraLight))
+                    Image(systemName: search.isEmpty && filter == .all ? "doc.on.clipboard" : "magnifyingglass").font(.system(size: 24, weight: .ultraLight))
                         .foregroundStyle(Theme.faint).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView(.horizontal) {
@@ -1386,26 +1399,38 @@ struct ClipCard: View {
     @ObservedObject var model: AppState
     let onCopy: () -> Void
     @State private var hovering = false
-    private var isLink: Bool { entry.text?.hasPrefix("http") == true }
-    private var isColor: Bool {
-        guard let t = entry.text?.trimmingCharacters(in: .whitespaces), t.hasPrefix("#"), t.count == 7 || t.count == 4 else { return false }
-        return t.dropFirst().allSatisfy(\.isHexDigit)
+    private var kindLabel: String {
+        switch entry.kind {
+        case .image: return String(localized: "Görsel")
+        case .file: return String(localized: "Dosya")
+        case .text: return entry.isColor ? String(localized: "Renk") : entry.isLink ? String(localized: "Bağlantı") : String(localized: "Metin")
+        }
     }
-    private var kindLabel: String { entry.kind == .image ? String(localized: "Görsel") : isColor ? String(localized: "Renk") : isLink ? String(localized: "Bağlantı") : String(localized: "Metin") }
-    private var kindIcon: String { entry.kind == .image ? "photo" : isColor ? "paintpalette" : isLink ? "link" : "text.alignleft" }
+    private var kindIcon: String {
+        switch entry.kind {
+        case .image: return "photo"
+        case .file: return "doc"
+        case .text: return entry.isColor ? "paintpalette" : entry.isLink ? "link" : "text.alignleft"
+        }
+    }
     var body: some View {
         Button(action: onCopy) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack {
                     if let data = entry.imageData, let image = NSImage(data: data) {
                         Image(nsImage: image).resizable().scaledToFill()
-                    } else if isColor, let color = Color(hex: entry.text ?? "") {
+                    } else if entry.isColor, let color = Color(hex: entry.text ?? "") {
                         color
                         Text(entry.title.uppercased()).font(.system(size: 11, weight: .semibold, design: .monospaced)).foregroundStyle(.white)
                             .shadow(color: .black.opacity(0.5), radius: 2)
+                    } else if let first = entry.fileURLs.first {
+                        VStack(spacing: 4) {
+                            Image(nsImage: AppIcons.icon(for: first)).resizable().frame(width: 32, height: 32)
+                            Text(entry.title).font(.system(size: 10, weight: .medium)).lineLimit(2).multilineTextAlignment(.center)
+                        }.padding(.horizontal, 8)
                     } else {
-                        Text(entry.title).font(.system(size: 10)).lineLimit(5).multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(9)
+                        Text(entry.title).font(.system(size: 10)).lineLimit(4).multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).padding(8)
                     }
                     if copied {
                         Color.black.opacity(0.5)
@@ -1413,28 +1438,47 @@ struct ClipCard: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
-                HStack(spacing: 5) {
-                    Image(systemName: kindIcon).font(.system(size: 8.5, weight: .semibold))
-                    Text(kindLabel).font(.system(size: 9, weight: .medium))
-                    Spacer(minLength: 0)
-                    if entry.pinned && !hovering { Image(systemName: "pin.fill").font(.system(size: 8)) }
-                    if hovering {
-                        IconButton(icon: entry.pinned ? "pin.fill" : "pin", label: entry.pinned ? "Sabitlemeyi kaldır" : "Sabitle", size: 18) { model.pinClip(entry) }
-                        IconButton(icon: "xmark", label: "Kaldır", size: 18) { model.removeClip(entry) }
-                    }
-                }
-                .foregroundStyle(Theme.dim).padding(.horizontal, 8).frame(height: 24).background(.black.opacity(0.25))
+                footer.foregroundStyle(Theme.dim).padding(.horizontal, 8).frame(height: 22).background(.black.opacity(0.25))
             }
-            .frame(width: 128, height: 124)
+            .frame(width: 128, height: 100)
             .background(hovering ? Theme.fillStrong : Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(entry.pinned ? 0.22 : 0.06), lineWidth: 0.5))
+            .overlay(alignment: .topTrailing) {
+                if hovering {
+                    HStack(spacing: 4) {
+                        IconButton(icon: entry.pinned ? "pin.fill" : "pin", label: entry.pinned ? "Sabitlemeyi kaldır" : "Sabitle",
+                                   tint: entry.pinned ? Theme.accent : .white, size: 18) { model.pinClip(entry) }
+                        IconButton(icon: "xmark", label: "Kaldır", size: 18) { model.removeClip(entry) }
+                    }
+                    .padding(5).transition(.opacity)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain).help("Kopyala")
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
         .animation(.easeOut(duration: 0.15), value: copied)
+    }
+
+    /// Where it came from and how long ago; clips from before the source was recorded show their type as before.
+    /// The pin mark sits here rather than in the corner, where it would cover the text.
+    private var footer: some View {
+        HStack(spacing: 5) {
+            if let icon = entry.sourceBundleID.flatMap(AppIcons.icon(bundleID:)) {
+                Image(nsImage: icon).resizable().interpolation(.high).frame(width: 13, height: 13)
+                Text(ClipRules.age(since: entry.date, now: model.now)).font(.system(size: 9, weight: .medium)).monospacedDigit()
+                Spacer(minLength: 0)
+                if entry.pinned { Image(systemName: "pin.fill").font(.system(size: 8)) }
+                Image(systemName: kindIcon).font(.system(size: 8.5, weight: .semibold))
+            } else {
+                Image(systemName: kindIcon).font(.system(size: 8.5, weight: .semibold))
+                Text(kindLabel).font(.system(size: 9, weight: .medium))
+                Spacer(minLength: 0)
+                if entry.pinned { Image(systemName: "pin.fill").font(.system(size: 8)) }
+            }
+        }
     }
 }
 
@@ -1847,5 +1891,20 @@ struct PillStyle: ButtonStyle {
         configuration.label.padding(.horizontal, 11).padding(.vertical, 6)
             .foregroundStyle(accent ? Color.black : Color.white)
             .glassLook(AnyShape(Capsule()), prominent: accent, pressed: configuration.isPressed)
+    }
+}
+
+/// A filter chip: the chosen one is the accent pill, the rest plain text at the same size, so choosing never
+/// shifts the row.
+struct ChipStyle: ButtonStyle {
+    let selected: Bool
+    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
+        let label = configuration.label.font(.system(size: 10.5, weight: .semibold)).lineLimit(1)
+            .padding(.horizontal, 8).frame(height: 20).contentShape(Capsule())
+        if selected {
+            label.foregroundStyle(.black).glassLook(AnyShape(Capsule()), prominent: true, pressed: configuration.isPressed)
+        } else {
+            label.foregroundStyle(Theme.dim).opacity(configuration.isPressed ? 0.6 : 1)
+        }
     }
 }

@@ -14,9 +14,11 @@ enum AgentProvider: String, Codable, CaseIterable {
     var icon: NSImage? { appURL.map { AppIcons.icon(for: $0) } }
 }
 
-/// Runtime app icons, cached per path.
+/// Runtime app (and file) icons, cached per path and per bundle id: views that redraw with the clock ask on
+/// every frame, and a Launch Services lookup is not free.
 enum AppIcons {
     nonisolated(unsafe) private static var cache: [String: NSImage] = [:]
+    nonisolated(unsafe) private static var bundles: [String: NSImage?] = [:]
     static func icon(for url: URL) -> NSImage {
         if let cached = cache[url.path] { return cached }
         let image = NSWorkspace.shared.icon(forFile: url.path)
@@ -24,8 +26,12 @@ enum AppIcons {
         cache[url.path] = image
         return image
     }
+    /// Nil when no such app is installed (remembered too, until relaunch).
     static func icon(bundleID: String) -> NSImage? {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map(icon(for:))
+        if let cached = bundles[bundleID] { return cached }
+        let image = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map(icon(for:))
+        bundles.updateValue(image, forKey: bundleID)
+        return image
     }
     static func name(bundleID: String) -> String? {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }

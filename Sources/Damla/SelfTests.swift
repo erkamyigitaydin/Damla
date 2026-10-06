@@ -38,6 +38,30 @@ func runSelfTests() -> Int32 {
     check(trimmed.first?.pinned == true, "Pinned entry retained ahead of recents")
     let images = (0..<8).map { _ in ClipEntry(kind: .image, imageData: Data(count: 4 * 1024 * 1024)) }
     check(ClipRules.trimmed(images).reduce(0) { $0 + $1.byteSize } <= 24 * 1024 * 1024, "Clipboard disk budget bounded")
+    let oldClip = #"[{"id":"6E4821FB-FC86-456D-9B9A-1F6412345678","kind":"text","text":"merhaba","date":780000000,"pinned":true}]"#
+    let oldClips = try? JSONDecoder().decode([ClipEntry].self, from: Data(oldClip.utf8))
+    check(oldClips?.count == 1 && oldClips?[0].sourceBundleID == nil && oldClips?[0].pinned == true
+          && oldClips?[0].date == Date(timeIntervalSinceReferenceDate: 780000000), "Clips saved before the source app was recorded still load")
+    var sourced = ClipEntry(kind: .text, text: "merhaba"); sourced.sourceBundleID = "com.apple.Safari"
+    let sourcedBack = try? JSONDecoder().decode(ClipEntry.self, from: JSONEncoder().encode(sourced))
+    check(sourcedBack?.sourceBundleID == "com.apple.Safari" && abs((sourcedBack?.date ?? .distantPast).timeIntervalSince(sourced.date)) < 0.001,
+          "Clip source app and copy time survive save/reload")
+    let sorted: [(ClipEntry, ClipFilter)] = [(ClipEntry(kind: .text, text: "Cuma ödenmezse hatırlat"), .text), (ClipEntry(kind: .text, text: "#153AA4"), .text),
+                                             (ClipEntry(kind: .text, text: " https://getdroppy.app/changelog\n"), .link), (ClipEntry(kind: .text, text: "https://a.com bak"), .text),
+                                             (ClipEntry(kind: .image, imageData: Data()), .image), (ClipEntry(kind: .file, text: "/tmp/a.pdf\n/tmp/b.png"), .file)]
+    check(sorted.allSatisfy { $0.0.category == $0.1 } && sorted[1].0.isColor, "Clips fall under the right chip; colour codes count as text")
+    check(ClipFilter.all.matches(sorted[4].0) && ClipFilter.link.matches(sorted[2].0) && !ClipFilter.link.matches(sorted[0].0), "Tümü shows every clip, a chip only its own")
+    check(sorted[5].0.title == "a.pdf, b.png" && sorted[5].0.fileURLs.count == 2, "Copied files are titled by name")
+    var istanbul = Calendar(identifier: .gregorian)
+    istanbul.timeZone = TimeZone(identifier: "Europe/Istanbul")!
+    let noon = istanbul.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 12))!
+    func clipAge(_ seconds: TimeInterval) -> String { ClipRules.age(since: noon.addingTimeInterval(-seconds), now: noon, calendar: istanbul) }
+    check(clipAge(20) == "şimdi" && clipAge(-5) == "şimdi" && clipAge(5 * 60) == "5 dk" && clipAge(2 * 3600 + 59) == "2 sa" && clipAge(13 * 3600) == "13 sa",
+          "Clip age reads şimdi, minutes, then hours for the first day")
+    check(clipAge(30 * 3600) == "dün" && clipAge(47 * 3600) == "2 g" && clipAge(3 * 86_400) == "3 g", "Past a day, clip age counts calendar days")
+    check(ShortcutsService.isAutomation("Automation 6E4821FB-FC86-456D-9B9A-1F6412345678") && ShortcutsService.isAutomation("automation 6e4821fb-fc86-456d-9b9a-1f6412345678")
+          && !ShortcutsService.isAutomation("Automation") && !ShortcutsService.isAutomation("Automation fikirleri") && !ShortcutsService.isAutomation("Sabah Automation"),
+          "Personal automations (Automation + UUID) are hidden, named shortcuts are not")
     let temp = FileManager.default.temporaryDirectory.appendingPathComponent("Damla-test-\(UUID().uuidString)")
     do {
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
