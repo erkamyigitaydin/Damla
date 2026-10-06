@@ -54,4 +54,27 @@ func runHookInstallerSelfTests(_ check: (Bool, String) -> Void) {
     let mode = ((try? FileManager.default.attributesOfItem(atPath: settings.path))?[.posixPermissions] as? NSNumber)?.intValue ?? 0
     check(first && !second && backups.count == 1 && mode == 0o600 && HookInstaller.isInstalled(.claude, home: home),
           "Install writes once, backs up, keeps the file private")
+
+    // A second account (VS Code's extension started with CLAUDE_CONFIG_DIR=~/.claude-default) gets the hooks too.
+    let fm = FileManager.default
+    let accounts = fm.temporaryDirectory.appendingPathComponent("Damla-accounts-\(UUID().uuidString)")
+    defer { try? fm.removeItem(at: accounts) }
+    try? fm.createDirectory(at: accounts.appendingPathComponent(".claude"), withIntermediateDirectories: true)
+    try? fm.createDirectory(at: accounts.appendingPathComponent(".claude-default/projects"), withIntermediateDirectories: true)
+    try? fm.createDirectory(at: accounts.appendingPathComponent(".claude-mem"), withIntermediateDirectories: true)
+    try? fm.createDirectory(at: accounts.appendingPathComponent("elsewhere"), withIntermediateDirectories: true)
+    let names = { (urls: [URL]) in urls.map(\.lastPathComponent) }
+    let elsewhere = accounts.appendingPathComponent("elsewhere").path
+    check(names(HookInstaller.claudeDirectories(home: accounts)) == [".claude", ".claude-default"]
+          && names(HookInstaller.claudeDirectories(home: accounts, environment: ["CLAUDE_CONFIG_DIR": elsewhere])) == [".claude", "elsewhere", ".claude-default"]
+          && names(HookInstaller.claudeDirectories(home: accounts, environment: ["CLAUDE_CONFIG_DIR": accounts.appendingPathComponent(".claude-default").path])) == [".claude", ".claude-default"],
+          "Every Claude Code config folder in use is found, other tools' folders are not")
+    let installed = (try? HookInstaller.install(.claude, approvals: false, binary: binary, home: accounts)) ?? false
+    check(installed && HookInstaller.isInstalled(.claude, home: accounts)
+          && fm.fileExists(atPath: accounts.appendingPathComponent(".claude-default/settings.json").path)
+          && !fm.fileExists(atPath: accounts.appendingPathComponent(".claude-mem/settings.json").path), "Install reaches every config folder")
+    try? fm.createDirectory(at: accounts.appendingPathComponent(".claude-work/projects"), withIntermediateDirectories: true)
+    check(!HookInstaller.isInstalled(.claude, home: accounts), "A config folder added later shows the hooks as missing")
+    let bare = fm.temporaryDirectory.appendingPathComponent("Damla-bare-\(UUID().uuidString)")
+    check(names(HookInstaller.claudeDirectories(home: bare)) == [".claude"], "Without any folder, ~/.claude is the one to create")
 }

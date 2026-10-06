@@ -18,17 +18,58 @@ enum HookInstaller {
         provider == .claude ? home.appendingPathComponent(".claude/settings.json") : home.appendingPathComponent(".codex/hooks.json")
     }
 
-    /// The agent is installed (its config folder exists), so offering to hook it makes sense.
-    static func isAvailable(_ provider: Provider, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
-        FileManager.default.fileExists(atPath: settingsURL(provider, home: home).deletingLastPathComponent().path)
+    /// Claude Code reads its settings from CLAUDE_CONFIG_DIR when that is set, which people use to keep one
+    /// account per editor (the VS Code extension started with ~/.claude-default, say). Each config folder in use
+    /// gets the hooks: ~/.claude, the environment's folder, and every ~/.claude-* folder Claude Code has kept
+    /// sessions in (other tools' ~/.claude-mem and the like have none). The environment only counts for the real
+    /// home, so a test home never reaches the user's settings.
+    static func claudeDirectories(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                                  environment: [String: String]? = nil) -> [URL] {
+        let fm = FileManager.default
+        let realHome = home.standardizedFileURL.path == fm.homeDirectoryForCurrentUser.standardizedFileURL.path
+        let env = environment ?? (realHome ? ProcessInfo.processInfo.environment : [:])
+        func isDirectory(_ url: URL) -> Bool {
+            var directory: ObjCBool = false
+            return fm.fileExists(atPath: url.path, isDirectory: &directory) && directory.boolValue
+        }
+        var found: [URL] = []
+        let standard = home.appendingPathComponent(".claude", isDirectory: true)
+        if isDirectory(standard) { found.append(standard) }
+        if let configured = env["CLAUDE_CONFIG_DIR"], configured.hasPrefix("/") {
+            let url = URL(fileURLWithPath: configured, isDirectory: true)
+            if isDirectory(url) { found.append(url) }
+        }
+        let names = ((try? fm.contentsOfDirectory(atPath: home.path)) ?? []).filter { $0.hasPrefix(".claude-") }.sorted()
+        for name in names {
+            let url = home.appendingPathComponent(name, isDirectory: true)
+            if isDirectory(url.appendingPathComponent("projects")) || fm.fileExists(atPath: url.appendingPathComponent("history.jsonl").path) {
+                found.append(url)
+            }
+        }
+        var seen = Set<String>()
+        found = found.filter { seen.insert($0.resolvingSymlinksInPath().standardizedFileURL.path).inserted }
+        return found.isEmpty ? [standard] : found
     }
 
+    /// Every settings file the provider reads: one per Claude Code config folder, Codex's single hooks file.
+    static func settingsURLs(_ provider: Provider, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
+        provider == .claude ? claudeDirectories(home: home).map { $0.appendingPathComponent("settings.json") } : [settingsURL(.codex, home: home)]
+    }
+
+    /// The agent is installed (a config folder exists), so offering to hook it makes sense.
+    static func isAvailable(_ provider: Provider, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+        settingsURLs(provider, home: home).contains { FileManager.default.fileExists(atPath: $0.deletingLastPathComponent().path) }
+    }
+
+    /// True only when every config folder has the hooks, so a newly added one (a second account) shows as missing.
     static func isInstalled(_ provider: Provider, approvals: Bool = false, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
-        guard let data = try? Data(contentsOf: settingsURL(provider, home: home)) else { return false }
-        let text = String(decoding: data, as: UTF8.self)
-        // Claude Code's approvals come with the question hook; an older install without it counts as missing.
-        guard approvals else { return text.contains("--agent-event") }
-        return text.contains("--agent-approval") && (provider != .claude || text.contains("--agent-question"))
+        settingsURLs(provider, home: home).allSatisfy { url in
+            guard let data = try? Data(contentsOf: url) else { return false }
+            let text = String(decoding: data, as: UTF8.self)
+            // Claude Code's approvals come with the question hook; an older install without it counts as missing.
+            guard approvals else { return text.contains("--agent-event") }
+            return text.contains("--agent-approval") && (provider != .claude || text.contains("--agent-question"))
+        }
     }
 
     /// Codex runs a hook only after the user trusted it with /hooks, which it records in config.toml under the
@@ -133,11 +174,18 @@ enum HookInstaller {
         return String(value.dropFirst().dropLast()).replacingOccurrences(of: "'\"'\"'", with: "'")
     }
 
-    /// Writes the merged settings. Returns false when they were already up to date.
+    /// Writes the merged settings into every file the provider reads. Returns false when all were already up to date.
     @discardableResult
     static func install(_ provider: Provider, approvals: Bool, binary: String = Bundle.main.executablePath ?? "",
                         home: URL = FileManager.default.homeDirectoryForCurrentUser, now: Date = Date()) throws -> Bool {
-        let url = settingsURL(provider, home: home)
+        var changed = false
+        for url in settingsURLs(provider, home: home) {
+            if try install(provider, at: url, approvals: approvals, binary: binary, now: now) { changed = true }
+        }
+        return changed
+    }
+
+    private static func install(_ provider: Provider, at url: URL, approvals: Bool, binary: String, now: Date) throws -> Bool {
         let old = try? Data(contentsOf: url)
         var original: [String: Any] = [:]
         if let old, !old.isEmpty {
