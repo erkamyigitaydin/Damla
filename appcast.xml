@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.7</title>
+      <pubDate>Tue, 06 Oct 2026 16:00:23 +0000</pubDate>
+      <sparkle:version>20</sparkle:version>
+      <sparkle:shortVersionString>0.8.7</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Daha düzenli sayfalar: Bugün görünümü, yeni Odak, Agent limitleri.</p><p>- Özet: Bir şey çalmıyorken panel &quot;Bugün&quot; ile açılır: selamlama, sıradaki toplantı, odak turları ve agent&#x27;lar. Yalnızca o gün kullandıkların görünür; duraklatılmış şarkı tek dokunuşla geri gelir.</p><p>- Odak: Dört turluk döngü, dördüncüden sonra uzun mola. 25/5, 45/10, 50/10 süre çiftleri; çalışırken bitiş saati ve sırada ne olduğu yazar.</p><p>- Agent&#x27;lar: Şimdi, Geçmiş ve Sunucular sekmeleri; kaydırmadan sığar. Codex ve Claude için 5 saatlik ve haftalık limit, bu hızla ne zaman dolacağı tahminiyle. Claude limiti terminalde çalışan Claude Code&#x27;dan gelir.</p><p>- Pano: Kartlarda kopyalandığı uygulama ve ne kadar önce; Metin, Bağlantı, Görsel, Dosya filtreleri; üzerine gelince sabitle ve sil. Finder&#x27;dan kopyalanan dosyalar dosya olarak saklanır.</p><p>- Kestirmeler: Aranabilir ızgara; &quot;Automation&quot; kimlikli otomasyonlar gizlendi.</p><p>- Ayarlar: Çentik üzerine gelince ya da tıklayınca açılsın, bekleme süresi, kendi kısayolun. Sayfalar &quot;Çentikte&quot; ve &quot;Kapalı&quot; diye ayrıldı.</p><p>- Sayfalar aynı başlık satırıyla açılır, alt ekranlarda geri oku var; arkadaki pencere panelin içinden daha az görünür.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.7.dmg" length="7065059" type="application/octet-stream" sparkle:edSignature="0c94I9zaMo6Lgq+9DV7do1qax/X2zl2+ZH/9Pm+lFY2zKWR1MNX1IMzvmv/JQklwI58DD+PArapTtqrSCNPGBA=="/>
+    </item>
+    <item>
       <title>Damla 0.8.6</title>
       <pubDate>Tue, 06 Oct 2026 14:44:07 +0000</pubDate>
       <sparkle:version>19</sparkle:version>
