@@ -116,13 +116,14 @@ Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` an
 - Your shelf, clipboard history and timer live in `~/Library/Application Support/Damla/`.
 - Now-playing info is read locally from macOS.
 - Video in the notch captures only the browser's own picture-in-picture window, on your Mac; nothing is recorded or sent.
-- Only two things ever touch the network: lyrics, if you turn them on (title, artist, album and duration go to [lrclib.net](https://lrclib.net)), and the daily update check.
+- Network access is used for lyrics, if you turn them on (title, artist, album and duration go to [lrclib.net](https://lrclib.net)), the daily update check, and downloading Spotify artwork from the HTTPS cover URL supplied by Spotify.
 
 ## Building from source
 
 You need Swift 6 and the Xcode Command Line Tools.
 
 ```sh
+zsh scripts/test-regressions.sh              # focus/calendar/lyrics regressions, no app launch or live services
 zsh build.sh                                  # builds and signs ../Damla.app, then runs the self-test
 ../Damla.app/Contents/MacOS/Damla --self-test # automated checks
 ../Damla.app/Contents/MacOS/Damla --diagnose  # displays, battery, volume, brightness and audio outputs

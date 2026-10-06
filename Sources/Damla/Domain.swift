@@ -40,6 +40,45 @@ struct FocusSession: Codable {
     }
 }
 
+/// Today's completed focus sessions, dated separately from the running timer. An old, undated lifetime
+/// total cannot tell us how many sessions happened today, so it is deliberately not imported.
+struct FocusDailyCount: Codable, Equatable {
+    static let defaultsKey = "focusDailyCount"
+    private(set) var day: Date
+    private(set) var count = 0
+
+    init(at now: Date, calendar: Calendar = .autoupdatingCurrent) {
+        day = calendar.startOfDay(for: now)
+    }
+
+    static func restored(from data: Data?, at now: Date, calendar: Calendar = .autoupdatingCurrent) -> FocusDailyCount {
+        guard let data, var saved = try? JSONDecoder().decode(Self.self, from: data), saved.count >= 0 else {
+            return Self(at: now, calendar: calendar)
+        }
+        saved.refresh(at: now, calendar: calendar)
+        return saved
+    }
+
+    mutating func refresh(at now: Date, calendar: Calendar = .autoupdatingCurrent) {
+        guard !calendar.isDate(day, inSameDayAs: now) else { return }
+        day = calendar.startOfDay(for: now)
+        count = 0
+    }
+
+    /// Reconciles a timer after a tick, relaunch or wake. Attribute an overdue session to its actual
+    /// deadline: waking today must not count yesterday's completed timer as today's work.
+    @discardableResult
+    mutating func update(session: inout FocusSession, at now: Date, calendar: Calendar = .autoupdatingCurrent) -> Bool {
+        refresh(at: now, calendar: calendar)
+        let deadline = session.deadline
+        guard session.finishIfNeeded(at: now) else { return false }
+        if session.phase == .focus, let deadline, calendar.isDate(deadline, inSameDayAs: now) {
+            count += 1
+        }
+        return true
+    }
+}
+
 struct ShelfItem: Identifiable, Codable {
     var id: UUID = UUID()
     var path: String

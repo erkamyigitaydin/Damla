@@ -76,6 +76,20 @@ enum LRCLib {
         return lyrics
     }
 
+    /// A malformed success response is a service error, not evidence that a song has no lyrics.
+    static func validRecord(_ object: [String: Any], needsDuration: Bool = false) -> Bool {
+        guard object["instrumental"] is Bool,
+              object["plainLyrics"] != nil || object["syncedLyrics"] != nil else { return false }
+        for key in ["plainLyrics", "syncedLyrics"] {
+            if let value = object[key], !(value is String), !(value is NSNull) { return false }
+        }
+        if needsDuration {
+            guard let duration = object["duration"] as? Double ?? (object["duration"] as? Int).map(Double.init),
+                  duration.isFinite, duration >= 0 else { return false }
+        }
+        return true
+    }
+
     /// From search results, the entry whose length is closest to the track (within 3 s), synced ones first.
     static func bestMatch(_ results: [[String: Any]], duration: Double) -> [String: Any]? {
         let close = results.filter { abs(($0["duration"] as? Double ?? ($0["duration"] as? Int).map(Double.init) ?? -100) - duration) <= 3 }
@@ -90,23 +104,51 @@ enum LRCLib {
     }
 }
 
+/// The small part of a data task the service needs; self-tests supply a transport without using the network.
+protocol LyricsRequest: AnyObject {
+    func resume()
+    func cancel()
+}
+extension URLSessionDataTask: LyricsRequest {}
+
 /// Lyrics for whatever is shown on Özet, fetched once per track and cached on disk (misses too, briefly).
 final class LyricsService: ObservableObject {
-    enum State: Equatable { case off, idle, loading, found, missing }
+    enum State: Equatable { case off, idle, loading, found, missing, failed }
+    typealias Transport = (URLRequest, @escaping (Data?, URLResponse?, Error?) -> Void) -> LyricsRequest
     @Published private(set) var state: State
     @Published private(set) var lyrics = Lyrics()
-    @Published var enabled = UserDefaults.standard.bool(forKey: "lyricsEnabled") {
+    @Published var enabled: Bool {
         didSet {
-            UserDefaults.standard.set(enabled, forKey: "lyricsEnabled")
+            defaults?.set(enabled, forKey: "lyricsEnabled")
+            guard enabled != oldValue else { return }
+            cancelRequest()
             if enabled { state = .idle; if let track = pending { load(track) } } else { state = .off; lyrics = Lyrics(); current = nil }
         }
     }
     private var current: LRCLib.Track?
     private var pending: LRCLib.Track?
-    private var task: URLSessionDataTask?
-    private static var folder: URL { DiskStore.directory.appendingPathComponent("lyrics", isDirectory: true) }
+    private var task: LyricsRequest?
+    private var requestID: UUID?
+    private let defaults: UserDefaults?
+    private let folder: URL
+    private let transport: Transport
 
-    init() { state = UserDefaults.standard.bool(forKey: "lyricsEnabled") ? .idle : .off }
+    init(defaults: UserDefaults? = .standard,
+         cacheDirectory: URL = DiskStore.directory.appendingPathComponent("lyrics", isDirectory: true),
+         transport: @escaping Transport = { URLSession.shared.dataTask(with: $0, completionHandler: $1) }) {
+        self.defaults = defaults
+        folder = cacheDirectory
+        self.transport = transport
+        let lyricsEnabled = defaults?.bool(forKey: "lyricsEnabled") ?? false
+        enabled = lyricsEnabled
+        state = lyricsEnabled ? .idle : .off
+    }
+
+    /// A failed lookup stays on this track until the user asks again; media updates never trigger retries.
+    func retry() {
+        guard enabled, state == .failed, let current else { return }
+        load(current, useCache: false)
+    }
 
     /// Called when the shown track changes. Browsers' videos and live streams have no song to look up.
     func show(title: String, artist: String, album: String, duration: Double) {
@@ -121,42 +163,61 @@ final class LyricsService: ObservableObject {
     /// over the new one while waiting.
     func expecting(title: String, artist: String) {
         guard enabled, current?.title != title || current?.artist != artist else { return }
-        task?.cancel(); current = nil; lyrics = Lyrics(); state = .loading
+        cancelRequest(); current = nil; pending = nil; lyrics = Lyrics(); state = .loading
     }
 
-    private func load(_ track: LRCLib.Track) {
-        current = track; task?.cancel(); lyrics = Lyrics()
+    private func cancelRequest() {
+        requestID = nil   // invalidate before cancellation can deliver its completion
+        task?.cancel(); task = nil
+    }
+
+    private func load(_ track: LRCLib.Track, useCache: Bool = true) {
+        cancelRequest(); current = track; lyrics = Lyrics()
         guard !track.title.isEmpty, !track.artist.isEmpty, track.duration > 30, track.duration.isFinite else { state = .missing; return }
-        if let cached = Self.cached(track) { lyrics = cached; state = cached.isEmpty ? .missing : .found; return }
+        if useCache, let cached = cached(track) { lyrics = cached; state = cached.isEmpty ? .missing : .found; return }
+        let id = UUID()
+        requestID = id
         state = .loading
-        fetch(LRCLib.getURL(track), track: track, fallback: true)
+        fetch(LRCLib.getURL(track), track: track, id: id, fallback: true)
     }
 
-    private func fetch(_ url: URL?, track: LRCLib.Track, fallback: Bool) {
-        guard let url else { finish(Lyrics(), for: track); return }
-        task = URLSession.shared.dataTask(with: LRCLib.request(url)) { [weak self] data, response, _ in
+    private func fetch(_ url: URL?, track: LRCLib.Track, id: UUID, fallback: Bool) {
+        guard let url else { fail(); return }
+        task = transport(LRCLib.request(url)) { [weak self] data, response, error in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let object = data.flatMap { try? JSONSerialization.jsonObject(with: $0) }
-            DispatchQueue.main.async {
-                guard let self, self.current == track else { return }
-                if status == 200, let found = object as? [String: Any] {
+            let receive = {
+                guard let self, self.enabled, self.current == track, self.requestID == id else { return }
+                guard error == nil else { self.fail(); return }
+                if status == 404 {
+                    if fallback { self.fetch(LRCLib.searchURL(track), track: track, id: id, fallback: false) }
+                    else { self.finish(Lyrics(), for: track) }
+                } else if status != 200 {
+                    self.fail()
+                } else if fallback, let found = object as? [String: Any], LRCLib.validRecord(found) {
                     self.finish(LRCLib.lyrics(from: found), for: track)
-                } else if status == 200, let results = object as? [[String: Any]], let best = LRCLib.bestMatch(results, duration: track.duration) {
-                    self.finish(LRCLib.lyrics(from: best), for: track)
-                } else if fallback && (status == 404 || status == 200) {
-                    self.fetch(LRCLib.searchURL(track), track: track, fallback: false)   // exact match missed: search by name
+                } else if !fallback, let results = object as? [[String: Any]], results.allSatisfy({ LRCLib.validRecord($0, needsDuration: true) }) {
+                    let best = LRCLib.bestMatch(results, duration: track.duration)
+                    self.finish(best.map(LRCLib.lyrics(from:)) ?? Lyrics(), for: track)
                 } else {
-                    self.finish(Lyrics(), for: track, cache: status == 404 || status == 200)   // network errors are not remembered
+                    self.fail()
                 }
             }
+            if Thread.isMainThread { receive() } else { DispatchQueue.main.async(execute: receive) }
         }
         task?.resume()
     }
 
-    private func finish(_ found: Lyrics, for track: LRCLib.Track, cache: Bool = true) {
+    private func fail() {
+        task = nil; requestID = nil
+        state = .failed   // keep the retry available; never cache transport or malformed-response errors
+    }
+
+    private func finish(_ found: Lyrics, for track: LRCLib.Track) {
+        task = nil; requestID = nil
         lyrics = found
         state = found.isEmpty ? .missing : .found
-        if cache { Self.store(found, for: track) }
+        store(found, for: track)
     }
 
     // MARK: Disk cache (one small JSON per track, keyed by a hash of the track)
@@ -166,8 +227,8 @@ final class LyricsService: ObservableObject {
         return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 
-    private static func cached(_ track: LRCLib.Track) -> Lyrics? {
-        let file = folder.appendingPathComponent(key(track) + ".json")
+    private func cached(_ track: LRCLib.Track) -> Lyrics? {
+        let file = folder.appendingPathComponent(Self.key(track) + ".json")
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: file.path), let data = try? Data(contentsOf: file),
               let lyrics = try? JSONDecoder().decode(Lyrics.self, from: data) else { return nil }
         // A miss is retried after a week: someone may have added the lyrics since.
@@ -175,9 +236,9 @@ final class LyricsService: ObservableObject {
         return lyrics
     }
 
-    private static func store(_ lyrics: Lyrics, for track: LRCLib.Track) {
+    private func store(_ lyrics: Lyrics, for track: LRCLib.Track) {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         guard let data = try? JSONEncoder().encode(lyrics) else { return }
-        try? data.write(to: folder.appendingPathComponent(key(track) + ".json"), options: .atomic)
+        try? data.write(to: folder.appendingPathComponent(Self.key(track) + ".json"), options: .atomic)
     }
 }

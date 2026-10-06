@@ -169,6 +169,17 @@ struct LyricsFlow: View {
         Group {
             if !lyrics.lyrics.lines.isEmpty { synced }
             else if !lyrics.lyrics.plain.isEmpty || lyrics.lyrics.instrumental { plain }
+            else if lyrics.state == .failed {
+                VStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.bubble").font(.system(size: 22, weight: .light))
+                    Text("Sözler yüklenemedi").font(.system(size: 13, weight: .medium))
+                    Button { lyrics.retry() } label: {
+                        Label("Tekrar dene", systemImage: "arrow.clockwise").font(.system(size: 12, weight: .medium))
+                    }
+                    .buttonStyle(PillStyle())
+                }
+                .foregroundStyle(Theme.dim)
+            }
             else {
                 // Still looking, or nothing to show: say so instead of an empty panel.
                 VStack(spacing: 8) {

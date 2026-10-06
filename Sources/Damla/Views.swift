@@ -911,18 +911,18 @@ struct HomeView: View {
                         }
                         .fixedSize()
                     }
-                    // Only when there is something to show: lyrics found, or the lookup still off (this button
-                    // turns it on). Hidden while searching, so songs without lyrics never flash it.
+                    // A failed lookup must remain reachable for retry. Keep the close button while the pane is
+                    // open, including during a lookup; confirmed misses still fold it away.
                     HStack(spacing: 0) {
                         Spacer(minLength: 0)
-                        if media.hasTrack && (lyrics.state == .found || lyrics.state == .off) {
+                        if media.hasTrack && (lyrics.state == .found || lyrics.state == .off || lyrics.state == .failed || model.lyricsExpanded) {
                             Button {
                                 // Lyrics mode on/off; turning it on also allows the lookup if it was off.
                                 withAnimation(Theme.motion(open: !model.lyricsExpanded)) { model.lyricsExpanded.toggle() }
                                 if model.lyricsExpanded && !lyrics.enabled { lyrics.enabled = true }
                                 if model.lyricsExpanded && !UserDefaults.standard.bool(forKey: "lyricsNoticeShown") {
                                     UserDefaults.standard.set(true, forKey: "lyricsNoticeShown")
-                                    model.showNotice(String(localized: "Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir"), duration: 5)
+                                    model.showNotice(String(localized: "Sözler lrclib.net’ten gelir · yalnızca şarkı adı, sanatçı, albüm ve süre gönderilir"), duration: 7)
                                 }
                             } label: {
                                 Image(systemName: model.lyricsExpanded ? "quote.bubble.fill" : "quote.bubble").font(.system(size: 11, weight: .semibold))

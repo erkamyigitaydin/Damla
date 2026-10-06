@@ -17,58 +17,111 @@ final class CalendarService: ObservableObject {
     static let soonBefore: TimeInterval = 10 * 60
     static let soonAfter: TimeInterval = 5 * 60
     static let homeWindow: TimeInterval = 3 * 3600
+    /// The 24-hour search window must advance even when its last result was empty.
+    static let refreshInterval: TimeInterval = 5 * 60
 
     @Published private(set) var next: Meeting?
-    @Published private(set) var access: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
-    @Published var enabled = UserDefaults.standard.bool(forKey: CalendarService.enabledKey) {
+    @Published private(set) var access: EKAuthorizationStatus
+    @Published var enabled: Bool {
         didSet {
-            UserDefaults.standard.set(enabled, forKey: Self.enabledKey)
-            if enabled { requestAccess() } else { next = nil }
+            defaults.set(enabled, forKey: Self.enabledKey)
+            if enabled { requestAccess() } else { clear() }
         }
     }
     /// A minute before a meeting starts: title, join link.
     var onStarting: ((Meeting) -> Void)?
 
-    private let store = EKEventStore()
+    private lazy var store = EKEventStore()
+    private let defaults: UserDefaults
+    private let now: () -> Date
+    private let authorizationStatus: () -> EKAuthorizationStatus
+    private let query: ((Date, Date) -> [Meeting])?
+    private var lastRefresh: Date?
     private var timer: Timer?
     private var announced: String?
     private var observer: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
+
+    /// Injected sources let regressions use a local clock and meetings without touching EventKit data.
+    init(defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init,
+         authorizationStatus: @escaping () -> EKAuthorizationStatus = { EKEventStore.authorizationStatus(for: .event) },
+         query: ((Date, Date) -> [Meeting])? = nil) {
+        self.defaults = defaults
+        self.now = now
+        self.authorizationStatus = authorizationStatus
+        self.query = query
+        access = authorizationStatus()
+        enabled = defaults.bool(forKey: Self.enabledKey)
+    }
 
     func start() {
+        guard timer == nil else { return }
         observer = NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: store, queue: .main) { [weak self] _ in self?.refresh() }
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in self?.didWake() }
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.tick() }
         timer?.tolerance = 5
         refresh()
     }
 
+    deinit {
+        timer?.invalidate()
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+    }
+
     func requestAccess() {
+        if authorizationStatus() == .fullAccess { refresh(); return }
         store.requestFullAccessToEvents { [weak self] _, _ in
             DispatchQueue.main.async {
-                self?.access = EKEventStore.authorizationStatus(for: .event)
                 self?.refresh()
             }
         }
     }
 
     func refresh() {
-        access = EKEventStore.authorizationStatus(for: .event)
-        guard enabled, access == .fullAccess else { next = nil; return }
-        let now = Date()
-        let predicate = store.predicateForEvents(withStart: now.addingTimeInterval(-Self.soonAfter), end: now.addingTimeInterval(24 * 3600), calendars: nil)
-        let events = store.events(matching: predicate)
-        let meeting = Self.pick(events.map { event in
+        access = authorizationStatus()
+        guard enabled, access == .fullAccess else { clear(); return }
+        let now = now()
+        let meeting = Self.pick(meetings(from: now.addingTimeInterval(-Self.soonAfter), to: now.addingTimeInterval(24 * 3600)), now: now)
+        lastRefresh = now
+        if meeting != next { next = meeting }
+        updateCountdown(at: now)
+    }
+
+    private func meetings(from start: Date, to end: Date) -> [Meeting] {
+        if let query { return query(start, end) }
+        let predicate = store.predicateForEvents(withStart: start, end: end, calendars: nil)
+        return store.events(matching: predicate).filter { !$0.isAllDay }.map { event in
             Meeting(id: event.calendarItemIdentifier + "\(event.startDate.timeIntervalSince1970)", title: event.title ?? String(localized: "Etkinlik"),
                     start: event.startDate, end: event.endDate,
                     joinURL: Self.joinURL(in: [event.url?.absoluteString, event.location, event.notes]))
-        }, allDay: Set(events.filter(\.isAllDay).map { $0.calendarItemIdentifier + "\($0.startDate.timeIntervalSince1970)" }), now: now)
-        if meeting != next { next = meeting }
-        tick()
+        }
     }
 
-    private func tick() {
+    private func clear() {
+        if next != nil { next = nil }
+        lastRefresh = nil
+    }
+
+    /// Wake notifications bypass the periodic deadline; a short sleep can still cross an event boundary.
+    func didWake() { refresh() }
+
+    func tick() {
+        let status = authorizationStatus()
+        if access != status { access = status }
+        guard enabled, access == .fullAccess else { clear(); return }
+        let now = now()
+        let refreshDue = lastRefresh.map { now < $0 || now.timeIntervalSince($0) >= Self.refreshInterval } ?? true
+        if refreshDue
+            || next.map({ now >= $0.start.addingTimeInterval(Self.soonAfter) || now >= $0.end }) == true {
+            refresh()
+            return
+        }
+        updateCountdown(at: now)
+    }
+
+    private func updateCountdown(at now: Date) {
         guard let meeting = next else { return }
-        let now = Date()
-        if now > meeting.start.addingTimeInterval(Self.soonAfter) { refresh(); return }
         let left = meeting.start.timeIntervalSince(now)
         if left <= 60, left > -30, announced != meeting.id {
             announced = meeting.id

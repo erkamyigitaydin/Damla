@@ -287,6 +287,8 @@ func runSelfTests() -> Int32 {
     check(order.first == .agents && order[1] == .home && order[2] == .files, "Saved order kept, missing pages follow their default neighbour")
     check(PanelTab.loadOrder(defaults: UserDefaults(suiteName: emptySuite)!) == PanelTab.allCases, "No saved order is the default")
     runMediaSelfTests { condition, name in check(condition, name) }
+    runFocusSelfTests { condition, name in check(condition, name) }
+    runCalendarSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
     runLyricsSelfTests { condition, name in check(condition, name) }
     runHookInstallerSelfTests { condition, name in check(condition, name) }

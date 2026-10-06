@@ -142,7 +142,9 @@ final class AppState: ObservableObject {
     @Published var clipboardEnabled = UserDefaults.standard.bool(forKey: "clipboardEnabled")
     @Published var session = DiskStore.load(FocusSession.self, name: "focus.json") ?? FocusSession()
     @Published var now = Date()
-    @Published var completedSessions = UserDefaults.standard.integer(forKey: "completedSessions")
+    @Published private var focusDailyCount = FocusDailyCount.restored(
+        from: UserDefaults.standard.data(forKey: FocusDailyCount.defaultsKey), at: Date())
+    var completedSessions: Int { focusDailyCount.count }
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
     let media = MediaService()
     let appVolumes = AppVolumeController()
@@ -255,6 +257,8 @@ final class AppState: ObservableObject {
     var compactContent: Bool { compactSlots > 0 }
 
     func start() {
+        // Persist the dated counter on first launch too, replacing the ambiguous legacy lifetime total.
+        saveFocusDailyCount()
         // Published only on change: every assignment redraws both notch windows, even with the same value.
         monitor.onBattery = { [weak self] value in if self?.battery != value { self?.battery = value } }
         monitor.onLevels = { [weak self] volume, brightness, muted in
@@ -405,6 +409,10 @@ final class AppState: ObservableObject {
             self?.showNotice(String(localized: "Erişilebilirlik izni gerekli · ayarları açmak için dokun"), duration: 8) { MediaKeyInterceptor.openAccessibilitySettings() }
         }
         if hideSystemHUD { keys.start(prompt: false) }
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
+            .receive(on: RunLoop.main).sink { [weak self] _ in self?.updateFocus(at: Date()) }.store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .NSCalendarDayChanged)
+            .receive(on: RunLoop.main).sink { [weak self] _ in self?.updateFocus(at: Date()) }.store(in: &cancellables)
         $expanded.removeDuplicates().sink { [weak self] expanded in
             guard let self else { return }
             self.media.wantsFrequentUpdates = expanded
@@ -420,16 +428,7 @@ final class AppState: ObservableObject {
             let date = Date()
             // Only republish the clock when something on screen depends on it; keeps the closed notch idle.
             if self.expanded || self.session.running { self.now = date }
-            if self.session.finishIfNeeded(at: date) {
-                if self.session.phase == .focus {
-                    self.completedSessions += 1
-                    UserDefaults.standard.set(self.completedSessions, forKey: "completedSessions")
-                }
-                self.saveSession()
-                NSSound(named: "Glass")?.play()
-                self.showHUD("checkmark.circle.fill", self.session.phase == .focus ? String(localized: "Odak tamamlandı") : String(localized: "Mola tamamlandı"), 1)
-                self.showNotice(self.session.phase == .focus ? String(localized: "Güzel iş. Kısa bir mola ver.") : String(localized: "Yeni bir odak turuna hazırsın."))
-            }
+            self.updateFocus(at: date)
         }
         clipboardTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in self?.captureClipboard() }
     }
@@ -710,6 +709,26 @@ final class AppState: ObservableObject {
     }
     func resetFocus() { session.reset(minutes: Int(session.duration / 60), phase: session.phase); saveSession() }
     func saveSession() { DiskStore.save(session, name: "focus.json") }
+    private func saveFocusDailyCount() {
+        if let data = try? JSONEncoder().encode(focusDailyCount) {
+            UserDefaults.standard.set(data, forKey: FocusDailyCount.defaultsKey)
+        }
+    }
+    private func updateFocus(at date: Date) {
+        var updatedSession = session, updatedCount = focusDailyCount
+        let finished = updatedCount.update(session: &updatedSession, at: date)
+        if updatedCount != focusDailyCount {
+            focusDailyCount = updatedCount
+            saveFocusDailyCount()
+        }
+        guard finished else { return }
+        session = updatedSession
+        now = date
+        saveSession()
+        NSSound(named: "Glass")?.play()
+        showHUD("checkmark.circle.fill", session.phase == .focus ? String(localized: "Odak tamamlandı") : String(localized: "Mola tamamlandı"), 1)
+        showNotice(session.phase == .focus ? String(localized: "Güzel iş. Kısa bir mola ver.") : String(localized: "Yeni bir odak turuna hazırsın."))
+    }
     var timeLabel: String {
         let seconds = Int(ceil(session.remaining(at: now)))
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)

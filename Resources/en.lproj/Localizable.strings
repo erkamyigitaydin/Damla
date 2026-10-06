@@ -187,7 +187,9 @@
 "Sonraki" = "Next";
 "Soruyu orada yanıtla" = "Answer the prompt there";
 "Sözler aranıyor…" = "Looking for lyrics…";
-"Sözler lrclib.net’ten gelir · yalnızca şarkı adı ve sanatçı gönderilir" = "Lyrics come from lrclib.net · only the song title and artist are sent";
+"Sözler lrclib.net’ten gelir · yalnızca şarkı adı, sanatçı, albüm ve süre gönderilir" = "Lyrics come from lrclib.net · only the song title, artist, album and duration are sent";
+"Sözler yüklenemedi" = "Couldn’t load lyrics";
+"Tekrar dene" = "Try again";
 "Süre dolunca soru terminalde sorulur" = "When time runs out, the terminal asks";
 "Sürüm %@" = "Version %@";
 "Sıfırla" = "Reset";
