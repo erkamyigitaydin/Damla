@@ -13,8 +13,9 @@ struct BrowserTab: Identifiable, Equatable {
 }
 
 /// Per-tab volume for browsers. macOS mixes every tab of a browser into one audio process, so a tab cannot be
-/// tapped like an app; instead the page's own <video>/<audio> elements are asked, over Apple Events, for their
-/// volume and given a new one. Chromium browsers take `execute javascript`, Safari `do JavaScript`, each with its
+/// tapped like an app; instead the page's own player is asked, over Apple Events, for its volume and given a new
+/// one (YouTube through its player API, which keeps the level for the next video; other pages through their
+/// <video>/<audio> elements, with a small guard that holds the level when the site reloads its player). Chromium browsers take `execute javascript`, Safari `do JavaScript`, each with its
 /// "Allow JavaScript from Apple Events" switch on. Media inside iframes and Web Audio players are out of reach, so
 /// a tab with sound can still be missing here. Scans run only while the Ses page shows a browser that plays.
 final class BrowserTabVolumes: ObservableObject {
@@ -24,6 +25,11 @@ final class BrowserTabVolumes: ObservableObject {
     @Published private(set) var javaScriptOff: Set<String> = []
     /// Browsers macOS will not let Damla control (System Settings → Privacy → Automation).
     @Published private(set) var automationDenied: Set<String> = []
+    /// Browsers whose tab-volume offer the user waved away ("Gerek yok"): their tabs are not asked for, and the
+    /// row below them stays quiet. Undone in Ayarlar → Panel → Ses.
+    @Published private(set) var dismissed: Set<String> = Set((UserDefaults.standard.array(forKey: "tabVolumesDismissed") as? [String]) ?? []) {
+        didSet { UserDefaults.standard.set(Array(dismissed).sorted(), forKey: "tabVolumesDismissed") }
+    }
 
     static let chromium: Set<String> = VideoNotch.browsers.union(["company.thebrowser.Browser"])
     static let safari: Set<String> = ["com.apple.Safari", "com.apple.SafariTechnologyPreview"]
@@ -103,6 +109,16 @@ final class BrowserTabVolumes: ObservableObject {
         }
     }
 
+    func dismiss(_ browser: String) {
+        dismissed.insert(browser)
+        tabs.removeValue(forKey: browser)
+    }
+
+    func resetDismissed() {
+        dismissed.removeAll()
+        if watching { scan() }
+    }
+
     static func openBrowser(_ browser: String) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: browser) else { return }
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
@@ -115,7 +131,7 @@ final class BrowserTabVolumes: ObservableObject {
     // MARK: Scanning
 
     private func scan() {
-        for browser in browsers where !scanning.contains(browser) && !javaScriptOff.contains(browser) && !automationDenied.contains(browser) {
+        for browser in browsers where !scanning.contains(browser) && !javaScriptOff.contains(browser) && !automationDenied.contains(browser) && !dismissed.contains(browser) {
             scanning.insert(browser)
             queue.async {
                 let result = VideoNotch.appleScript(Self.scanScript(browser))
@@ -171,9 +187,36 @@ final class BrowserTabVolumes: ObservableObject {
 
     /// Runs in each page: the playing, unmuted media elements and the loudest one's volume. Muted autoplay
     /// videos (news sites) are not sound and are left out. A "(17) " unread count in the title is dropped.
-    private static let probe = "(()=>{const s=String.fromCharCode(31),m=[...document.querySelectorAll('video,audio')].filter(e=>!e.paused&&!e.ended&&!e.muted);"
-        + "if(!m.length)return '';const v=Math.round(Math.max(...m.map(e=>e.volume))*100);"
-        + "return v+s+location.hostname.replace(/^www\\./,'')+s+document.title.replace(/[\\x00-\\x1f]/g,' ').replace(/^\\(\\d+\\)\\s*/,'').slice(0,80)})()"
+    /// Chrome runs Apple Events JavaScript in an isolated world: the DOM and storage are shared with the page,
+    /// its own globals and player objects are not (so YouTube's player API is reached only from Safari).
+    private static let probe = "(()=>{const s=String.fromCharCode(31);let on=false,v=0;const p=document.querySelector('#movie_player');"
+        + "if(p&&p.getVolume&&p.getPlayerState){const st=p.getPlayerState();on=(st===1||st===3)&&!(p.isMuted&&p.isMuted());v=Math.round(p.getVolume());}"
+        + "else{const m=[...document.querySelectorAll('video,audio')].filter(e=>!e.paused&&!e.ended&&!e.muted);on=m.length>0;if(on)v=Math.round(Math.max(...m.map(e=>e.volume))*100);}"
+        + "if(!on)return '';return v+s+location.hostname.replace(/^www\\./,'')+s+document.title.replace(/[\\x00-\\x1f]/g,' ').replace(/^\\(\\d+\\)\\s*/,'').slice(0,80)})()"
+
+    /// Installed once per page when a level is set. A site putting its own level back (the next video, an ad,
+    /// autoplay) is overruled, so the chosen level sticks; a change made by hand on the page's own controls is
+    /// followed instead of fought. The two are told apart by what the user was doing: a pointer press, wheel or
+    /// key not aimed at a link within the last moment (or a press still held, for a slider drag) means by hand.
+    private static let guardScript = "if(!window.__damlaGuard){window.__damlaGuard=1;let U=0,down=false;"
+        + "const apply=e=>{const v=window.__damlaVolume;if(v==null)return;if(Math.abs(e.volume-v)>0.005){window.__damlaSetting=1;e.volume=v;window.__damlaSetting=0;}};"
+        + "const media=ev=>ev.target instanceof HTMLMediaElement?ev.target:null;"
+        + "const mark=ev=>{if(ev.target instanceof Element&&ev.target.closest('a'))return;U=Date.now();if(ev.type==='pointerdown')down=true;};"
+        + "for(const t of ['pointerdown','wheel','keydown'])document.addEventListener(t,mark,true);"
+        + "for(const t of ['pointerup','pointercancel'])document.addEventListener(t,()=>{down=false;U=Date.now();},true);"
+        + "for(const t of ['loadstart','loadedmetadata','play','playing'])document.addEventListener(t,ev=>{const e=media(ev);if(e)apply(e);},true);"
+        + "document.addEventListener('volumechange',ev=>{const e=media(ev);if(!e||window.__damlaSetting||window.__damlaVolume==null)return;"
+        + "if(down||Date.now()-U<1500){if(!e.muted)window.__damlaVolume=e.volume;}else apply(e);},true);}"
+
+    /// Sets the level on every media element, with the guard in place for whatever the page loads next (the
+    /// next video, an ad). YouTube's own stored level is left alone: it is shared by every YouTube tab, and this
+    /// is one tab's level. A full reload of the tab starts over at the page's own level.
+    private static func setScript(_ level: Double) -> String {
+        let v = level / 100
+        return "(()=>{const v=\(v);window.__damlaVolume=v;" + guardScript
+            + "const p=document.querySelector('#movie_player');if(p&&p.setVolume){p.setVolume(Math.round(v*100));if(v>0&&p.isMuted&&p.isMuted()&&p.unMute)p.unMute();}"
+            + "document.querySelectorAll('video,audio').forEach(e=>{if(Math.abs(e.volume-v)>0.005){window.__damlaSetting=1;e.volume=v;window.__damlaSetting=0;}});return 'ok'})()"
+    }
 
     /// Every http tab of every window is probed inside one script, so the browser does the walking.
     private static func scanScript(_ browser: String) -> String {
@@ -214,7 +257,7 @@ final class BrowserTabVolumes: ObservableObject {
     }
 
     private static func apply(_ tab: BrowserTab, _ level: Double) {
-        let js = VideoNotch.escaped("(()=>{const v=\(level / 100);document.querySelectorAll('video,audio').forEach(e=>{e.volume=v});return 'ok'})()")
+        let js = VideoNotch.escaped(setScript(level))
         let body = safari.contains(tab.browser) ? "do JavaScript \"\(js)\" in (\(tab.ref))" : "execute (\(tab.ref)) javascript \"\(js)\""
         let result = VideoNotch.appleScript("with timeout of 4 seconds\ntell application id \"\(tab.browser)\"\n\(body)\nend tell\nend timeout")
         MediaService.trace("tabs: \(tab.host) → \(Int(level)) \(result.value ?? result.error ?? "")")

@@ -141,6 +141,7 @@ private struct PanelSettings: View {
                     Text("Parola yöneticilerinden gelenler kaydedilmez.")
                 }
             }
+            TabVolumeSettings(tabs: model.browserTabs)
             Section("Ayna") {
                 Toggle("Polaroide tarih yaz", isOn: $polaroidDate)
             }
@@ -402,6 +403,26 @@ private struct NotificationSettings: View {
                 }
             }
         }
+    }
+}
+
+/// Settings → Panel → Ses: the tab-volume offer a browser's row stopped showing after "Gerek yok" can be brought back.
+private struct TabVolumeSettings: View {
+    @ObservedObject var tabs: BrowserTabVolumes
+    var body: some View {
+        if !tabs.dismissed.isEmpty {
+            Section("Ses") {
+                LabeledContent {
+                    Button("Yeniden göster") { tabs.resetDismissed() }
+                } label: {
+                    Text("Sekme sesleri")
+                    Text("\(names) için “Gerek yok” dedin; teklif Ses sayfasında tekrar görünür.")
+                }
+            }
+        }
+    }
+    private var names: String {
+        tabs.dismissed.map { MediaService.appName(for: $0) }.sorted().formatted(.list(type: .and))
     }
 }
 

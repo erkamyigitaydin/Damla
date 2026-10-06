@@ -78,10 +78,12 @@ struct SoundView: View {
                                  onChange: { tabs.setVolume(tab, $0) }, onMute: { tabs.toggleMute(tab) })
                             .help(Text(verbatim: tab.title.isEmpty ? tab.host : "\(tab.host) · \(tab.title)"))
                     }
-                    if tabs.javaScriptOff.contains(app.id) {
-                        hint(Text("Sekme sesleri için: \(shortName(app.id)) → \(BrowserTabVolumes.menuPath(app.id))"), action: Text("Aç")) {
-                            tabs.enableJavaScript(app.id)
-                        }
+                    if tabs.javaScriptOff.contains(app.id) && !tabs.dismissed.contains(app.id) {
+                        // Optional, and said so: the browser's own switch comes with the browser's own warning.
+                        hint(Text("Sekme sesleri isteğe bağlı: \(shortName(app.id)) bir kez izin ister ve bir onay kutusu gösterir."),
+                             action: Text("Aç"), secondary: Text("Gerek yok"),
+                             perform: { tabs.enableJavaScript(app.id) }, dismiss: { withAnimation(Theme.quick) { tabs.dismiss(app.id) } })
+                            .help(Text("\(shortName(app.id)) → \(BrowserTabVolumes.menuPath(app.id))"))
                     }
                     if tabs.automationDenied.contains(app.id) {
                         hint(Text("\(shortName(app.id)) için otomasyon izni kapalı · Sistem Ayarları → Gizlilik → Otomasyon"), action: Text("Ayarlar")) {
@@ -113,14 +115,20 @@ struct SoundView: View {
         return name.hasPrefix("Google ") ? String(name.dropFirst(7)) : name.hasPrefix("Microsoft ") ? String(name.dropFirst(10)) : name
     }
 
-    /// A one-time setup step under a browser's row, with the button that takes care of it.
-    private func hint(_ text: Text, action: Text, perform: @escaping () -> Void) -> some View {
+    /// A one-time setup step under a browser's row, with the button that takes care of it and, for an optional
+    /// step, a quiet way to wave it off.
+    private func hint(_ text: Text, action: Text, secondary: Text? = nil, perform: @escaping () -> Void, dismiss: (() -> Void)? = nil) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9.5, weight: .semibold))
-            text.font(.system(size: 10, weight: .medium)).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: perform) { action.font(.system(size: 10, weight: .semibold)) }.buttonStyle(PillStyle())
+            Image(systemName: secondary == nil ? "exclamationmark.triangle.fill" : "info.circle.fill").font(.system(size: 9.5, weight: .semibold))
+            text.font(.system(size: 10, weight: .medium)).lineLimit(3).frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .trailing, spacing: 3) {
+                Button(action: perform) { action.font(.system(size: 10, weight: .semibold)) }.buttonStyle(PillStyle())
+                if let secondary, let dismiss {
+                    Button(action: dismiss) { secondary.font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.dim) }.buttonStyle(.plain)
+                }
+            }
         }
-        .foregroundStyle(Theme.amber)
+        .foregroundStyle(secondary == nil ? Theme.amber : Theme.dim)
         .padding(.leading, 14)
     }
 }

@@ -7,6 +7,7 @@
 "%@ bu Mac’te yüklü değil." = "%@ is not installed on this Mac.";
 "%@ için onay bekliyor" = "Waiting for approval: %@";
 "%@ için otomasyon izni kapalı · Sistem Ayarları → Gizlilik → Otomasyon" = "Automation is off for %@ · System Settings → Privacy → Automation";
+"%@ için “Gerek yok” dedin; teklif Ses sayfasında tekrar görünür." = "You said “No need” for %@; the offer shows on the Sound page again.";
 "%@ kullanmak istiyor" = "wants to use %@";
 "%@ kullanıyor" = "Using %@";
 "%@ sürümünü yükle" = "Install %@";
@@ -17,6 +18,7 @@
 "%@ · %@ · tıkla: %@" = "%@ · %@ · click: %@";
 "%@ · arka planda" = "%@ · in the background";
 "%@ · uygulamayı aç" = "%@ · open the app";
+"%@ → %@" = "%@ → %@";
 "%@’a git" = "Go to %@";
 "%@’te bir parça aç." = "Open a track in %@.";
 "%lld" = "%lld";
@@ -96,6 +98,7 @@
 "Finder’da göster" = "Show in Finder";
 "Geliştirici → Apple Events’ten JavaScript’e İzin Ver" = "Develop → Allow JavaScript from Apple Events";
 "Genel" = "General";
+"Gerek yok" = "No need";
 "Geçmiş · %lld" = "History · %lld";
 "Giriş öğesi onay bekliyor · Sistem Ayarları'nı aç" = "Login item needs approval · open System Settings";
 "Girişte başlat" = "Launch at login";
@@ -177,7 +180,7 @@
 "Sabitle" = "Pin";
 "Sabitlemeyi kaldır" = "Unpin";
 "Sayfalar" = "Pages";
-"Sekme sesleri için: %@ → %@" = "Tab volumes need: %@ → %@";
+"Sekme sesleri isteğe bağlı: %@ bir kez izin ister ve bir onay kutusu gösterir." = "Tab volumes are optional: %@ asks once, with a confirmation box of its own.";
 "Seni bekliyor" = "Waiting for you";
 "Ses" = "Volume";
 "Ses %lld" = "Volume %lld";
@@ -295,6 +298,7 @@
 "%lld gün önce" = "%lld days ago";
 "Claude kullanımı %%%lld" = "Claude usage %lld%%";
 "%@ sıfırlanır" = "resets at %@";
+"Sekme sesleri" = "Tab volumes";
 "Ses çalan uygulamalar ve tarayıcı sekmeleri burada görünür; her birinin sesini ayrı ayarlayabilirsin." = "Apps and browser tabs playing sound show up here; set each one’s volume separately.";
 "bağlam %%%lld" = "context %lld%%";
 "5 sa %%%lld" = "5h %lld%%";
@@ -511,3 +515,4 @@
 "Katıl" = "Join";
 "Geçmiş %lld" = "History %lld";
 "Sunucular %lld" = "Servers %lld";
+"Yeniden göster" = "Show again";
