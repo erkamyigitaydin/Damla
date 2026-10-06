@@ -144,16 +144,11 @@ struct BatteryLabel: View {
 }
 
 /// Title and close button shared by the panes that replace the player on Özet.
+/// The player's sub-views (levels, outputs, sources) lead back to it from the same corner as every other page.
 struct PaneHeader: View {
     let title: Text
     let close: () -> Void
-    var body: some View {
-        HStack {
-            title.font(.system(size: 15, weight: .semibold)).lineLimit(1)
-            Spacer()
-            IconButton(icon: "xmark", label: "Kapat", size: 24, action: close)
-        }
-    }
+    var body: some View { PageHeader(title: title, back: close) }
 }
 
 /// Lyrics the way Apple Music shows them, flowing under the player in lyrics mode: big bold lines, the sung one

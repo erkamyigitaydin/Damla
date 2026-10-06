@@ -769,10 +769,7 @@ struct NotificationsView: View {
             if mirror.history.isEmpty {
                 empty
             } else {
-                HStack(spacing: 4) {
-                    Text("\(mirror.history.count) bildirim").font(.system(size: 10.5, weight: .medium)).foregroundStyle(Theme.dim)
-                    Text("· son bir saat").font(.system(size: 10.5)).foregroundStyle(Theme.faint)
-                    Spacer()
+                PageHeader(title: Text("\(mirror.history.count) bildirim"), detail: Text("· son bir saat")) {
                     Button("Temizle") { withAnimation(Theme.quick) { mirror.clearHistory() } }
                         .font(.system(size: 10.5, weight: .medium)).buttonStyle(PillStyle())
                 }

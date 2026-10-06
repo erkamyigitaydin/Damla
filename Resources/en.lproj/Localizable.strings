@@ -439,3 +439,17 @@
 "Sıradaki toplantı ve katılma bağlantısı" = "Next meeting and its join link";
 "İzin verildi" = "Granted";
 "Geri" = "Back";
+"Mola" = "Break";
+"Uzun mola" = "Long break";
+"Mola ver" = "Take a break";
+"Sonrakine geç" = "Skip to next";
+"· Tur %lld/%lld" = "· Round %lld/%lld";
+"· %lld dk" = "· %lld min";
+"Bugün henüz tur yok" = "No rounds yet today";
+"Bitiş %@ · %@" = "Ends %@ · %@";
+"Duraklatıldı · %@" = "Paused · %@";
+"%lld / %lld dk" = "%lld / %lld min";
+"Odak ve mola süresi: 25/5, 45/10, 50/10" = "Focus and break length: 25/5, 45/10, 50/10";
+"sonra %lld dk mola" = "then a %lld min break";
+"sonra Tur %lld/%lld" = "then round %lld/%lld";
+"Dört tur bitti. Uzun bir mola ver." = "Four rounds done. Take a long break.";

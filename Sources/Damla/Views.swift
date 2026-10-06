@@ -190,6 +190,17 @@ struct DamlaView: View {
             ], startPoint: .top, endPoint: .bottom))
                 .animation(.easeInOut(duration: 0.9), value: media.accent)
                 .opacity(ambientStrength)
+            // Where the artwork colour is weak or missing (other pages, nothing playing) the same band gets plain
+            // black instead, so a page's text never sits on the window behind; the rim at the foot stays clear.
+            shape.inset(by: 1.5).fill(LinearGradient(stops: [
+                .init(color: .clear, location: notchEdge),
+                .init(color: .black.opacity(0.4), location: notchEdge + bodyHeight * 0.22),
+                .init(color: .black.opacity(0.4), location: notchEdge + bodyHeight * 0.66),
+                .init(color: .clear, location: notchEdge + bodyHeight * 0.96),
+                .init(color: .clear, location: 1)
+            ], startPoint: .top, endPoint: .bottom))
+                .opacity(open && !model.tallPanel ? 1 - ambientStrength : 0)
+                .animation(.easeInOut(duration: 0.35), value: ambientStrength)
             shape.fill(LinearGradient(stops: [
                 .init(color: .black, location: 0),
                 .init(color: .black, location: notchEdge),
@@ -1239,13 +1250,11 @@ struct ShelfView: View {
                         .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5, 5])).foregroundStyle(.white.opacity(0.14))
                 }
             } else {
-                HStack {
-                    Text("\(model.files.count) öğe").font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Theme.dim)
-                    Spacer()
+                PageHeader(title: Text("\(model.files.count) öğe")) {
                     IconButton(icon: "trash", label: "Rafı boşalt") { model.clearFiles() }
                     IconButton(icon: "square.and.arrow.up", label: "Seçili dosyayı paylaş") { model.shareFile() }
                     IconButton(icon: "plus", label: "Dosya ekle") { model.chooseFiles() }
-                }.frame(height: 18)
+                }
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 8) {
                         ForEach(model.files) { item in FileTile(item: item, model: model) }
@@ -1451,17 +1460,17 @@ struct FocusView: View {
 
     var body: some View {
         let running = model.session.running
-        HStack(spacing: 26) {
+        HStack(spacing: 20) {
             ZStack {
                 Circle().stroke(.white.opacity(dialMode && setMinutes >= 60 ? 0.22 : 0.1), lineWidth: 4)
                 if dialMode {
-                    FocusDial(minutes: setMinutes, active: dialMinutes != nil || dialHover)
+                    FocusDial(minutes: setMinutes, active: dialMinutes != nil || dialHover, tint: tint)
                         .transition(.opacity.combined(with: .scale(scale: 0.9)))
                 } else {
                     Circle().trim(from: 0, to: model.session.progress(at: model.now))
-                        .stroke(running ? Theme.accent : .white.opacity(0.7), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .stroke(running ? tint : .white.opacity(0.7), style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .rotationEffect(.degrees(-90)).animation(.linear(duration: 0.5), value: model.now)
-                        .shadow(color: Theme.accent.opacity(running ? 0.5 : 0), radius: 6)
+                        .shadow(color: tint.opacity(running ? 0.5 : 0), radius: 6)
                         .transition(.opacity)
                 }
                 VStack(spacing: 4) {
@@ -1498,29 +1507,93 @@ struct FocusView: View {
             .animation(.spring(duration: 0.45, bounce: 0.25), value: dialMode)
             .overlay(ScrollCatcher { steps in model.adjustFocus(by: steps) }.allowsHitTesting(!running && !editing))
             .onChange(of: fieldFocused) { _, focused in if !focused && editing { commit() } }
-            VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                status
+                HStack(spacing: 10) {
+                    // Play/pause is always the filled one; the two beside it are secondary.
+                    Button { model.toggleFocus() } label: {
+                        Image(systemName: running ? "pause.fill" : "play.fill").font(.system(size: 17, weight: .bold))
+                            .frame(width: 46, height: 46).contentShape(Circle()).contentTransition(.symbolEffect(.replace))
+                    }.buttonStyle(GlassCircleStyle(prominent: true))
+                        .help(running ? "Duraklat" : "Başlat").accessibilityLabel(running ? "Duraklat" : "Başlat")
+                    if model.session.phase == .focus && !model.session.hasStarted {
+                        IconButton(icon: "cup.and.saucer", label: "Mola ver", size: 34) { model.startBreak() }
+                    } else {
+                        IconButton(icon: "forward.fill", label: "Sonrakine geç", size: 34) { model.skipFocusPhase() }
+                    }
+                    IconButton(icon: "arrow.counterclockwise", label: "Sıfırla", size: 34) { model.resetFocus() }
+                }
+                footer.frame(height: 26, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Breaks wear green so a glance tells work from rest.
+    private var tint: Color { model.session.phase == .rest ? Theme.green : Theme.accent }
+    private var completed: Int { model.completedSessions }
+
+    /// What this is and where the day stands: the phase, the round in a cycle of four, today's count.
+    private var status: some View {
+        let session = model.session
+        let lit = FocusCycle.filled(completed: completed, phase: session.phase)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text(session.phase == .focus ? "Odak" : lit == FocusCycle.length ? "Uzun mola" : "Mola")
+                    .font(.system(size: 15, weight: .semibold))
+                Group {
+                    if session.phase == .focus { Text("· Tur \(FocusCycle.round(completed: completed))/\(FocusCycle.length)") }
+                    else { Text("· \(Int(session.duration / 60)) dk") }
+                }
+                .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.dim)
+            }
+            HStack(spacing: 8) {
                 HStack(spacing: 5) {
-                    ForEach([25, 45, 50], id: \.self) { minutes in
-                        Button("\(minutes)") { model.setFocus(minutes: minutes) }
-                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                            .buttonStyle(PillStyle(accent: model.session.phase == .focus && Int(model.session.duration) == minutes * 60))
-                            .disabled(running).help("\(minutes) dakika")
+                    ForEach(0..<FocusCycle.length, id: \.self) { index in
+                        let current = session.phase == .focus && session.hasStarted && index == lit
+                        // The round under way is a lit ring, apart from finished (filled) and coming (faint) ones.
+                        Circle().fill(index < lit ? Color.white : .clear)
+                            .overlay(Circle().strokeBorder(current ? tint : .white.opacity(index < lit ? 0 : 0.4), lineWidth: current ? 2 : 1.2))
+                            .frame(width: 7, height: 7)
                     }
                 }
-                HStack(spacing: 14) {
-                    IconButton(icon: "arrow.counterclockwise", label: "Sıfırla", size: 32) { model.resetFocus() }
-                    Button { model.toggleFocus() } label: {
-                        Image(systemName: running ? "pause.fill" : "play.fill").font(.system(size: 16, weight: .bold))
-                            .frame(width: 44, height: 44).contentShape(Circle()).contentTransition(.symbolEffect(.replace))
-                    }.buttonStyle(GlassCircleStyle(prominent: running))
-                        .help(running ? "Duraklat" : "Başlat").accessibilityLabel(running ? "Duraklat" : "Başlat")
-                    IconButton(icon: "cup.and.saucer", label: "5 dakika mola", size: 32) { model.setFocus(minutes: 5, phase: .rest); model.toggleFocus() }.disabled(running)
-                }
-                if model.completedSessions > 0 {
-                    Text("Bugün \(model.completedSessions) tur").font(.system(size: 9.5, weight: .medium, design: .rounded)).foregroundStyle(Theme.faint)
-                }
+                Text(completed == 0 ? "Bugün henüz tur yok" : "Bugün \(completed) tur")
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.faint).lineLimit(1)
             }
-        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// Under the buttons: once a phase is under way, when it ends and what follows; before that, the plan.
+    @ViewBuilder private var footer: some View {
+        let session = model.session
+        if session.hasStarted {
+            Group {
+                if let deadline = session.deadline { Text("Bitiş \(deadline.formatted(date: .omitted, time: .shortened)) · \(nextLabel)") }
+                else { Text("Duraklatıldı · \(nextLabel)") }
+            }
+            .font(.system(size: 11.5, weight: .medium)).foregroundStyle(Theme.dim).lineLimit(1)
+        } else {
+            // A tap steps through the pairs; a menu here would fight the panel's hover for the pointer.
+            Button(action: nextPlan) {
+                HStack(spacing: 5) {
+                    Text("\(model.focusLength) / \(model.focusBreak) dk")
+                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.dim)
+                }
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+            }
+            .buttonStyle(PillStyle())
+            .help("Odak ve mola süresi: 25/5, 45/10, 50/10")
+        }
+    }
+    private var nextLabel: String {
+        model.session.phase == .focus
+            ? String(localized: "sonra \(FocusCycle.breakMinutes(completed: completed + 1, short: model.focusBreak)) dk mola")
+            : String(localized: "sonra Tur \(FocusCycle.round(completed: completed))/\(FocusCycle.length)")
+    }
+    private func nextPlan() {
+        let presets = FocusCycle.presets
+        let index = presets.firstIndex { $0.0 == model.focusLength && $0.1 == model.focusBreak }.map { ($0 + 1) % presets.count } ?? 0
+        model.setFocusPlan(focus: presets[index].0, rest: presets[index].1)
     }
 
     /// Dragging around the ring: 6° a minute, one turn is an hour, several turns up to four hours. The drag counts
@@ -1550,7 +1623,7 @@ struct FocusView: View {
                 }
             }
             .onEnded { _ in
-                if let minutes = dialMinutes { model.setFocus(minutes: minutes) }
+                if let minutes = dialMinutes { model.setFocus(minutes: minutes, phase: model.session.phase) }
                 withAnimation(.spring(duration: 0.3)) { dialMinutes = nil }
                 dialAngle = nil
             }
@@ -1574,6 +1647,7 @@ struct FocusView: View {
 struct FocusDial: View {
     let minutes: Int
     let active: Bool
+    var tint: Color = Theme.accent
     private var lap: Int { minutes % 60 == 0 && minutes > 0 ? 60 : minutes % 60 }
     var body: some View {
         ZStack {
@@ -1587,17 +1661,17 @@ struct FocusDial: View {
                     path.move(to: CGPoint(x: center.x + sin(angle) * inner, y: center.y - cos(angle) * inner))
                     path.addLine(to: CGPoint(x: center.x + sin(angle) * outer, y: center.y - cos(angle) * outer))
                     let lit = tick < lap
-                    let color = lit ? Theme.accent.opacity(active ? 1 : 0.75) : Color.white.opacity(active ? 0.35 : 0.16)
+                    let color = lit ? tint.opacity(active ? 1 : 0.75) : Color.white.opacity(active ? 0.35 : 0.16)
                     context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: long ? 1.6 : 1, lineCap: .round))
                 }
             }
             Circle().trim(from: 0, to: CGFloat(lap) / 60)
-                .stroke(Theme.accent.opacity(0.85), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .stroke(tint.opacity(0.85), style: StrokeStyle(lineWidth: 4, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             // The handle rides the ring.
             Circle().fill(.white)
                 .frame(width: 14, height: 14)
-                .shadow(color: Theme.accent.opacity(0.8), radius: active ? 7 : 3)
+                .shadow(color: tint.opacity(0.8), radius: active ? 7 : 3)
                 .scaleEffect(active ? 1.25 : 1)
                 .offset(y: -64)
                 // Total minutes, not the lap: past the hour the handle keeps turning forward instead of unwinding.

@@ -40,6 +40,26 @@ struct FocusSession: Codable {
     }
 }
 
+/// Today's rounds in cycles of four, the classic pomodoro: a long break after every fourth focus round.
+enum FocusCycle {
+    static let length = 4
+    static let longBreakMinutes = 15
+    /// Focus/break pairs offered next to the dial; any other focus length comes from turning the dial.
+    static let presets = [(25, 5), (45, 10), (50, 10)]
+
+    /// Dots lit in the current cycle. During the break after the fourth round all four stay lit.
+    static func filled(completed: Int, phase: FocusSession.Phase) -> Int {
+        let inCycle = completed % length
+        return phase == .rest && completed > 0 && inCycle == 0 ? length : inCycle
+    }
+    /// The round being worked on, or the one up next during a break: 1 to 4.
+    static func round(completed: Int) -> Int { completed % length + 1 }
+    /// The break that follows a finished focus round: the long one after every fourth.
+    static func breakMinutes(completed: Int, short: Int) -> Int {
+        completed > 0 && completed % length == 0 ? max(longBreakMinutes, short) : short
+    }
+}
+
 /// Today's completed focus sessions, dated separately from the running timer. An old, undated lifetime
 /// total cannot tell us how many sessions happened today, so it is deliberately not imported.
 struct FocusDailyCount: Codable, Equatable {

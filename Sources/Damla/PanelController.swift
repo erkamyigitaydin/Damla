@@ -760,6 +760,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case "quit": NSApp.terminate(nil)
         case "focus-start": model.setFocus(minutes: 25); model.toggleFocus()
         case "focus-stop": model.setFocus(minutes: 25)
+        case "focus-skip": model.skipFocusPhase()
         case "files-demo":
             let base = URL(fileURLWithPath: "/Users/erkamyigitaydin/Desktop/Projects/Damla")
             model.addFiles(["README.md", "Package.swift", "build.sh", "Resources/AppIcon.icns", "Sources/Damla/Views.swift"].map { base.appendingPathComponent($0) })

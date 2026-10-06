@@ -145,6 +145,9 @@ final class AppState: ObservableObject {
     @Published private var focusDailyCount = FocusDailyCount.restored(
         from: UserDefaults.standard.data(forKey: FocusDailyCount.defaultsKey), at: Date())
     var completedSessions: Int { focusDailyCount.count }
+    /// The chosen focus and break lengths; a finished phase sets up the next one with them.
+    @Published private(set) var focusLength = UserDefaults.standard.object(forKey: "focusLength") as? Int ?? 25
+    @Published private(set) var focusBreak = UserDefaults.standard.object(forKey: "focusBreak") as? Int ?? 5
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
     let media = MediaService()
     let appVolumes = AppVolumeController()
@@ -695,8 +698,26 @@ final class AppState: ObservableObject {
         }
     }
     static let focusMinutes = 1...240
+    /// Sets the current phase's length; it also becomes the length used for that phase from now on.
     func setFocus(minutes: Int, phase: FocusSession.Phase = .focus) {
-        session.reset(minutes: min(max(minutes, Self.focusMinutes.lowerBound), Self.focusMinutes.upperBound), phase: phase); saveSession()
+        let minutes = min(max(minutes, Self.focusMinutes.lowerBound), Self.focusMinutes.upperBound)
+        session.reset(minutes: minutes, phase: phase); saveSession()
+        if phase == .focus { focusLength = minutes; UserDefaults.standard.set(minutes, forKey: "focusLength") }
+        else { focusBreak = minutes; UserDefaults.standard.set(minutes, forKey: "focusBreak") }
+    }
+    /// A focus/break pair from the picker; a timer that hasn't started takes it at once.
+    func setFocusPlan(focus: Int, rest: Int) {
+        focusLength = focus; focusBreak = rest
+        UserDefaults.standard.set(focus, forKey: "focusLength"); UserDefaults.standard.set(rest, forKey: "focusBreak")
+        guard !session.hasStarted else { return }
+        session.reset(minutes: session.phase == .focus ? focus : rest, phase: session.phase); saveSession()
+    }
+    func startBreak() { session.reset(minutes: focusBreak, phase: .rest); session.start(); saveSession() }
+    /// Moves on to the next phase without counting the current one, ready to start.
+    func skipFocusPhase() { prepareNextPhase(after: session.phase); saveSession() }
+    private func prepareNextPhase(after phase: FocusSession.Phase) {
+        if phase == .focus { session.reset(minutes: FocusCycle.breakMinutes(completed: completedSessions, short: focusBreak), phase: .rest) }
+        else { session.reset(minutes: focusLength, phase: .focus) }
     }
     /// Scrolling on the ring: a minute at a time, only while the timer is stopped.
     func adjustFocus(by minutes: Int) {
@@ -722,12 +743,17 @@ final class AppState: ObservableObject {
             saveFocusDailyCount()
         }
         guard finished else { return }
+        let finishedPhase = updatedSession.phase
         session = updatedSession
+        // The next phase is set up and waits for play, so the page always shows what comes next.
+        prepareNextPhase(after: finishedPhase)
         now = date
         saveSession()
         NSSound(named: "Glass")?.play()
-        showHUD("checkmark.circle.fill", session.phase == .focus ? String(localized: "Odak tamamlandı") : String(localized: "Mola tamamlandı"), 1)
-        showNotice(session.phase == .focus ? String(localized: "Güzel iş. Kısa bir mola ver.") : String(localized: "Yeni bir odak turuna hazırsın."))
+        let longBreak = finishedPhase == .focus && FocusCycle.filled(completed: completedSessions, phase: .rest) == FocusCycle.length
+        showHUD("checkmark.circle.fill", finishedPhase == .focus ? String(localized: "Odak tamamlandı") : String(localized: "Mola tamamlandı"), 1)
+        showNotice(finishedPhase == .rest ? String(localized: "Yeni bir odak turuna hazırsın.")
+                   : longBreak ? String(localized: "Dört tur bitti. Uzun bir mola ver.") : String(localized: "Güzel iş. Kısa bir mola ver."))
     }
     var timeLabel: String {
         let seconds = Int(ceil(session.remaining(at: now)))

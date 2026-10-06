@@ -63,4 +63,13 @@ func runFocusSelfTests(_ check: (Bool, String) -> Void) {
     dstCount.refresh(at: afterDST, calendar: dst)
     check(afterDST.timeIntervalSince(shortDay) == 23 * 3600 && dstCount.count == 0,
           "Focus daily: a 23-hour DST day resets at local midnight, not after 24 hours")
+
+    check(FocusCycle.filled(completed: 0, phase: .focus) == 0 && FocusCycle.round(completed: 0) == 1
+          && FocusCycle.filled(completed: 2, phase: .focus) == 2 && FocusCycle.round(completed: 2) == 3,
+          "Focus cycle: dots and round follow today's completed rounds")
+    check(FocusCycle.filled(completed: 4, phase: .rest) == 4 && FocusCycle.filled(completed: 4, phase: .focus) == 0
+          && FocusCycle.round(completed: 4) == 1, "Focus cycle: all four stay lit through the long break, then a new cycle")
+    check(FocusCycle.breakMinutes(completed: 3, short: 5) == 5 && FocusCycle.breakMinutes(completed: 4, short: 5) == 15
+          && FocusCycle.breakMinutes(completed: 8, short: 20) == 20 && FocusCycle.breakMinutes(completed: 0, short: 5) == 5,
+          "Focus cycle: every fourth round earns the long break, never shorter than the chosen one")
 }
