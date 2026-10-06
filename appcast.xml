@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.8</title>
+      <pubDate>Tue, 06 Oct 2026 23:07:59 +0000</pubDate>
+      <sparkle:version>21</sparkle:version>
+      <sparkle:shortVersionString>0.8.8</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Ses kendi sayfasında: uygulamalar, tarayıcı sekmeleri ve çıkış tek yerde.</p><p>- Ses: Kapsülde Özet&#x27;in yanında yeni sayfa. Sistem sesi, Music/Spotify, ses çalan uygulamalar ve her tarayıcının altında oynayan sekmeleri ayrı ayrı ayarla. Sayfa Ayarlar → Sayfalar&#x27;dan kapatılıp sıralanabilir.</p><p>- Sekme sesleri: Chrome, Brave, Edge, Arc, Vivaldi ve Safari&#x27;de oynayan sekmeler sayfadaki oynatıcı üzerinden kısılır; seçtiğin seviye sonraki videoda ve reklamda da kalır, sayfanın kendi kumandasıyla değiştirirsen o izlenir. İsteğe bağlı: tarayıcının &quot;Apple Events&#x27;ten JavaScript&#x27;e izin ver&quot; ayarı gerekir; satırın altındaki teklif tek dokunuşla açar ya da &quot;Gerek yok&quot; ile susar.</p><p>- Sessize al: Satırın simgesine dokununca ses kapanır, tekrar dokununca önceki seviye geri gelir.</p><p>- Çıkış: Ses sayfasının başlığındaki çipten değiştirilir; Bluetooth kulaklıkların pili listede.</p><p>- Özet: Çıkış ve ses kapsülleri birleşti: aygıt, adı ve seviye tek kapsülde; dokununca Ses sayfası açılır.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.8.dmg" length="7213814" type="application/octet-stream" sparkle:edSignature="hhOlAD815iyxqkgY4tCic96KBfkoqCrzW/wuhiWxEVFge300LyQN51YdibM0TtkuGCTE1MkKv6k7xZFw0j+vDQ=="/>
+    </item>
+    <item>
       <title>Damla 0.8.7</title>
       <pubDate>Tue, 06 Oct 2026 16:00:23 +0000</pubDate>
       <sparkle:version>20</sparkle:version>
