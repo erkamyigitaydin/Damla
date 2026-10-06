@@ -1664,6 +1664,42 @@ struct IconButton: View {
     }
 }
 
+/// Every page opens the same way: what it is, or its state, on the left and its own one or two actions on the
+/// right. A sub-view (lyrics, levels) gets a back chevron instead of a close button, so leaving is always in the
+/// same corner.
+struct PageHeader<Actions: View>: View {
+    let title: Text
+    var detail: Text? = nil
+    var back: (() -> Void)? = nil
+    @ViewBuilder var actions: Actions
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let back {
+                Button(action: back) {
+                    Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
+                        .frame(width: 20, height: 24).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).foregroundStyle(Theme.dim)
+                .help("Geri").accessibilityLabel(Text("Geri"))
+            }
+            title.font(.system(size: 14, weight: .semibold)).lineLimit(1)
+            if let detail {
+                detail.font(.system(size: 12.5, weight: .medium)).foregroundStyle(Theme.dim).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            HStack(spacing: 6) { actions }
+        }
+        .frame(height: 26)
+    }
+}
+
+extension PageHeader where Actions == EmptyView {
+    init(title: Text, detail: Text? = nil, back: (() -> Void)? = nil) {
+        self.init(title: title, detail: detail, back: back) { EmptyView() }
+    }
+}
+
 /// Glass-looking chrome drawn with plain layers. A real `glassEffect` inside the panel's glass would be
 /// glass-in-glass, which makes the compositor pull the backdrop through the panel's black top.
 struct GlassLook: ViewModifier {
