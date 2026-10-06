@@ -72,7 +72,7 @@ enum AgentText {
         }
     }
 
-    static func summary(_ sessions: [AgentSession], turns: Int, at now: Date) -> String {
+    static func summary(_ sessions: [AgentSession], at now: Date) -> String {
         let phases = sessions.map { $0.effectivePhase(at: now) }
         let working = phases.filter { $0 == .working }.count
         let waiting = phases.filter { $0 == .waiting }.count
@@ -80,8 +80,51 @@ enum AgentText {
         if working > 0 { parts.append(String(localized: "\(working) çalışıyor")) }
         if waiting > 0 { parts.append(String(localized: "\(waiting) onay bekliyor")) }
         if parts.isEmpty { parts.append(String(localized: "Aktif oturum yok")) }
-        if turns > 0 { parts.append(String(localized: "bugün \(turns) tur")) }
         return parts.joined(separator: " · ")
+    }
+
+    /// "12 dk önce", "3 sa önce", "2 gün önce".
+    static func ago(_ interval: TimeInterval) -> String {
+        let minutes = max(0, Int(interval / 60))
+        if minutes < 60 { return String(localized: "\(minutes) dk önce") }
+        if minutes < 48 * 60 { return String(localized: "\(minutes / 60) sa önce") }
+        return String(localized: "\(minutes / 1440) gün önce")
+    }
+
+    /// The suffix a Turkish clock time takes, by how its last number is read aloud: 14:30 "otuz" → da,
+    /// 14:00 "on dört" → te, 13:40 "kırk" → ta.
+    static func locative(_ time: String) -> String {
+        let numbers = time.split { !$0.isNumber }.compactMap { Int($0) }
+        guard var spoken = numbers.last else { return "da" }
+        if spoken == 0, numbers.count > 1 { spoken = numbers[numbers.count - 2] }
+        let units = ["da", "de", "de", "te", "te", "te", "da", "de", "de", "da"]  // sıfır bir iki üç dört beş altı yedi sekiz dokuz
+        let tens = ["da", "da", "de", "da", "ta", "de"]                          // sıfır on yirmi otuz kırk elli
+        return spoken % 10 != 0 ? units[spoken % 10] : tens[min(spoken / 10 % 10, 5)]
+    }
+
+    /// "14:30’da", or "Cum 14:00’te" when it is not today. Other languages drop the suffix in their strings.
+    static func at(_ date: Date, now: Date) -> String {
+        let time = Calendar.current.isDate(date, inSameDayAs: now) ? date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+        switch locative(time) {
+        case "de": return String(localized: "\(time)’de")
+        case "ta": return String(localized: "\(time)’ta")
+        case "te": return String(localized: "\(time)’te")
+        default: return String(localized: "\(time)’da")
+        }
+    }
+
+    /// The faint line under a usage bar: when it resets, or where the current pace leads.
+    static func outlook(_ window: AgentUsage.Window, length: TimeInterval, at now: Date) -> String {
+        switch window.outlook(length: length, at: now) {
+        case .resets: return String(localized: "\(at(window.resetsAt, now: now)) sıfırlanır")
+        case .fills(let date):
+            // An estimate, so no false minutes: ten-minute steps for five hours, whole hours for the week.
+            let step: TimeInterval = length > AgentUsage.fiveHourLength ? 3600 : 600
+            let rounded = Date(timeIntervalSinceReferenceDate: (date.timeIntervalSinceReferenceDate / step).rounded() * step)
+            return String(localized: "bu hızla \(at(rounded, now: now)) dolar")
+        case .leaves(let left): return String(localized: "sıfırlanınca ~%\(left) kalır")
+        }
     }
 }
 
@@ -102,30 +145,65 @@ struct ContextBadge: View {
     }
 }
 
-/// The Claude account's five-hour and weekly use, from the status line; each bar tells when it resets.
-struct UsageStrip: View {
+/// One agent account's plan limits: per window a thin bar with a tick where even use would stand by now, and
+/// under it when the window resets or, once it is under way, where the current pace leads.
+struct UsageCard: View {
+    let title: String
     let usage: AgentUsage
+    let now: Date
     var body: some View {
-        HStack(spacing: 12) {
-            if let window = usage.fiveHour { bar(String(localized: "5 saat"), window) }
-            if let window = usage.sevenDay { bar(String(localized: "7 gün"), window) }
-        }
-    }
-    private func bar(_ title: String, _ window: AgentUsage.Window) -> some View {
-        let tint = window.percent >= 95 ? Color(red: 1, green: 0.47, blue: 0.47) : window.percent >= 80 ? Theme.amber : Theme.agent
-        return HStack(spacing: 6) {
-            Text(title).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.dim)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.fill)
-                    Capsule().fill(tint).frame(width: max(3, proxy.size.width * window.percent / 100))
+        let age = now.timeIntervalSince(usage.updated)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Text(verbatim: title).font(.system(size: 10.5, weight: .semibold))
+                if let plan = usage.planTitle {
+                    Text(verbatim: plan).font(.system(size: 8.5, weight: .semibold)).foregroundStyle(Theme.dim)
+                        .padding(.horizontal, 4).padding(.vertical, 1).background(Theme.fill, in: Capsule())
                 }
+                Spacer(minLength: 4)
+                // Both only report while a session runs; old numbers say how old they are.
+                if age > 15 * 60 { Text(AgentText.ago(age)).font(.system(size: 9)).foregroundStyle(Theme.faint) }
             }
-            .frame(height: 4)
-            Text("%\(Int(window.percent.rounded()))").font(.system(size: 9.5, weight: .semibold, design: .rounded)).monospacedDigit()
-                .foregroundStyle(window.percent >= 80 ? tint : Theme.dim)
+            .lineLimit(1)
+            if let window = usage.fiveHour { UsageWindowRow(title: String(localized: "5 saat"), window: window, length: AgentUsage.fiveHourLength, now: now) }
+            if let window = usage.sevenDay { UsageWindowRow(title: String(localized: "Hafta"), window: window, length: AgentUsage.weekLength, now: now) }
         }
-        .help(String(localized: "\(title) kullanımı · \(window.resetsAt.formatted(date: .omitted, time: .shortened)) sıfırlanır"))
+        .padding(.horizontal, 9).padding(.vertical, 7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+private struct UsageWindowRow: View {
+    let title: String
+    let window: AgentUsage.Window
+    let length: TimeInterval
+    let now: Date
+    var body: some View {
+        let pace = window.elapsed(length: length, at: now)
+        let tint = window.percent >= 90 ? Theme.red : window.percent >= 75 ? Theme.amber : Color.white.opacity(0.85)
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 6) {
+                Text(title).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.dim).lineLimit(1)
+                    .frame(width: 36, alignment: .leading)
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.fillStrong).frame(height: 3)
+                        Capsule().fill(tint).frame(width: window.percent > 0 ? max(3, proxy.size.width * window.percent / 100) : 0, height: 3)
+                        // Taller than the bar, so it shows over the fill as well as past it.
+                        Capsule().fill(Theme.dim).frame(width: 1.5, height: 8).offset(x: (proxy.size.width - 1.5) * pace)
+                    }
+                    .frame(maxHeight: .infinity)
+                }
+                .frame(height: 8)
+                Text("%\(Int(window.percent.rounded()))").font(.system(size: 9.5, weight: .semibold, design: .rounded)).monospacedDigit()
+                    .foregroundStyle(window.percent >= 75 ? tint : .white.opacity(0.85))
+            }
+            Text(AgentText.outlook(window, length: length, at: now)).font(.system(size: 9)).foregroundStyle(Theme.faint).lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+        .help(String(localized: "\(AgentText.at(window.resetsAt, now: now)) sıfırlanır") + " · "
+              + String(localized: "çentik: kullanım eşit yayılsaydı şu an %\(Int((pace * 100).rounded())) olurdu"))
     }
 }
 
@@ -138,7 +216,7 @@ struct HeroAgentCard: View {
     var body: some View {
         let phase = session.effectivePhase(at: now)
         let activity = AgentText.activity(session, at: now)
-        let tint = phase == .waiting ? Theme.amber : phase == .failed ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.agent
+        let tint = phase == .waiting ? Theme.amber : phase == .failed ? Theme.red : Theme.agent
         Button { service.activate(session) } label: {
             HStack(spacing: 14) {
                 AgentMascot(session: session, size: 56, showHost: true).frame(width: 64, height: 64)
@@ -185,8 +263,8 @@ struct AgentPanelView: View {
     @State private var showServers = true
     var body: some View {
         content
-            .onAppear { servers.start() }
-            .onDisappear { servers.stop() }
+            .onAppear { servers.start(); service.watchCodexUsage(true) }
+            .onDisappear { servers.stop(); service.watchCodexUsage(false) }
     }
 
     /// Dev servers and databases listening on this Mac, folded like the history.
@@ -207,6 +285,18 @@ struct AgentPanelView: View {
         }
     }
 
+    /// Claude's and Codex's plan limits side by side; a provider with nothing (current) to say has no card.
+    @ViewBuilder private func usageCards(at now: Date) -> some View {
+        let claude = service.usage?.current(at: now), codex = service.codexUsage?.current(at: now)
+        if claude != nil || codex != nil {
+            HStack(spacing: 6) {
+                if let claude { UsageCard(title: "Claude", usage: claude, now: now) }
+                if let codex { UsageCard(title: "Codex", usage: codex, now: now) }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var content: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let now = context.date
@@ -221,30 +311,28 @@ struct AgentPanelView: View {
                 }
             } else {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Text(AgentText.summary(service.sessions, turns: service.todayTurns, at: now))
-                        .font(.system(size: 11.5, weight: .semibold)).lineLimit(1)
-                    Spacer()
+                PageHeader(title: Text(AgentText.summary(service.sessions, at: now)),
+                           detail: service.todayTurns > 0 ? Text("Bugün \(service.todayTurns) tur") : nil) {
                     IconButton(icon: service.soundEnabled ? "bell.fill" : "bell.slash", label: service.soundEnabled ? "Onay beklerken ses: açık" : "Onay beklerken ses: kapalı",
                                tint: service.soundEnabled ? Theme.accent : .white, size: 22) { service.soundEnabled.toggle() }
                 }
-                if let usage = service.usage?.current(at: now) { UsageStrip(usage: usage) }
-                if service.sessions.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("Henüz durum gelmedi", systemImage: "antenna.radiowaves.left.and.right")
-                            .font(.system(size: 12, weight: .medium))
-                        if servers.servers.isEmpty {
-                            Text("Bağlı bir Claude Code veya Codex oturumunda yeni bir mesajla başlar.")
-                                .font(.system(size: 11)).foregroundStyle(Theme.dim)
-                            Text("Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
-                                .font(.system(size: 10)).foregroundStyle(Theme.faint)
+                // The cards scroll with the list: pinned, they would leave the sessions too little room to read.
+                ScrollView {
+                    LazyVStack(spacing: 5) {
+                        usageCards(at: now)
+                        if service.sessions.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("Henüz durum gelmedi", systemImage: "antenna.radiowaves.left.and.right")
+                                    .font(.system(size: 12, weight: .medium))
+                                if servers.servers.isEmpty {
+                                    Text("Bağlı bir Claude Code veya Codex oturumunda yeni bir mesajla başlar.")
+                                        .font(.system(size: 11)).foregroundStyle(Theme.dim)
+                                    Text("Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
+                                        .font(.system(size: 10)).foregroundStyle(Theme.faint)
+                                }
+                            }
+                            .padding(.top, 2).frame(maxWidth: .infinity, alignment: .leading)
                         } else {
-                            ScrollView { LazyVStack(spacing: 5) { serverSection } }.scrollIndicators(.hidden)
-                        }
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 5) {
                             // The session that needs eyes (working or waiting, else the latest) gets the big card.
                             let hero = active.first { [.working, .waiting].contains($0.effectivePhase(at: now)) } ?? active.first
                             if let hero { HeroAgentCard(session: hero, now: now, service: service) }
@@ -263,10 +351,10 @@ struct AgentPanelView: View {
                                     ForEach(history) { AgentRow(session: $0, now: now, service: service).opacity(0.75) }
                                 }
                             }
-                            serverSection
                         }
-                    }.scrollIndicators(.hidden)
-                }
+                        serverSection
+                    }
+                }.scrollIndicators(.hidden)
             }
             }
         }
@@ -526,7 +614,7 @@ struct DevServerRow: View {
                 if hovering || confirming {
                     Button { if confirming { monitor.terminate(server) } else { confirming = true } } label: {
                         Text(confirming ? "Durdur?" : "Durdur").font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(confirming ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.dim)
+                            .foregroundStyle(confirming ? Theme.red : Theme.dim)
                             .padding(.horizontal, 8).frame(height: 20).background(Theme.fill, in: Capsule())
                     }
                     .buttonStyle(.plain)

@@ -346,9 +346,12 @@ enum AgentEventStore {
     }
 }
 
-/// The Claude account's rate limits, as the status line last reported them (Pro and Max only).
+/// An agent account's rate limits: Claude's as the status line last reported them (Pro and Max only), Codex's
+/// from its newest session rollout.
 struct AgentUsage: Codable, Equatable {
     static let fileName = "usage.json"
+    static let fiveHourLength: TimeInterval = 5 * 3600
+    static let weekLength: TimeInterval = 7 * 24 * 3600
     struct Window: Codable, Equatable {
         var percent: Double
         var resetsAt: Date
@@ -356,6 +359,7 @@ struct AgentUsage: Codable, Equatable {
     var fiveHour: Window?
     var sevenDay: Window?
     var updated: Date
+    var plan: String? = nil   // Codex's plan_type; Claude's status line does not say
 
     init?(_ limits: [String: Any]?, now: Date) {
         func window(_ key: String) -> Window? {
@@ -365,6 +369,25 @@ struct AgentUsage: Codable, Equatable {
         }
         fiveHour = window("five_hour"); sevenDay = window("seven_day"); updated = now
         if fiveHour == nil && sevenDay == nil { return nil }
+    }
+    /// Codex's `rate_limits`: two slots, primary and secondary, either one null; the window's length tells
+    /// which is the five-hour one and which the week.
+    init?(codex limits: [String: Any], updated: Date) {
+        for key in ["primary", "secondary"] {
+            guard let raw = limits[key] as? [String: Any], let percent = (raw["used_percent"] as? NSNumber)?.doubleValue,
+                  let minutes = (raw["window_minutes"] as? NSNumber)?.intValue,
+                  let resets = (raw["resets_at"] as? NSNumber)?.doubleValue else { continue }
+            let window = Window(percent: min(max(percent, 0), 100), resetsAt: Date(timeIntervalSince1970: resets))
+            if minutes == 300 { fiveHour = window } else if minutes == 10080 { sevenDay = window }
+        }
+        plan = (limits["plan_type"] as? String).map { AgentApprovals.clean($0, limit: 20) }
+        self.updated = updated
+        if fiveHour == nil && sevenDay == nil { return nil }
+    }
+    /// "prolite" reads as "Pro Lite"; the rest ("plus", "pro", "team") just get a capital.
+    var planTitle: String? {
+        guard let plan, !plan.isEmpty else { return nil }
+        return plan == "prolite" ? "Pro Lite" : plan.prefix(1).uppercased() + plan.dropFirst()
     }
     /// Drops windows that have already reset: their percentage no longer means anything.
     func current(at now: Date) -> AgentUsage? {
@@ -377,10 +400,98 @@ struct AgentUsage: Codable, Equatable {
     static let warnAt: [Double] = [80, 95]
 }
 
+extension AgentUsage.Window {
+    /// How far through its window we are, 0…1: where the bar would stand now if use were spread evenly.
+    func elapsed(length: TimeInterval, at now: Date) -> Double {
+        min(max(1 - resetsAt.timeIntervalSince(now) / length, 0), 1)
+    }
+    enum Outlook: Equatable { case resets, fills(Date), leaves(Int) }
+    /// Where the current pace leads. In the first tenth of a window a pace means little, and a full window can
+    /// only wait for its reset; both just tell the reset time.
+    func outlook(length: TimeInterval, at now: Date) -> Outlook {
+        let elapsed = elapsed(length: length, at: now)
+        guard elapsed > 0.1, percent < 100 else { return .resets }
+        let projected = percent / elapsed
+        guard projected > 100 else { return .leaves(Int((100 - projected).rounded())) }
+        // `percent` took `elapsed * length` seconds, so the rest goes in (100 - percent) / percent of that.
+        return .fills(now.addingTimeInterval((100 - percent) / percent * elapsed * length))
+    }
+}
+
+/// Codex keeps no usage file: each token_count event in a session's rollout
+/// (~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl) carries the plan's limits, so the newest rollout has the
+/// newest numbers.
+enum CodexUsage {
+    static var sessions: URL {
+        let configured = ProcessInfo.processInfo.environment["CODEX_HOME"].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0, isDirectory: true) : nil }
+        return (configured ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true))
+            .appendingPathComponent("sessions", isDirectory: true)
+    }
+
+    /// Tries the newest few rollouts until one has limits, reading only the last 256 KB of each.
+    static func read(root: URL = sessions) -> AgentUsage? {
+        for (url, modified) in recentRollouts(in: root).prefix(3) {
+            if let tail = tail(of: url), let usage = parse(tail: tail, updated: modified) { return usage }
+        }
+        return nil
+    }
+
+    /// Rollouts of the last few day folders, newest written first. The tree keeps every session ever, so only
+    /// those folders are listed; a session started yesterday may still be the one being written today.
+    static func recentRollouts(in root: URL, days: Int = 3) -> [(url: URL, modified: Date)] {
+        let fm = FileManager.default
+        func numbered(_ url: URL) -> [URL] {
+            ((try? fm.contentsOfDirectory(atPath: url.path)) ?? []).compactMap { name in Int(name).map { (name, $0) } }
+                .sorted { $0.1 > $1.1 }.map { url.appendingPathComponent($0.0, isDirectory: true) }
+        }
+        var folders: [URL] = []
+        search: for year in numbered(root) {
+            for month in numbered(year) {
+                for day in numbered(month) {
+                    folders.append(day)
+                    if folders.count == days { break search }
+                }
+            }
+        }
+        let files: [URL] = folders.flatMap { folder -> [URL] in
+            (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles])) ?? []
+        }
+        return files.filter { $0.lastPathComponent.hasPrefix("rollout-") && $0.pathExtension == "jsonl" }
+            .map { url -> (url: URL, modified: Date) in
+                (url, (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast)
+            }
+            .sorted { $0.modified > $1.modified }
+    }
+
+    static func tail(of url: URL, bytes: UInt64 = 256 * 1024) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(), (try? handle.seek(toOffset: size > bytes ? size - bytes : 0)) != nil else { return nil }
+        return try? handle.readToEnd()
+    }
+
+    /// The last account-wide limits in a rollout's tail, newest line first (the first line may be cut; it just
+    /// fails to parse). Limits of a single model, under another `limit_id`, are not the plan's and are skipped.
+    static func parse(tail: Data, updated: Date) -> AgentUsage? {
+        let marker = Data("\"rate_limits\"".utf8)
+        for line in tail.split(separator: UInt8(ascii: "\n")).reversed() where line.range(of: marker) != nil {
+            guard let event = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any],
+                  let limits = (event["payload"] as? [String: Any])?["rate_limits"] as? [String: Any] ?? event["rate_limits"] as? [String: Any],
+                  (limits["limit_id"] as? String ?? "codex") == "codex" else { continue }
+            if let usage = AgentUsage(codex: limits, updated: updated) { return usage }
+        }
+        return nil
+    }
+}
+
 final class AgentStatusService: ObservableObject {
     @Published private(set) var sessions: [AgentSession] = []
     @Published private(set) var todayTurns = 0
     @Published private(set) var usage: AgentUsage?
+    /// Codex's plan limits, read only while the Agents page is on screen.
+    @Published private(set) var codexUsage: AgentUsage?
+    private var codexWatchers = 0             // queue only
+    private var codexRead = Date.distantPast  // queue only
     /// Five-hour use passed 80 % or 95 %: (percent, resets at).
     var onUsageWarning: ((Int, Date) -> Void)?
     private var usageWarned: (resetsAt: Date, threshold: Double)?
@@ -413,6 +524,10 @@ final class AgentStatusService: ObservableObject {
             // Hooks wait for the notch only while this heartbeat is fresh; with the setting off they never do.
             if AgentApprovals.enabled { AgentApprovals.heartbeat() }
             let approvals = AgentApprovals.enabled ? AgentApprovals.pending() : []
+            // Rollouts are large and Codex's limits move slowly: at most once a minute, and only while watched.
+            let readCodex = self.map { $0.codexWatchers > 0 && Date().timeIntervalSince($0.codexRead) >= 60 } ?? false
+            if readCodex { self?.codexRead = Date() }
+            let codex: AgentUsage?? = readCodex ? .some(CodexUsage.read()) : nil
             DispatchQueue.main.async {
                 guard let self else { return }
                 let known = Set(self.approvals.map(\.id))
@@ -428,12 +543,18 @@ final class AgentStatusService: ObservableObject {
                 if records != self.sessions { self.sessions = records }
                 if turns != self.todayTurns { self.todayTurns = turns }
                 if usage != self.usage { self.usage = usage; self.checkUsage(usage) }
+                if case .some(let codex) = codex, codex != self.codexUsage { self.codexUsage = codex }
                 self.onRefresh?()
             }
         }
         self.timer = timer; timer.resume()
     }
     func stop() { timer?.cancel(); timer = nil }
+    /// The Agents page came on screen or left it; the heartbeat above picks Codex's limits up meanwhile. A count,
+    /// since a page transition can show the new view before the old one is gone.
+    func watchCodexUsage(_ on: Bool) {
+        queue.async { self.codexWatchers = max(0, self.codexWatchers + (on ? 1 : -1)) }
+    }
 
     /// Warns once per window and threshold. What was already true when Damla started is not news.
     func checkUsage(_ usage: AgentUsage?) {

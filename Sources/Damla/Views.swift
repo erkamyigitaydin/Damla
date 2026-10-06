@@ -23,6 +23,8 @@ enum Theme {
     static let agent = Color(red: 0.8, green: 0.89, blue: 1.0)
     static let amber = Color(red: 1.0, green: 0.80, blue: 0.36)
     static let green = Color(red: 0.45, green: 0.87, blue: 0.55)
+    /// Failures, a muted microphone, a limit nearly used up.
+    static let red = Color(red: 1, green: 0.47, blue: 0.47)
     static let dim = Color.white.opacity(0.55)
     static let faint = Color.white.opacity(0.32)
     static let fill = Color.white.opacity(0.08)
@@ -370,7 +372,7 @@ struct CompactRow: View {
         switch activity {
         case .mic:
             Image(systemName: model.microphone.muted ? "mic.slash.fill" : "mic.fill").font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(model.microphone.muted ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.amber)
+                .foregroundStyle(model.microphone.muted ? Theme.red : Theme.amber)
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 22, height: 22).contentShape(Rectangle())
                 .onTapGesture { model.toggleMicrophone() }
@@ -412,7 +414,7 @@ struct CompactRow: View {
         switch activity {
         case .mic:
             Text(model.microphone.muted ? "Kapalı" : "Açık").font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(model.microphone.muted ? Color(red: 1, green: 0.47, blue: 0.47) : Theme.dim)
+                .foregroundStyle(model.microphone.muted ? Theme.red : Theme.dim)
                 .onTapGesture { model.toggleMicrophone() }
         case .meeting:
             Text(model.calendar.soon.map { CalendarService.countdown($0) } ?? "").font(.system(size: 10.5, weight: .semibold, design: .rounded))

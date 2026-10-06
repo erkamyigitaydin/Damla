@@ -30,7 +30,7 @@ struct DropletMascot: View {
         switch phase {
         case .working, .done: return Theme.agent
         case .waiting: return Theme.amber
-        case .failed: return Color(red: 1, green: 0.47, blue: 0.47)
+        case .failed: return Theme.red
         case .interrupted: return Color(red: 0.62, green: 0.72, blue: 0.9)
         case .idle: return Color(red: 0.66, green: 0.78, blue: 0.94)
         case .stale: return Color(white: 0.62)

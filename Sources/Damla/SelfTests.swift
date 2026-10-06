@@ -310,6 +310,7 @@ func runSelfTests() -> Int32 {
     runFocusSelfTests { condition, name in check(condition, name) }
     runCalendarSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
+    runUsageSelfTests { condition, name in check(condition, name) }
     runLyricsSelfTests { condition, name in check(condition, name) }
     runHookInstallerSelfTests { condition, name in check(condition, name) }
     print("Damla self-test: \(count - failures.count)/\(count) passed")

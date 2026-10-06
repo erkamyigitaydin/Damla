@@ -215,7 +215,6 @@
 "Yeni bir odak turuna hazırsın." = "Ready for another focus round.";
 "Yeni sürüm hazır" = "New version ready";
 "açık" = "on";
-"bugün %lld tur" = "%lld turns today";
 "dosya düzenlemek istiyor" = "wants to edit a file";
 "dosya okumak istiyor" = "wants to read a file";
 "dosya yazmak istiyor" = "wants to write a file";
@@ -275,8 +274,17 @@
 "%@ · bağlamın %%%lld dolu" = "%@ · context %lld%% full";
 "Bağlamın %%%lld dolu" = "Context %lld%% full";
 "5 saat" = "5 hours";
-"7 gün" = "7 days";
-"%@ kullanımı · %@ sıfırlanır" = "%@ usage · resets at %@";
+"Hafta" = "Week";
+"bu hızla %@ dolar" = "full by %@ at this pace";
+"sıfırlanınca ~%%%lld kalır" = "~%lld%% left at reset";
+"çentik: kullanım eşit yayılsaydı şu an %%%lld olurdu" = "tick: where even use would be now (%lld%%)";
+"%@’da" = "%@";
+"%@’de" = "%@";
+"%@’ta" = "%@";
+"%@’te" = "%@";
+"%lld dk önce" = "%lld min ago";
+"%lld sa önce" = "%lld h ago";
+"%lld gün önce" = "%lld days ago";
 "Claude kullanımı %%%lld" = "Claude usage %lld%%";
 "%@ sıfırlanır" = "resets at %@";
 "bağlam %%%lld" = "context %lld%%";
