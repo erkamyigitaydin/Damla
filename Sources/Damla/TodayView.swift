@@ -10,17 +10,61 @@ struct TodayView: View {
     @ObservedObject var calendar: CalendarService
 
     var body: some View {
+        let tiles = visibleTiles
         VStack(alignment: .leading, spacing: 8) {
             header
-            HStack(spacing: 7) {
-                if calendar.enabled { meetingTile }
-                focusTile
-                agentTile
+            if tiles.isEmpty {
+                // Nothing else to report: the paused track (or the way to start one) takes the room.
+                Spacer(minLength: 0)
+                bigPlayer
+                Spacer(minLength: 0)
+            } else {
+                HStack(spacing: 7) {
+                    // Fewer tiles share the row between them; a lone one spreads out and brings its action along.
+                    let wide = tiles.count == 1
+                    ForEach(tiles, id: \.self) { kind in
+                        switch kind {
+                        case .meeting: meetingTile(wide: wide)
+                        case .focus: focusTile(wide: wide)
+                        case .agents: agentTile(wide: wide)
+                        }
+                    }
+                }
+                .frame(height: 74)
+                playerRow.frame(height: 36)
             }
-            .frame(height: 74)
-            playerRow.frame(height: 36)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // A lone agents tile shows the limits; Codex's are read only while someone is looking (a counted watch).
+        .onAppear { agents.watchCodexUsage(true) }
+        .onDisappear { agents.watchCodexUsage(false) }
+    }
+
+    // MARK: Which tiles
+
+    enum Tile { case meeting, focus, agents }
+
+    /// Only what is in use earns a tile: a meeting today, a timer running or rounds done today, agents at work
+    /// today. A waiting approval always shows, whatever the pages.
+    private var visibleTiles: [Tile] {
+        var tiles: [Tile] = []
+        if todaysMeeting != nil { tiles.append(.meeting) }
+        if model.session.hasStarted || (model.completedSessions > 0 && model.visibleTabs.contains(.focus)) { tiles.append(.focus) }
+        let counts = agentCounts
+        if counts.waiting > 0 || (model.visibleTabs.contains(.agents) && (counts.working > 0 || agents.todayTurns > 0)) {
+            tiles.append(.agents)
+        }
+        return tiles
+    }
+
+    private var todaysMeeting: CalendarService.Meeting? {
+        guard calendar.enabled else { return nil }
+        return calendar.next.flatMap { Calendar.current.isDateInToday($0.start) || $0.start < Date() ? $0 : nil }
+    }
+
+    private var agentCounts: (waiting: Int, working: Int) {
+        let phases = agents.sessions.map { $0.effectivePhase(at: model.now) }
+        return (max(agents.approvals.count, phases.filter { $0 == .waiting }.count), phases.filter { $0 == .working }.count)
     }
 
     // MARK: Greeting
@@ -58,11 +102,16 @@ struct TodayView: View {
 
     // MARK: Tiles
 
-    private var meetingTile: some View {
-        let meeting = calendar.next.flatMap { Calendar.current.isDateInToday($0.start) || $0.start < Date() ? $0 : nil }
+    private func meetingTile(wide: Bool) -> some View {
+        let meeting = todaysMeeting
         return tile(icon: meeting?.joinURL == nil ? "calendar" : "video.fill", label: Text("Sıradaki"),
                     help: meeting.map { _ in String(localized: "Toplantıyı aç") } ?? String(localized: "Takvim")) {
             if let meeting { calendar.open(meeting) } else { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app")) }
+        } accessory: {
+            if wide, let meeting, meeting.joinURL != nil {
+                Button { calendar.open(meeting) } label: { Label("Katıl", systemImage: "video.fill").font(.system(size: 11, weight: .semibold)) }
+                    .buttonStyle(PillStyle(accent: true))
+            }
         } content: {
             if let meeting {
                 Text(meeting.start <= Date() ? String(localized: "Şimdi") : meeting.start.formatted(date: .omitted, time: .shortened))
@@ -75,12 +124,20 @@ struct TodayView: View {
         }
     }
 
-    private var focusTile: some View {
+    private func focusTile(wide: Bool) -> some View {
         let session = model.session
         let completed = model.completedSessions
         return tile(icon: session.phase == .rest && session.hasStarted ? "cup.and.saucer" : "timer", label: Text("Odak"),
                     help: String(localized: "Odak sayfasını aç")) {
             model.select(.focus)
+        } accessory: {
+            if wide {
+                Button { model.toggleFocus() } label: {
+                    Image(systemName: session.running ? "pause.fill" : "play.fill").font(.system(size: 13, weight: .bold))
+                        .frame(width: 34, height: 34).contentShape(Circle())
+                }
+                .buttonStyle(GlassCircleStyle(prominent: true)).help(session.running ? "Duraklat" : "Başlat")
+            }
         } content: {
             if session.hasStarted {
                 Text(model.timeLabel).font(.system(size: 18, weight: .semibold, design: .rounded)).monospacedDigit()
@@ -104,14 +161,24 @@ struct TodayView: View {
         }
     }
 
-    private var agentTile: some View {
-        let phases = agents.sessions.map { $0.effectivePhase(at: model.now) }
-        let waiting = max(agents.approvals.count, phases.filter { $0 == .waiting }.count)
-        let working = phases.filter { $0 == .working }.count
+    private func agentTile(wide: Bool) -> some View {
+        let (waiting, working) = agentCounts
         // Amber only when something waits on the user; otherwise the tile stays quiet.
         return tile(icon: "terminal", label: Text("Agent’lar"), tint: waiting > 0 ? Theme.amber : nil,
                     help: String(localized: "Agent’lar sayfasını aç")) {
             model.select(.agents)
+        } accessory: {
+            if wide {
+                VStack(alignment: .trailing, spacing: 3) {
+                    ForEach([("Claude", agents.usage), ("Codex", agents.codexUsage)], id: \.0) { name, usage in
+                        if let percent = usage.flatMap({ [$0.fiveHour?.percent, $0.sevenDay?.percent].compactMap { $0 }.max() }) {
+                            Text(verbatim: "\(name) %\(Int(percent.rounded()))")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded)).monospacedDigit()
+                                .foregroundStyle(percent >= 90 ? Theme.red : percent >= 75 ? Theme.amber : Theme.dim)
+                        }
+                    }
+                }
+            }
         } content: {
             Group {
                 if waiting > 0 { Text("\(waiting) onay") }
@@ -125,9 +192,12 @@ struct TodayView: View {
         }
     }
 
-    private func tile<Content: View>(icon: String, label: Text, tint: Color? = nil, help: String,
-                                     action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
-        Button(action: action) {
+    /// A tile opens its page when tapped; its accessory (a lone tile's own action) sits apart on the right, so the
+    /// two never swallow each other's clicks.
+    private func tile<Content: View, Accessory: View>(icon: String, label: Text, tint: Color? = nil, help: String,
+                                                      action: @escaping () -> Void, @ViewBuilder accessory: () -> Accessory,
+                                                      @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 4) {
                     Image(systemName: icon).font(.system(size: 9.5, weight: .semibold))
@@ -137,17 +207,48 @@ struct TodayView: View {
                 Spacer(minLength: 0)
                 content()
             }
-            .padding(.horizontal, 10).padding(.vertical, 9)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.08), lineWidth: 0.6))
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(Rectangle())
+            .onTapGesture(perform: action)
+            .accessibilityElement(children: .combine).accessibilityAddTraits(.isButton)
+            .accessibilityAction { action() }
+            .help(help)
+            accessory()
         }
-        .buttonStyle(.plain)
-        .help(help)
+        .padding(.horizontal, 10).padding(.vertical, 9)
+        .background(Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.08), lineWidth: 0.6))
     }
 
     // MARK: Paused track
+
+    /// The paused track as a card of its own when there are no tiles above it.
+    @ViewBuilder private var bigPlayer: some View {
+        if media.hasTrack {
+            HStack(spacing: 14) {
+                Button { model.homeShowsToday = false } label: {
+                    HStack(spacing: 14) {
+                        Artwork(image: media.artwork, placeholder: "music.note", size: 72)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(media.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+                            Text(media.artist).font(.system(size: 12)).foregroundStyle(Theme.dim).lineLimit(1)
+                            Text("duraklatıldı").font(.system(size: 11)).foregroundStyle(Theme.faint)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).help("Oynatıcıyı göster")
+                Button { media.command("playpause") } label: {
+                    Image(systemName: "play.fill").font(.system(size: 16, weight: .bold))
+                        .frame(width: 44, height: 44).contentShape(Circle())
+                }
+                .buttonStyle(GlassCircleStyle(prominent: true)).help("Çal").accessibilityLabel("Çal")
+            }
+        } else {
+            playerRow
+        }
+    }
 
     @ViewBuilder private var playerRow: some View {
         if media.hasTrack {

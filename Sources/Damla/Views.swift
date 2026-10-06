@@ -1393,6 +1393,19 @@ struct ClipboardView: View {
     }
 }
 
+/// Decoded clip images, kept by clip id: the open panel redraws twice a second and decoding a screenshot each
+/// time was the card's whole cost.
+enum ClipThumbnails {
+    private static let cache: NSCache<NSUUID, NSImage> = { let cache = NSCache<NSUUID, NSImage>(); cache.countLimit = 60; return cache }()
+    static func image(for entry: ClipEntry) -> NSImage? {
+        guard let data = entry.imageData else { return nil }
+        if let image = cache.object(forKey: entry.id as NSUUID) { return image }
+        guard let image = NSImage(data: data) else { return nil }
+        cache.setObject(image, forKey: entry.id as NSUUID)
+        return image
+    }
+}
+
 struct ClipCard: View {
     let entry: ClipEntry
     let copied: Bool
@@ -1417,7 +1430,7 @@ struct ClipCard: View {
         Button(action: onCopy) {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack {
-                    if let data = entry.imageData, let image = NSImage(data: data) {
+                    if let image = ClipThumbnails.image(for: entry) {
                         Image(nsImage: image).resizable().scaledToFill()
                     } else if entry.isColor, let color = Color(hex: entry.text ?? "") {
                         color

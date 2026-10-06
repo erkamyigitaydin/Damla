@@ -337,6 +337,11 @@ func runSelfTests() -> Int32 {
     runUsageSelfTests { condition, name in check(condition, name) }
     runLyricsSelfTests { condition, name in check(condition, name) }
     runHookInstallerSelfTests { condition, name in check(condition, name) }
+    let at = { (hour: Int) in Calendar.current.date(bySettingHour: hour, minute: 10, second: 0, of: Date())! }
+    check(TodayView.greeting(at: at(8), fullName: "Erkam Yiğit Aydın") == "Günaydın, Erkam"
+          && TodayView.greeting(at: at(14), fullName: "Erkam") == "İyi günler, Erkam"
+          && TodayView.greeting(at: at(19), fullName: "") == "İyi akşamlar"
+          && TodayView.greeting(at: at(2), fullName: " ") == "İyi geceler", "Today: greeting by the hour, with the first name when there is one")
     print("Damla self-test: \(count - failures.count)/\(count) passed")
     for failure in failures { print("FAIL: \(failure)") }
     return failures.isEmpty ? 0 : 1
