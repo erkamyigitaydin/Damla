@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.6</title>
+      <pubDate>Tue, 06 Oct 2026 14:44:07 +0000</pubDate>
+      <sparkle:version>19</sparkle:version>
+      <sparkle:shortVersionString>0.8.6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Daha sağlam odak, takvim ve şarkı sözleri; birden fazla Claude Code hesabı.</p><p>- Claude Code&#x27;u birden fazla hesapla kullanıyorsan (örneğin VS Code eklentisi ayrı bir ayar klasöründe), Damla bağlantıyı artık her hesaba kurar. Yeni bir hesap eklendiğinde Ayarlar → Agent&#x27;lar bağlantıyı eksik gösterir.</p><p>- Odak sayacı artık günlük: her gün sıfırdan başlar. Mac uykudayken biten tur, uyanınca tamamlanır ve bittiği güne sayılır.</p><p>- Takvim, 24 saatin ötesindeki toplantıyı zamanı gelince kendiliğinden görür; uykudan uyanınca hemen yenilenir, izin geri alınınca eski toplantı kalmaz.</p><p>- Şarkı sözleri yüklenemezse &quot;Tekrar dene&quot; düğmesi çıkar; bağlantı hataları artık &quot;söz yok&quot; diye hatırlanmaz.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.6.dmg" length="6619528" type="application/octet-stream" sparkle:edSignature="lKcFETdQ0bf3ohrcQ3XmKIbdyOJ2d+nDpBD/K54OSqh3ArdZ09GSBSDwnUaAU2TDpXWV9TZxLaFYBL3wj5tjCQ=="/>
+    </item>
+    <item>
       <title>Damla 0.8.5</title>
       <pubDate>Mon, 05 Oct 2026 16:48:32 +0000</pubDate>
       <sparkle:version>18</sparkle:version>
