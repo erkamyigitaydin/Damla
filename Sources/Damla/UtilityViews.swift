@@ -181,21 +181,12 @@ private struct UsageWindowRow: View {
     let now: Date
     var body: some View {
         let pace = window.elapsed(length: length, at: now)
-        let tint = window.percent >= 90 ? Theme.red : window.percent >= 75 ? Theme.amber : Color.white.opacity(0.85)
+        let tint = UsageBar.tint(window.percent)
         VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 6) {
                 Text(title).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.dim).lineLimit(1)
                     .frame(width: 36, alignment: .leading)
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Theme.fillStrong).frame(height: 3)
-                        Capsule().fill(tint).frame(width: window.percent > 0 ? max(3, proxy.size.width * window.percent / 100) : 0, height: 3)
-                        // Taller than the bar, so it shows over the fill as well as past it.
-                        Capsule().fill(Theme.dim).frame(width: 1.5, height: 8).offset(x: (proxy.size.width - 1.5) * pace)
-                    }
-                    .frame(maxHeight: .infinity)
-                }
-                .frame(height: 8)
+                UsageBar(window: window, length: length, now: now)
                 Text("%\(Int(window.percent.rounded()))").font(.system(size: 9.5, weight: .semibold, design: .rounded)).monospacedDigit()
                     .foregroundStyle(window.percent >= 75 ? tint : .white.opacity(0.85))
             }
@@ -259,42 +250,14 @@ struct HeroAgentCard: View {
 struct AgentPanelView: View {
     @ObservedObject var service: AgentStatusService
     @ObservedObject var servers: DevServerMonitor
-    @State private var showHistory = false
-    @State private var showServers = true
+    /// Three plain sections instead of one long scroll: what is happening now, what happened, what listens.
+    enum Section { case now, history, servers }
+    @State private var section = Section.now
+
     var body: some View {
         content
             .onAppear { servers.start(); service.watchCodexUsage(true) }
             .onDisappear { servers.stop(); service.watchCodexUsage(false) }
-    }
-
-    /// Dev servers and databases listening on this Mac, folded like the history.
-    @ViewBuilder private var serverSection: some View {
-        if !servers.servers.isEmpty {
-            Button { withAnimation(Theme.quick) { showServers.toggle() } } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
-                        .rotationEffect(.degrees(showServers ? 90 : 0))
-                    Text("Yerel sunucular · \(servers.servers.count)").font(.system(size: 10.5, weight: .medium))
-                    Spacer()
-                }
-                .foregroundStyle(Theme.dim).padding(.horizontal, 8).frame(height: 22).contentShape(Rectangle())
-            }.buttonStyle(.plain)
-            if showServers {
-                ForEach(servers.servers) { DevServerRow(server: $0, monitor: servers) }
-            }
-        }
-    }
-
-    /// Claude's and Codex's plan limits side by side; a provider with nothing (current) to say has no card.
-    @ViewBuilder private func usageCards(at now: Date) -> some View {
-        let claude = service.usage?.current(at: now), codex = service.codexUsage?.current(at: now)
-        if claude != nil || codex != nil {
-            HStack(spacing: 6) {
-                if let claude { UsageCard(title: "Claude", usage: claude, now: now) }
-                if let codex { UsageCard(title: "Codex", usage: codex, now: now) }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-        }
     }
 
     private var content: some View {
@@ -310,54 +273,140 @@ struct AgentPanelView: View {
                     ApprovalCard(request: request, waiting: service.approvals.count, now: now, service: service)
                 }
             } else {
-            VStack(alignment: .leading, spacing: 6) {
-                PageHeader(title: Text(AgentText.summary(service.sessions, at: now)),
-                           detail: service.todayTurns > 0 ? Text("Bugün \(service.todayTurns) tur") : nil) {
-                    IconButton(icon: service.soundEnabled ? "bell.fill" : "bell.slash", label: service.soundEnabled ? "Onay beklerken ses: açık" : "Onay beklerken ses: kapalı",
-                               tint: service.soundEnabled ? Theme.accent : .white, size: 22) { service.soundEnabled.toggle() }
-                }
-                // The cards scroll with the list: pinned, they would leave the sessions too little room to read.
-                ScrollView {
-                    LazyVStack(spacing: 5) {
-                        usageCards(at: now)
-                        if service.sessions.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Label("Henüz durum gelmedi", systemImage: "antenna.radiowaves.left.and.right")
-                                    .font(.system(size: 12, weight: .medium))
-                                if servers.servers.isEmpty {
-                                    Text("Bağlı bir Claude Code veya Codex oturumunda yeni bir mesajla başlar.")
-                                        .font(.system(size: 11)).foregroundStyle(Theme.dim)
-                                    Text("Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
-                                        .font(.system(size: 10)).foregroundStyle(Theme.faint)
-                                }
-                            }
-                            .padding(.top, 2).frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            // The session that needs eyes (working or waiting, else the latest) gets the big card.
-                            let hero = active.first { [.working, .waiting].contains($0.effectivePhase(at: now)) } ?? active.first
-                            if let hero { HeroAgentCard(session: hero, now: now, service: service) }
-                            ForEach(active.filter { $0.id != hero?.id }) { AgentRow(session: $0, now: now, service: service) }
-                            if !history.isEmpty {
-                                Button { withAnimation(Theme.quick) { showHistory.toggle() } } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
-                                            .rotationEffect(.degrees(showHistory ? 90 : 0))
-                                        Text("Geçmiş · \(history.count)").font(.system(size: 10.5, weight: .medium))
-                                        Spacer()
-                                    }
-                                    .foregroundStyle(Theme.dim).padding(.horizontal, 8).frame(height: 22).contentShape(Rectangle())
-                                }.buttonStyle(.plain)
-                                if showHistory {
-                                    ForEach(history) { AgentRow(session: $0, now: now, service: service).opacity(0.75) }
-                                }
-                            }
-                        }
-                        serverSection
+                // A section that has emptied out falls back to "now" rather than showing nothing.
+                let shown = section == .history && history.isEmpty || section == .servers && servers.servers.isEmpty ? .now : section
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 4) {
+                        tab("Şimdi", .now, shown)
+                        if !history.isEmpty { tab("Geçmiş \(history.count)", .history, shown) }
+                        if !servers.servers.isEmpty { tab("Sunucular \(servers.servers.count)", .servers, shown) }
+                        Spacer(minLength: 8)
+                        IconButton(icon: service.soundEnabled ? "bell.fill" : "bell.slash", label: service.soundEnabled ? "Onay beklerken ses: açık" : "Onay beklerken ses: kapalı",
+                                   tint: service.soundEnabled ? Theme.accent : .white, size: 22) { service.soundEnabled.toggle() }
                     }
-                }.scrollIndicators(.hidden)
-            }
+                    .frame(height: 26)
+                    switch shown {
+                    case .now: nowSection(active: active, now: now)
+                    case .history:
+                        ScrollView {
+                            LazyVStack(spacing: 5) { ForEach(history) { AgentRow(session: $0, now: now, service: service) } }
+                        }.scrollIndicators(.hidden)
+                    case .servers:
+                        ScrollView {
+                            LazyVStack(spacing: 5) { ForEach(servers.servers) { DevServerRow(server: $0, monitor: servers) } }
+                        }.scrollIndicators(.hidden)
+                    }
+                }
             }
         }
+    }
+
+    private func tab(_ title: LocalizedStringKey, _ value: Section, _ shown: Section) -> some View {
+        Button(title) { withAnimation(Theme.quick) { section = value } }.buttonStyle(ChipStyle(selected: shown == value))
+    }
+
+    /// One session gets the big card; several get rows. The limits ride along as a single line under them, and
+    /// with nothing running they take the space themselves, the moment one most wants to look at them.
+    @ViewBuilder private func nowSection(active: [AgentSession], now: Date) -> some View {
+        let claude = service.usage?.current(at: now), codex = service.codexUsage?.current(at: now)
+        let limits = [("Claude", claude), ("Codex", codex)].compactMap { name, usage in usage.map { (name, $0) } }
+        if active.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 5) {
+                    Text(AgentText.summary(service.sessions, at: now)).font(.system(size: 12.5, weight: .semibold))
+                    if service.todayTurns > 0 {
+                        Text(verbatim: "·").foregroundStyle(Theme.faint)
+                        Text("Bugün \(service.todayTurns) tur").font(.system(size: 11.5, weight: .medium)).foregroundStyle(Theme.dim)
+                    }
+                }
+                .lineLimit(1)
+                if !limits.isEmpty {
+                    HStack(spacing: 6) { ForEach(limits, id: \.0) { UsageCard(title: $0.0, usage: $0.1, now: now) } }
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if service.sessions.isEmpty {
+                    Text("Bağlı bir Claude Code veya Codex oturumunda yeni bir mesajla başlar.")
+                        .font(.system(size: 11)).foregroundStyle(Theme.dim)
+                    Text("Codex ilk bağlantıda /hooks üzerinden güven onayı ister.")
+                        .font(.system(size: 10)).foregroundStyle(Theme.faint)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            // The session that needs eyes (working or waiting) comes first.
+            let ordered = active.sorted { urgency($0, now) > urgency($1, now) }
+            VStack(spacing: 6) {
+                if ordered.count == 1 {
+                    HeroAgentCard(session: ordered[0], now: now, service: service)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 5) { ForEach(ordered) { AgentRow(session: $0, now: now, service: service) } }
+                    }.scrollIndicators(.hidden)
+                }
+                Spacer(minLength: 0)
+                if !limits.isEmpty { UsageLine(limits: limits, now: now) }
+            }
+        }
+    }
+
+    private func urgency(_ session: AgentSession, _ now: Date) -> Int {
+        switch session.effectivePhase(at: now) { case .waiting: 2; case .working: 1; default: 0 }
+    }
+}
+
+/// The limits in one line under running sessions: per provider the window closest to full, with the pace tick.
+/// A lone provider also says where its pace leads.
+struct UsageLine: View {
+    let limits: [(String, AgentUsage)]
+    let now: Date
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(limits, id: \.0) { name, usage in
+                if let (label, window, length) = Self.pressing(usage) {
+                    HStack(spacing: 5) {
+                        Text(verbatim: name).font(.system(size: 10.5, weight: .semibold))
+                        Text(label).font(.system(size: 9.5, weight: .medium)).foregroundStyle(Theme.dim)
+                        UsageBar(window: window, length: length, now: now).frame(width: limits.count == 1 ? 70 : 46)
+                        Text("%\(Int(window.percent.rounded()))").font(.system(size: 10, weight: .semibold, design: .rounded)).monospacedDigit()
+                            .foregroundStyle(UsageBar.tint(window.percent))
+                    }
+                    .lineLimit(1).fixedSize()   // the name and the number never truncate; the outlook gives way
+                    .help(AgentText.outlook(window, length: length, at: now))
+                    if limits.count == 1 {
+                        Spacer(minLength: 6)
+                        Text(AgentText.outlook(window, length: length, at: now)).font(.system(size: 9.5)).foregroundStyle(Theme.faint).lineLimit(1)
+                    }
+                }
+            }
+            if limits.count > 1 { Spacer(minLength: 0) }
+        }
+        .frame(height: 18)
+    }
+
+    static func pressing(_ usage: AgentUsage) -> (String, AgentUsage.Window, TimeInterval)? {
+        let windows = [(String(localized: "5 saat"), usage.fiveHour, AgentUsage.fiveHourLength), (String(localized: "Hafta"), usage.sevenDay, AgentUsage.weekLength)]
+            .compactMap { label, window, length in window.map { (label, $0, length) } }
+        return windows.max { $0.1.percent < $1.1.percent }
+    }
+}
+
+/// A thin limit bar with a tick where even use would be by now; amber from 75 %, red from 90 %.
+struct UsageBar: View {
+    let window: AgentUsage.Window
+    let length: TimeInterval
+    let now: Date
+    static func tint(_ percent: Double) -> Color { percent >= 90 ? Theme.red : percent >= 75 ? Theme.amber : Color.white.opacity(0.85) }
+    var body: some View {
+        let pace = window.elapsed(length: length, at: now)
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.fillStrong).frame(height: 3)
+                Capsule().fill(Self.tint(window.percent)).frame(width: window.percent > 0 ? max(3, proxy.size.width * window.percent / 100) : 0, height: 3)
+                // Taller than the bar, so it shows over the fill as well as past it.
+                Capsule().fill(Theme.dim).frame(width: 1.5, height: 8).offset(x: (proxy.size.width - 1.5) * pace)
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .frame(height: 8)
     }
 }
 
