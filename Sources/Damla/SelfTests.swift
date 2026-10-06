@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Foundation
 import PDFKit
 import CoreAudio
@@ -286,6 +287,25 @@ func runSelfTests() -> Int32 {
     check(order.count == PanelTab.allCases.count && Set(order) == Set(PanelTab.allCases), "Saved page order keeps every page once")
     check(order.first == .agents && order[1] == .home && order[2] == .files, "Saved order kept, missing pages follow their default neighbour")
     check(PanelTab.loadOrder(defaults: UserDefaults(suiteName: emptySuite)!) == PanelTab.allCases, "No saved order is the default")
+    let keySuite = "damla-hotkey-test-\(UUID().uuidString)"
+    defer { UserDefaults.standard.removePersistentDomain(forName: keySuite) }
+    let keyDefaults = UserDefaults(suiteName: keySuite)!
+    check(HotKey.load(defaults: keyDefaults) == .panelDefault && HotKey.panelDefault.display == "⌃ ⌥ Space", "Panel shortcut starts as ⌃ ⌥ Space")
+    let commandShiftF5 = HotKey(keyCode: UInt32(kVK_F5), modifiers: HotKey.carbonModifiers([.command, .shift, .function, .capsLock]))
+    check(commandShiftF5.modifiers == UInt32(cmdKey | shiftKey) && commandShiftF5.display == "⇧ ⌘ F5", "Recorded keys keep only ⌃ ⌥ ⇧ ⌘, shown in menu order")
+    check(HotKey(keyCode: UInt32(kVK_LeftArrow), modifiers: UInt32(controlKey | optionKey | shiftKey | cmdKey)).display == "⌃ ⌥ ⇧ ⌘ ←", "Arrow keys show as arrows")
+    commandShiftF5.save(defaults: keyDefaults)
+    check(HotKey.load(defaults: keyDefaults) == commandShiftF5, "A recorded shortcut survives save and load")
+    HotKey.panelDefault.save(defaults: keyDefaults)
+    check(keyDefaults.object(forKey: HotKey.codeKey) == nil && HotKey.load(defaults: keyDefaults) == .panelDefault, "Back to default leaves no saved key")
+    check(HotKey(keyCode: UInt32(kVK_ANSI_K), modifiers: 0).problem == .needsModifier
+          && HotKey(keyCode: UInt32(kVK_ANSI_K), modifiers: UInt32(shiftKey)).problem == .needsModifier
+          && HotKey(keyCode: UInt32(kVK_ANSI_K), modifiers: UInt32(cmdKey)).problem == nil, "A shortcut needs ⌘, ⌃ or ⌥")
+    check(HotKey.approvalAllow.problem == .reserved && HotKey.approvalDeny.problem == .reserved
+          && HotKey(keyCode: UInt32(kVK_Return), modifiers: UInt32(controlKey | optionKey | shiftKey)).problem == nil, "Approval keys stay reserved")
+    keyDefaults.set(kVK_Return, forKey: HotKey.codeKey); keyDefaults.set(controlKey | optionKey, forKey: HotKey.modifiersKey)
+    check(HotKey.load(defaults: keyDefaults) == .panelDefault, "A saved key that is not allowed falls back to the default")
+    check(HoverDelay.normal.seconds == 0.12 && HoverDelay.short.seconds < 0.12 && HoverDelay.long.seconds > 0.12, "Normal hover wait is the notch’s old 0.12 s")
     runMediaSelfTests { condition, name in check(condition, name) }
     runFocusSelfTests { condition, name in check(condition, name) }
     runCalendarSelfTests { condition, name in check(condition, name) }

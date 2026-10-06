@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import SwiftUI
 
 /// A regular macOS settings window: toolbar tabs, grouped forms, system controls. It lives outside the
@@ -65,8 +66,16 @@ private struct GeneralSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle("İmleç çentiğe gelince aç", isOn: $model.automaticOpen)
-                    .onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
+                Picker("Çentiği aç", selection: $model.automaticOpen) {
+                    Text("Üzerine gelince").tag(true)
+                    Text("Tıklayınca").tag(false)
+                }
+                .onChange(of: model.automaticOpen) { _, _ in model.savePreferences() }
+                if model.automaticOpen {
+                    Picker("Bekleme", selection: $model.hoverDelay) {
+                        ForEach(HoverDelay.allCases) { Text($0.title).tag($0) }
+                    }
+                }
                 Toggle("Girişte başlat", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                 Picker("Dil", selection: $language) {
                     ForEach(AppLanguage.allCases) { Text($0.title).tag($0) }
@@ -79,7 +88,7 @@ private struct GeneralSettings: View {
             MeetingSettings(model: model, calendar: model.calendar)
             NotificationSettings(mirror: model.notifications)
             Section("Kısayollar") {
-                shortcut("Paneli aç veya kapat", "⌃ ⌥ Space")
+                PanelShortcutRow(model: model)
                 shortcut("Onayda izin ver · reddet", "⌃ ⌥ ↩ · ⌃ ⌥ ⌫")
             }
             Section {
@@ -102,19 +111,28 @@ private struct PanelSettings: View {
     @AppStorage(PolaroidCard.datedKey) private var polaroidDate = true
     var body: some View {
         Form {
+            // The pill's pages in its order, then the ones switched off (Bildirimler too while notifications are off).
+            let shown = model.visibleTabs
             Section {
-                ForEach(model.tabOrder) { tab in TabOrderRow(tab: tab, model: model) }
+                ForEach(shown) { tab in TabOrderRow(tab: tab, model: model) }
             } header: {
                 HStack {
-                    Text("Sayfalar")
+                    Text("Çentikte")
                     Spacer()
-                    if model.tabOrder != PanelTab.allCases {
+                    if shown != PanelTab.allCases.filter(shown.contains) {
                         Button("Varsayılan sıra") { withAnimation { model.resetTabOrder() } }
                             .buttonStyle(.link).font(.caption)
                     }
                 }
             } footer: {
                 Text("Sıralamak için sürükle.").font(.caption).foregroundStyle(.secondary)
+            }
+            let off = model.tabOrder.filter { !shown.contains($0) }
+            if !off.isEmpty {
+                // "Kapalı" alone is the muted microphone's label, "Muted" in English.
+                Section(String(localized: "Kapalı sayfalar", defaultValue: "Kapalı")) {
+                    ForEach(off) { tab in TabOrderRow(tab: tab, model: model) }
+                }
             }
             Section("Dosyalar ve Pano") {
                 Toggle("Ekran görüntüleri rafa düşsün", isOn: $model.screenshotsToShelf)
@@ -387,38 +405,104 @@ private struct NotificationSettings: View {
     }
 }
 
-/// One page in Settings → Sayfalar: on/off, and dragged by its row to a new place in the pill.
+/// One page in Settings → Panel. Under Çentikte it is dragged by its row to a new place in the pill and switched
+/// off into Kapalı; switched on from Kapalı, it joins the end of the pill.
 private struct TabOrderRow: View {
     let tab: PanelTab
     @ObservedObject var model: AppState
     @State private var targeted = false
     var body: some View {
-        let on = model.enabledTabs.contains(tab)
+        if model.visibleTabs.contains(tab) {
+            HStack(spacing: 10) {
+                Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
+                    .help("Sıralamak için sürükle")
+                toggle(shown: true)
+            }
+            .contentShape(Rectangle())
+            .draggable(tab.rawValue) {
+                Label(tab.title, systemImage: tab.icon).padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(.regularMaterial, in: Capsule())
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard let dragged = items.first.flatMap(PanelTab.init(rawValue:)), model.visibleTabs.contains(dragged) else { return false }
+                withAnimation(.snappy(duration: 0.25)) { model.moveTab(dragged, to: tab) }
+                return true
+            } isTargeted: { targeted = $0 }
+            .overlay {
+                // The page it takes the place of (it lands before it moving up, after it moving down).
+                if targeted {
+                    RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 1.5).padding(-4).allowsHitTesting(false)
+                }
+            }
+        } else {
+            toggle(shown: false)
+        }
+    }
+    private func toggle(shown: Bool) -> some View {
         let unavailable = tab == .notifications && !model.notifications.enabled   // its own switch is in Genel
-        HStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
-                .help("Sıralamak için sürükle")
-            Toggle(isOn: Binding(get: { on && !unavailable }, set: { model.setTab(tab, enabled: $0) })) {
-                Label(tab.title, systemImage: tab.icon)
-                if unavailable { Text("Bildirimler kapalı; Genel’den aç.") }
+        return Toggle(isOn: Binding(get: { shown }, set: { on in withAnimation(.snappy(duration: 0.25)) { model.setTab(tab, enabled: on) } })) {
+            Label(tab.title, systemImage: tab.icon)
+            if unavailable { Text("Bildirimler kapalı; Genel’den aç.") }
+        }
+        .disabled(unavailable || (shown && model.visibleTabs.count == 1))   // one page always stays
+    }
+}
+
+/// Settings → Kısayollar: the panel's shortcut on a key cap. Clicking it listens for the next combination with
+/// ⌘, ⌃ or ⌥; Esc, a second click or leaving the window gives up and keeps the old one.
+private struct PanelShortcutRow: View {
+    @ObservedObject var model: AppState
+    @State private var monitor: Any?
+    @State private var held = ""                  // modifiers down while listening, shown on the cap
+    @State private var refused: HotKey.Problem?
+    var body: some View {
+        let recording = model.recordingHotKey
+        LabeledContent {
+            HStack(spacing: 10) {
+                if model.panelHotKey != .panelDefault && !recording {
+                    Button("Varsayılana dön") { model.panelHotKey = .panelDefault }.buttonStyle(.link)
+                }
+                Button { recording ? stop() : start() } label: {
+                    Text(verbatim: recording ? (held.isEmpty ? "…" : held) : model.panelHotKey.display)
+                        .font(.system(.body, design: .rounded)).frame(minWidth: 84)
+                }
+                .overlay {
+                    if recording { RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2).allowsHitTesting(false) }
+                }
+                .help("Yeni kısayol için tıkla")
             }
-            .disabled(unavailable || (on && model.enabledTabs.count == 1))   // one page always stays
-        }
-        .contentShape(Rectangle())
-        .draggable(tab.rawValue) {
-            Label(tab.title, systemImage: tab.icon).padding(.horizontal, 10).padding(.vertical, 5)
-                .background(.regularMaterial, in: Capsule())
-        }
-        .dropDestination(for: String.self) { items, _ in
-            guard let dragged = items.first.flatMap(PanelTab.init(rawValue:)) else { return false }
-            withAnimation(.snappy(duration: 0.25)) { model.moveTab(dragged, to: tab) }
-            return true
-        } isTargeted: { targeted = $0 }
-        .overlay {
-            // The page it takes the place of (it lands before it moving up, after it moving down).
-            if targeted {
-                RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 1.5).padding(-4).allowsHitTesting(false)
+        } label: {
+            Text("Paneli aç veya kapat")
+            if recording {
+                Text(refused == .reserved ? "⌃ ⌥ ↩ ve ⌃ ⌥ ⌫ onaylar için ayrılmış." as LocalizedStringKey
+                     : refused == .needsModifier ? "⌘, ⌃ ya da ⌥ ile birlikte bas." : "Yeni kısayola bas; Esc vazgeçer.")
+            } else if model.hotKeyTaken {
+                Text("Başka bir uygulama bu kısayolu kullanıyor; başka birini seç.").foregroundStyle(.orange)
             }
         }
+        .onDisappear { stop() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in stop() }
+    }
+
+    private func start() {
+        refused = nil; held = ""
+        model.recordingHotKey = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+            if event.type == .flagsChanged {
+                held = HotKey.symbols(HotKey.carbonModifiers(event.modifierFlags)).joined(separator: " ")
+                return event
+            }
+            if event.keyCode == UInt16(kVK_Escape) { stop(); return nil }
+            let key = HotKey(keyCode: UInt32(event.keyCode), modifiers: HotKey.carbonModifiers(event.modifierFlags))
+            if let problem = key.problem { refused = problem } else { model.panelHotKey = key; stop() }
+            return nil   // nothing typed while listening reaches the window (⌘W must not close it)
+        }
+    }
+    /// Also clears a flag left on without its monitor, so the panel key and the notch's Esc always come back.
+    private func stop() {
+        guard monitor != nil || model.recordingHotKey else { return }
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil; held = ""
+        model.recordingHotKey = false
     }
 }

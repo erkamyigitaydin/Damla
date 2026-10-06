@@ -47,6 +47,17 @@ enum PanelTab: String, CaseIterable, Identifiable {
     }
 }
 
+/// How long the pointer rests on the notch before it opens (Ayarlar → Genel → Bekleme). The hover tick runs at
+/// 10 Hz near the notch, so each wait rounds up to the next tick; Normal is the 0.12 s the notch always had.
+enum HoverDelay: String, CaseIterable, Identifiable {
+    case short = "Kısa", normal = "Normal", long = "Uzun"   // raw values are stored settings
+    var id: String { rawValue }
+    var seconds: TimeInterval { switch self { case .short: return 0.05; case .normal: return 0.12; case .long: return 0.3 } }
+    var title: String {
+        switch self { case .short: return String(localized: "Kısa"); case .normal: return String(localized: "Normal"); case .long: return String(localized: "Uzun") }
+    }
+}
+
 struct HUDItem: Identifiable {
     enum Kind { case volume, mute, brightness, battery, done, agent, device }
     var id = UUID()
@@ -148,7 +159,20 @@ final class AppState: ObservableObject {
     /// The chosen focus and break lengths; a finished phase sets up the next one with them.
     @Published private(set) var focusLength = UserDefaults.standard.object(forKey: "focusLength") as? Int ?? 25
     @Published private(set) var focusBreak = UserDefaults.standard.object(forKey: "focusBreak") as? Int ?? 5
+    /// Hovering opens the notch; off, only a click does (Ayarlar → Genel → Çentiği aç).
     @Published var automaticOpen = UserDefaults.standard.object(forKey: "automaticOpen") as? Bool ?? true
+    @Published var hoverDelay = HoverDelay(rawValue: UserDefaults.standard.string(forKey: "hoverDelay") ?? "") ?? .normal {
+        didSet { UserDefaults.standard.set(hoverDelay.rawValue, forKey: "hoverDelay") }
+    }
+    /// The panel's global shortcut (Ayarlar → Genel → Kısayollar); the app delegate registers it again on change.
+    @Published var panelHotKey = HotKey.load() {
+        didSet { panelHotKey.save() }
+    }
+    /// The system refused the panel shortcut: another app holds it.
+    @Published var hotKeyTaken = false
+    /// Settings is listening for a new shortcut: no panel hot key is registered meanwhile (so the current one can
+    /// be pressed too), and the notch's own Esc handling steps aside.
+    @Published var recordingHotKey = false
     let media = MediaService()
     let appVolumes = AppVolumeController()
     let lyrics = LyricsService()
@@ -496,9 +520,16 @@ final class AppState: ObservableObject {
         pinnedOpen = false; expanded = false
         presentSettings?()
     }
-    /// The last page cannot be turned off: the panel always has something to open to.
+    /// The last page in the pill cannot be turned off: the panel always has something to open to. A page turned on
+    /// joins the end of the pill (in Settings → Panel it moves from Kapalı to the bottom of Çentikte).
     func setTab(_ tab: PanelTab, enabled: Bool) {
-        if enabled { enabledTabs.insert(tab) } else if enabledTabs.count > 1 { enabledTabs.remove(tab) }
+        if enabled {
+            guard !enabledTabs.contains(tab) else { return }
+            tabOrder = tabOrder.filter { $0 != tab } + [tab]
+            enabledTabs.insert(tab)
+        } else if visibleTabs.contains(where: { $0 != tab }) {
+            enabledTabs.remove(tab)
+        }
     }
     /// The tour told inside the notch; nil when it is not running.
     @Published private(set) var tour: TourStep?

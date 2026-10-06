@@ -287,7 +287,7 @@ final class PanelController {
             || model.video.hovering || visibleRect().insetBy(dx: -90, dy: -60).contains(NSEvent.mouseLocation)
     }
     /// Every mouse event: pass clicks through where nothing is drawn, and wake the hover check when the pointer
-    /// comes near (so opening still takes the same 0.12 s).
+    /// comes near (so opening still takes only the chosen wait, Ayarlar → Genel → Bekleme).
     private func pointerMoved() {
         updateMousePassthrough()
         if !hoverFast && needsFastHover { scheduleHover(fast: true); trackHover() }
@@ -323,7 +323,7 @@ final class PanelController {
             exitedAt = nil
             if enteredAt == nil { enteredAt = now }
             if state != .expanded && !model.dragActive && model.automaticOpen && now >= suppressHoverUntil
-                && now.timeIntervalSince(enteredAt!) > 0.12 {
+                && now.timeIntervalSince(enteredAt!) > model.hoverDelay.seconds {
                 model.activeScreenID = id
                 model.expanded = true
             }
@@ -434,6 +434,7 @@ final class PanelManager {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             if self.model.cleaning.active { return nil }
+            if self.model.recordingHotKey { return event }   // Settings is recording a shortcut; Esc there cancels it
             if event.keyCode == 53, self.model.notifications.replying { self.model.notifications.cancelReply(); return nil }
             if event.keyCode == 53 { // Esc: Quick Look first, then the notch
                 if QuickLookController.isShowing { QLPreviewPanel.shared().orderOut(nil); return nil }
@@ -834,13 +835,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { delegate.hotKeyPressed(key.id) }
             return noErr
         }, 1, &event, Unmanaged.passUnretained(self).toOpaque(), &eventHandler)
-        let identifier = EventHotKeyID(signature: 0x444D4C41, id: 1)
-        let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), identifier, GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { model.showNotice(String(localized: "Kısayol kullanılıyor. Menüdeki damladan açabilirsin.")) }
+        registerPanelKey(model.panelHotKey, recording: false)
+        if model.hotKeyTaken { model.showNotice(String(localized: "Kısayol kullanılıyor. Menüdeki damladan açabilirsin.")) }
+        // A key recorded in Settings takes over at once; none is registered while one is being recorded.
+        Publishers.CombineLatest(model.$panelHotKey, model.$recordingHotKey).dropFirst().removeDuplicates { $0 == $1 }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] key, recording in self?.registerPanelKey(key, recording: recording) }.store(in: &observers)
         // ⌃⌥↩ allows and ⌃⌥⌫ denies the shown permission prompt. They are only registered while a prompt waits,
         // so other apps keep these keys the rest of the time.
         model.agents.$approvals.map(\.isEmpty).removeDuplicates().receive(on: RunLoop.main)
             .sink { [weak self] empty in self?.setApprovalKeys(!empty) }.store(in: &observers)
+    }
+
+    /// Swaps the panel's hot key; a refusal (another app holds the combination) shows under it in Settings.
+    private func registerPanelKey(_ key: HotKey, recording: Bool) {
+        if let hotKey { UnregisterEventHotKey(hotKey); self.hotKey = nil }
+        guard !recording else { return }
+        let status = RegisterEventHotKey(key.keyCode, key.modifiers, EventHotKeyID(signature: 0x444D4C41, id: 1), GetApplicationEventTarget(), 0, &hotKey)
+        if status != noErr { hotKey = nil }
+        if model.hotKeyTaken != (status != noErr) { model.hotKeyTaken = status != noErr }
     }
 
     private static let approvalAllowKey: UInt32 = 2, approvalDenyKey: UInt32 = 3
@@ -852,9 +865,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         approvalKeys = []
         approvalKeysArmed = on ? Date().addingTimeInterval(Self.approvalKeyDelay) : .distantFuture
         guard on else { return }
-        for (id, code) in [(Self.approvalAllowKey, kVK_Return), (Self.approvalDenyKey, kVK_Delete)] {
+        for (id, key) in [(Self.approvalAllowKey, HotKey.approvalAllow), (Self.approvalDenyKey, HotKey.approvalDeny)] {
             var ref: EventHotKeyRef?
-            if RegisterEventHotKey(UInt32(code), UInt32(controlKey | optionKey), EventHotKeyID(signature: 0x444D4C41, id: id),
+            if RegisterEventHotKey(key.keyCode, key.modifiers, EventHotKeyID(signature: 0x444D4C41, id: id),
                                    GetApplicationEventTarget(), 0, &ref) == noErr, let ref { approvalKeys.append(ref) }
         }
     }
@@ -882,6 +895,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let hotKey { UnregisterEventHotKey(hotKey) }
         for key in approvalKeys { UnregisterEventHotKey(key) }
         if let eventHandler { RemoveEventHandler(eventHandler) }
+    }
+}
+
+/// A global shortcut as RegisterEventHotKey takes it: a virtual key code and Carbon modifier bits. The panel's is
+/// recorded in Ayarlar → Genel and saved under two integer keys; the approval keys are fixed.
+struct HotKey: Equatable {
+    var keyCode: UInt32
+    var modifiers: UInt32
+
+    static let panelDefault = HotKey(keyCode: UInt32(kVK_Space), modifiers: UInt32(controlKey | optionKey))
+    static let approvalAllow = HotKey(keyCode: UInt32(kVK_Return), modifiers: UInt32(controlKey | optionKey))
+    static let approvalDeny = HotKey(keyCode: UInt32(kVK_Delete), modifiers: UInt32(controlKey | optionKey))
+    static let codeKey = "panelHotKeyCode", modifiersKey = "panelHotKeyModifiers"
+
+    enum Problem { case needsModifier, reserved }
+    /// A bare or ⇧ key would be taken from typing in every app, so ⌘, ⌃ or ⌥ is required; the approval keys
+    /// stay free for the prompts.
+    var problem: Problem? {
+        if modifiers & UInt32(cmdKey | controlKey | optionKey) == 0 { return .needsModifier }
+        if self == .approvalAllow || self == .approvalDeny { return .reserved }
+        return nil
+    }
+
+    /// The saved panel key; ⌃⌥Space when none is saved or the saved one is not allowed.
+    static func load(defaults: UserDefaults = .standard) -> HotKey {
+        guard let code = defaults.object(forKey: codeKey) as? Int, let bits = defaults.object(forKey: modifiersKey) as? Int else { return .panelDefault }
+        let key = HotKey(keyCode: UInt32(clamping: code), modifiers: UInt32(clamping: bits) & UInt32(controlKey | optionKey | shiftKey | cmdKey))
+        return key.problem == nil ? key : .panelDefault
+    }
+    /// The default is saved as no value, so "Varsayılana dön" leaves nothing behind.
+    func save(defaults: UserDefaults = .standard) {
+        if self == .panelDefault {
+            defaults.removeObject(forKey: Self.codeKey); defaults.removeObject(forKey: Self.modifiersKey)
+        } else {
+            defaults.set(Int(keyCode), forKey: Self.codeKey); defaults.set(Int(modifiers), forKey: Self.modifiersKey)
+        }
+    }
+
+    /// Caps Lock and the fn flag (arrows and F-keys carry it) are not part of a shortcut.
+    static func carbonModifiers(_ flags: NSEvent.ModifierFlags) -> UInt32 {
+        var bits = 0
+        if flags.contains(.control) { bits |= controlKey }
+        if flags.contains(.option) { bits |= optionKey }
+        if flags.contains(.shift) { bits |= shiftKey }
+        if flags.contains(.command) { bits |= cmdKey }
+        return UInt32(bits)
+    }
+    /// In the order macOS menus show them.
+    static func symbols(_ modifiers: UInt32) -> [String] {
+        [(controlKey, "⌃"), (optionKey, "⌥"), (shiftKey, "⇧"), (cmdKey, "⌘")].filter { modifiers & UInt32($0.0) != 0 }.map(\.1)
+    }
+    /// "⌃ ⌥ Space", spaced like the other keys in Settings.
+    var display: String { (Self.symbols(modifiers) + [Self.keyName(keyCode)]).joined(separator: " ") }
+
+    private static let named: [Int: String] = [
+        kVK_Space: "Space", kVK_Return: "↩", kVK_ANSI_KeypadEnter: "⌤", kVK_Tab: "⇥", kVK_Delete: "⌫", kVK_ForwardDelete: "⌦",
+        kVK_Escape: "⎋", kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+        kVK_Home: "↖", kVK_End: "↘", kVK_PageUp: "⇞", kVK_PageDown: "⇟"]
+    private static let functionKeys = [kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+                                       kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20]
+    /// Keys without a character go by symbol or name; the rest as the current keyboard layout prints them
+    /// (a Turkish Q's Ş, not the US ;).
+    static func keyName(_ code: UInt32) -> String {
+        if let name = named[Int(code)] { return name }
+        if let index = functionKeys.firstIndex(of: Int(code)) { return "F\(index + 1)" }
+        return layoutCharacter(code) ?? "#\(code)"
+    }
+    private static func layoutCharacter(_ code: UInt32) -> String? {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData),
+              let bytes = CFDataGetBytePtr(Unmanaged<CFData>.fromOpaque(property).takeUnretainedValue()) else { return nil }
+        var dead: UInt32 = 0, length = 0
+        var characters = [UniChar](repeating: 0, count: 4)
+        let status = UCKeyTranslate(UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self), UInt16(code), UInt16(kUCKeyActionDisplay),
+                                    0, UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysMask), &dead, characters.count, &length, &characters)
+        let text = String(utf16CodeUnits: characters, count: length).trimmingCharacters(in: .whitespacesAndNewlines.union(.controlCharacters))
+        return status == noErr && !text.isEmpty ? text.uppercased(with: .current) : nil
     }
 }
 
