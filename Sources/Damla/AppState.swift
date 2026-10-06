@@ -127,6 +127,9 @@ final class AppState: ObservableObject {
     @Published var outputs: [AudioOutput] = []
     /// What Özet shows: the player, the output list, or the volume levels.
     enum HomePane { case player, outputs, levels, sources, videoSetup }
+    /// Özet opens as "Bugün" when nothing is playing. It is decided as the panel opens, so pausing never swaps
+    /// the page under the pointer; playback starting while it shows brings the player back.
+    @Published var homeShowsToday = false
     @Published var homePane: HomePane = .player {
         willSet { if newValue != homePane { pageDirection = newValue == .player ? -1 : 1 } }   // a pane opens forward, closes back
     }
@@ -296,6 +299,11 @@ final class AppState: ObservableObject {
         }
         monitor.onHUD = { [weak self] icon, title, level in self?.showHUD(icon, title, level) }
         notifications.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &cancellables)
+        // Play from "Bugün" (its row, a media key, the app itself): the player takes the page back.
+        media.$playing.removeDuplicates().filter { $0 }.receive(on: RunLoop.main).sink { [weak self] _ in
+            guard let self, self.homeShowsToday else { return }
+            withAnimation(Theme.page) { self.homeShowsToday = false }
+        }.store(in: &cancellables)
         notifications.isViewing = { [weak self] in self.map { $0.expanded && $0.selectedTab == .notifications } ?? false }
         // Looking at the page reads everything on it; leaving it (another page, or the panel closing) clears
         // what was read.
@@ -443,6 +451,7 @@ final class AppState: ObservableObject {
         $expanded.removeDuplicates().sink { [weak self] expanded in
             guard let self else { return }
             self.media.wantsFrequentUpdates = expanded
+            if expanded { self.homeShowsToday = !self.media.playing }
             if !expanded {
                 self.homePane = .player; self.lyricsExpanded = false
                 // Never reopen on the mirror: hovering the notch must not switch the camera on.

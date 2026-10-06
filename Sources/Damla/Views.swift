@@ -626,7 +626,12 @@ struct ExpandedView: View {
                 switch model.selectedTab {
                 case .home:
                     switch model.homePane {
-                    case .player: HomeView(model: model, media: model.media, lyrics: model.lyrics)
+                    case .player:
+                        if model.homeShowsToday {
+                            TodayView(model: model, media: model.media, agents: model.agents, calendar: model.calendar)
+                        } else {
+                            HomeView(model: model, media: model.media, lyrics: model.lyrics)
+                        }
                     case .outputs: OutputsView(model: model)
                     case .levels: MixerView(model: model, media: model.media, apps: model.appVolumes)
                     case .sources: SourcesView(model: model, media: model.media)
@@ -647,7 +652,7 @@ struct ExpandedView: View {
             .opacity(1 - min(abs(model.swipeOffset) / 320, 0.45))
             .blur(radius: min(abs(model.swipeOffset) / 45, 3))
             .transition(.page(model.pageDirection))
-            .id(model.tour.map { "tour-\($0.rawValue)" } ?? (model.selectedTab == .home ? "home-\(model.homePane)" : model.selectedTab.rawValue))
+            .id(model.tour.map { "tour-\($0.rawValue)" } ?? (model.selectedTab == .home ? (model.homeShowsToday && model.homePane == .player ? "home-today" : "home-\(model.homePane)") : model.selectedTab.rawValue))
             .padding(.horizontal, 24).padding(.top, m.hasNotch ? 8 : 4).padding(.bottom, 18)
             .frame(width: Layout.panelWidth, height: model.contentHeight)
         }
