@@ -101,5 +101,14 @@ class InstallerTests(unittest.TestCase):
             self.assertFalse((root / ".claude/settings.json").exists())
 
 
+    def test_every_claude_config_folder(self):
+        with tempfile.TemporaryDirectory(prefix="Damla-installer-test-") as tmp:
+            root = Path(tmp); binary = root / "Damla"; binary.touch()
+            (root / ".claude").mkdir(); (root / ".claude-default/projects").mkdir(parents=True); (root / ".claude-mem").mkdir()
+            self.assertEqual([p.name for p in installer.claude_dirs(root)], [".claude", ".claude-default"])
+            subprocess.run([sys.executable, str(SCRIPT), "--home", tmp, "--binary", str(binary), "--apply"], check=True, capture_output=True)
+            self.assertIn("--agent-event", (root / ".claude-default/settings.json").read_text())
+            self.assertFalse((root / ".claude-mem/settings.json").exists())
+
 if __name__ == "__main__":
     unittest.main()

@@ -89,6 +89,32 @@ def atomic_write(path, data):
             os.unlink(name)
 
 
+def claude_dirs(home, environ=None):
+    """Every Claude Code config folder in use, as HookInstaller.claudeDirectories finds them.
+
+    CLAUDE_CONFIG_DIR keeps an account per editor (VS Code with ~/.claude-default, say); it only counts for the
+    real home, so a test home never reaches the user's settings.
+    """
+    if environ is None:
+        environ = os.environ if home.resolve() == Path.home().resolve() else {}
+    found = []
+    standard = home / ".claude"
+    if standard.is_dir():
+        found.append(standard)
+    configured = environ.get("CLAUDE_CONFIG_DIR", "")
+    if configured.startswith("/") and Path(configured).is_dir():
+        found.append(Path(configured))
+    for path in sorted(home.glob(".claude-*")):
+        if (path / "projects").is_dir() or (path / "history.jsonl").is_file():
+            found.append(path)
+    seen, unique = set(), []
+    for path in found:
+        if path.resolve() not in seen:
+            seen.add(path.resolve())
+            unique.append(path)
+    return unique or [standard]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--home", type=Path, default=Path.home())
@@ -100,12 +126,13 @@ def main():
     if not args.binary.is_file():
         parser.error("Damla uygulaması bulunamadı")
     plans = []
-    for provider, path in [("claude", args.home / ".claude/settings.json"), ("codex", args.home / ".codex/hooks.json")]:
+    targets = [("claude", path / "settings.json") for path in claude_dirs(args.home)] + [("codex", args.home / ".codex/hooks.json")]
+    for provider, path in targets:
         old = path.read_bytes() if path.exists() else None
         original = json.loads(old) if old else {}
         updated = merge(original, provider, args.binary.resolve(), args.approvals)
         if updated == original:
-            print(provider + ": zaten kurulu")
+            print(provider + ": " + str(path) + " zaten kurulu")
             continue
         new = (json.dumps(updated, ensure_ascii=False, indent=2) + "\n").encode()
         plans.append((path, old, new))
