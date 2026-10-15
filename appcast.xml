@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.9</title>
+      <pubDate>Thu, 15 Oct 2026 22:59:51 +0000</pubDate>
+      <sparkle:version>22</sparkle:version>
+      <sparkle:shortVersionString>0.8.9</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Codex onayları: yalnızca kullanıcı kararı gereken istekler Damla’da sorulur.</p><p>- Codex’in otomatik incelemeye aldığı komutlar artık gereksiz “İzin ver / Reddet” kartı ve “Onay bekliyor” durumu oluşturmuyor.</p><p>- Kullanıcı onayı gereken Codex istekleri Damla’dan onaylanabilir veya reddedilebilir.</p><p>- Oturumun onay türü doğrulanamazsa istek karar verilmeden Codex’in kendi onay akışına bırakılır.</p><p>- Onay türü kart açıkken değişirse kart kapanır; eski, doğrulanmamış Codex onay kartları temizlenir.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.9.dmg" length="7261431" type="application/octet-stream" sparkle:edSignature="FMhzoMxmuAesLxd5sLTXUlZqJgpvY3XPQERV23aTMU64bTl4jB9Z9633JM6WK9S+5jJqpwZ9dQiM9s1V+JlLCA=="/>
+    </item>
+    <item>
       <title>Damla 0.8.8</title>
       <pubDate>Tue, 06 Oct 2026 23:07:59 +0000</pubDate>
       <sparkle:version>21</sparkle:version>
