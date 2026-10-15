@@ -18,6 +18,8 @@ struct ApprovalRequest: Codable, Identifiable, Equatable {
     var always: [String]? = nil
     /// Set when Claude asks a multiple-choice question (AskUserQuestion) instead of a permission.
     var questions: [QuestionPrompt]? = nil
+    /// Only new, metadata-confirmed manual Codex approvals may be shown; older records are ambiguous.
+    var codexManualApproval: Bool? = nil
 }
 
 /// One AskUserQuestion question, as far as the notch needs it.
@@ -186,6 +188,7 @@ enum AgentApprovals {
     static func output(_ decision: ApprovalDecision, input: Data = Data(#"{"hook_event_name":"PermissionRequest"}"#.utf8),
                        provider: AgentProvider = .claude) -> Data {
         guard let event = try? JSONSerialization.jsonObject(with: input) as? [String: Any] else { return Data() }
+        if provider == .codex, CodexApprovalRouting.reviewer(event) != .user { return Data() }
         let object: [String: Any]
         if event["hook_event_name"] as? String == "PreToolUse" {
             guard case .answer(let answers) = decision, var toolInput = event["tool_input"] as? [String: Any] else { return Data() }
@@ -219,6 +222,7 @@ enum AgentApprovals {
         }
         var enabled: () -> Bool = { AgentApprovals.enabled }
         var wait: () -> TimeInterval = { AgentApprovals.wait }
+        var codexReviewer: ([String: Any]) -> CodexApprovalRouting.Reviewer? = CodexApprovalRouting.reviewer
     }
 
     /// Hook entry point. Returns the decision to print, or nil to step aside.
@@ -235,6 +239,9 @@ enum AgentApprovals {
         switch event["hook_event_name"] as? String {
         case "PermissionRequest":
             guard !AgentSession.questionTools.contains(tool) else { return nil }
+            // Codex fires this before automatic review. Only a confirmed human reviewer gets a card;
+            // automatic or unknown requests continue through Codex with no decision and no delay.
+            if provider == .codex, env.codexReviewer(event) != .user { return nil }
         case "PreToolUse":
             guard provider == .claude, tool == "AskUserQuestion", let parsed = Self.questions(toolInput) else { return nil }
             questions = parsed
@@ -251,7 +258,8 @@ enum AgentApprovals {
                                       provider: provider, project: cwd.isEmpty ? String(localized: "Oturum") : clean(URL(fileURLWithPath: cwd).lastPathComponent, limit: 80),
                                       tool: clean(tool, limit: 120), summary: summary, detail: detail, host: host,
                                       created: start, deadline: start.addingTimeInterval(wait),
-                                      always: always.isEmpty ? nil : always, questions: questions)
+                                      always: always.isEmpty ? nil : always, questions: questions,
+                                      codexManualApproval: provider == .codex ? true : nil)
         guard write(request, directory: directory) else { return nil }
         let requestFile = directory.appendingPathComponent(request.id + ".json")
         let decisionFile = directory.appendingPathComponent(request.id + ".decision")
@@ -263,6 +271,8 @@ enum AgentApprovals {
             _exit(0)
         }
         while env.now() < request.deadline {
+            // A changed permission mode must take effect even while the notch is open.
+            if provider == .codex, env.codexReviewer(event) != .user { return nil }
             if let raw = try? String(contentsOf: decisionFile, encoding: .utf8), let decision = ApprovalDecision(fileText: raw) {
                 // A question only takes answers; a permission prompt never does.
                 return (questions != nil) == (decision.isAnswer) ? decision : nil
@@ -317,7 +327,7 @@ enum AgentApprovals {
         return files.filter { $0.pathExtension == "json" }.compactMap { url -> ApprovalRequest? in
             guard let data = try? Data(contentsOf: url), data.count < 64_000,
                   let request = try? JSONDecoder().decode(ApprovalRequest.self, from: data) else { return nil }
-            if now > request.deadline.addingTimeInterval(5) {
+            if (request.provider == .codex && request.codexManualApproval != true) || now > request.deadline.addingTimeInterval(5) {
                 try? FileManager.default.removeItem(at: url)
                 try? FileManager.default.removeItem(at: directory.appendingPathComponent(request.id + ".decision"))
                 return nil

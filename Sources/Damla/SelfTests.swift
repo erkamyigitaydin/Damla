@@ -122,7 +122,7 @@ func runSelfTests() -> Int32 {
     cleaning.stop()
     check(cleaning.shouldUnlock(at: 101) && cleaning.remaining(at: 101) == 0, "Stopping cleaning clears every deadline")
 
-    var agent = AgentSession(id: "test", provider: .codex, project: "Damla", updated: origin)
+    var agent = AgentSession(id: "test", provider: .claude, project: "Damla", updated: origin)
     _ = agent.apply(["hook_event_name": "UserPromptSubmit"], at: origin)
     check(agent.phase == .working, "Agent begins from prompt event")
     check(agent.turnStarted == origin && agent.toolCalls == 0, "Prompt starts the turn clock and counter")
@@ -140,7 +140,8 @@ func runSelfTests() -> Int32 {
     _ = agent.apply(["hook_event_name": "PermissionRequest", "tool_use_id": "three", "tool_name": "Edit"], at: origin)
     _ = agent.apply(["hook_event_name": "PermissionDenied", "tool_use_id": "three", "tool_name": "Edit"], at: origin)
     check(agent.phase == .working && agent.waitingTool == nil, "Denied approval returns to working")
-    _ = agent.apply(["hook_event_name": "PreToolUse", "tool_use_id": "four", "tool_name": "request_permissions"], at: origin)
+    agent.provider = .codex
+    _ = agent.apply(["hook_event_name": "PreToolUse", "tool_use_id": "four", "tool_name": "request_permissions"], at: origin, codexReviewer: .user)
     check(agent.phase == .waiting && agent.detail == "Onay bekliyor", "Codex app's permission request shows as waiting for approval")
     _ = agent.apply(["hook_event_name": "PostToolUse", "tool_use_id": "four", "tool_name": "request_permissions"], at: origin)
     check(agent.phase == .working && agent.pending.isEmpty, "Answering it in Codex returns to working")
@@ -344,6 +345,7 @@ func runSelfTests() -> Int32 {
     runFocusSelfTests { condition, name in check(condition, name) }
     runCalendarSelfTests { condition, name in check(condition, name) }
     runApprovalSelfTests { condition, name in check(condition, name) }
+    runCodexApprovalRoutingSelfTests { condition, name in check(condition, name) }
     runUsageSelfTests { condition, name in check(condition, name) }
     runLyricsSelfTests { condition, name in check(condition, name) }
     runHookInstallerSelfTests { condition, name in check(condition, name) }

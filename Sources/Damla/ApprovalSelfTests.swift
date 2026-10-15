@@ -10,6 +10,18 @@ func runApprovalSelfTests(_ check: (Bool, String) -> Void) {
         try! JSONSerialization.data(withJSONObject: ["hook_event_name": "PermissionRequest", "session_id": "s1", "cwd": "/Users/x/Projem",
                                                      "tool_name": tool, "tool_input": input])
     }
+    let codexTranscript = root.appendingPathComponent("codex.jsonl")
+    func codexContext(_ reviewer: String) {
+        let records: [[String: Any]] = [
+            ["type": "session_meta", "payload": ["id": "s1"]],
+            ["type": "turn_context", "payload": ["turn_id": "turn", "approvals_reviewer": reviewer]]]
+        let lines = records.map { String(decoding: try! JSONSerialization.data(withJSONObject: $0), as: UTF8.self) }.joined(separator: "\n") + "\n"
+        try! Data(lines.utf8).write(to: codexTranscript)
+    }
+    func codexEvent(_ tool: String = "Bash", name: String = "PermissionRequest") -> Data {
+        try! JSONSerialization.data(withJSONObject: ["hook_event_name": name, "session_id": "s1", "turn_id": "turn",
+            "transcript_path": codexTranscript.path, "tool_name": tool, "tool_input": ["command": "pwd"]])
+    }
     var env = AgentApprovals.Environment()
     env.pause = { Thread.sleep(forTimeInterval: $0) }
     env.hostIsFrontmost = { _ in false }
@@ -104,9 +116,39 @@ func runApprovalSelfTests(_ check: (Bool, String) -> Void) {
     answer(.deny)
     check(AgentApprovals.handle(provider: .claude, input: event(), host: nil, directory: approvals, sessions: sessions, environment: env) == .deny, "Deny from the notch reaches the hook")
     AgentApprovals.heartbeat(directory: approvals)
+    codexContext("user")
     answer(.allow)
-    check(AgentApprovals.handle(provider: .codex, input: event("apply_patch", ["command": patch]), host: nil, directory: approvals, sessions: sessions, environment: env) == .allow,
-          "Codex requests are answered the same way")
+    check(AgentApprovals.handle(provider: .codex, input: codexEvent("apply_patch"), host: nil, directory: approvals, sessions: sessions, environment: env) == .allow,
+          "A confirmed manual Codex permission can still be allowed from Damla")
+    let codexAllowed = try? JSONSerialization.jsonObject(with: AgentApprovals.output(.allow, input: codexEvent(), provider: .codex)) as? [String: Any]
+    check(((codexAllowed?["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any])?["behavior"] as? String == "allow",
+          "Manual Codex approval returns its native allow response")
+    AgentApprovals.heartbeat(directory: approvals)
+    answer(.deny)
+    check(AgentApprovals.handle(provider: .codex, input: codexEvent(), host: "com.openai.codex", directory: approvals, sessions: sessions, environment: env) == .deny,
+          "A confirmed manual Codex permission can still be denied from Damla")
+    check(!AgentApprovals.output(.deny, input: codexEvent(), provider: .codex).isEmpty, "Manual Codex denial returns a native response")
+    check(AgentApprovals.handle(provider: .codex, input: codexEvent(name: "PreToolUse"), host: nil, directory: approvals, sessions: sessions, environment: env) == nil,
+          "An ordinary Codex command does not open a card even in manual mode")
+    for reviewer in ["auto_review", "unknown"] {
+        codexContext(reviewer)
+        for tool in ["Bash", "apply_patch", "mcp__server__tool", "request_permissions"] {
+            AgentApprovals.heartbeat(directory: approvals)
+            var clock = Date(), paused = false
+            var fast = env; fast.now = { clock }; fast.pause = { _ in paused = true; clock = clock.addingTimeInterval(2) }
+            check(AgentApprovals.handle(provider: .codex, input: codexEvent(tool), host: "com.openai.codex", directory: approvals, sessions: sessions, environment: fast) == nil
+                  && !paused && requestFiles().isEmpty, "Codex \(reviewer) \(tool) opens no card and never waits")
+            check(AgentApprovals.output(.allow, input: codexEvent(tool), provider: .codex).isEmpty
+                  && AgentApprovals.output(.deny, input: codexEvent(tool), provider: .codex).isEmpty,
+                  "Codex \(reviewer) \(tool) gets no automatic allow or deny")
+        }
+    }
+    codexContext("user")
+    AgentApprovals.heartbeat(directory: approvals)
+    var changed = env
+    changed.pause = { _ in codexContext("auto_review") }
+    check(AgentApprovals.handle(provider: .codex, input: codexEvent(), host: nil, directory: approvals, sessions: sessions, environment: changed) == nil
+          && requestFiles().isEmpty, "Switching to automatic review withdraws an open manual card without a decision")
     AgentApprovals.heartbeat(directory: approvals)
     final class Seen: @unchecked Sendable { var request: ApprovalRequest? }
     let seen = Seen()

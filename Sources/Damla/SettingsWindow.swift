@@ -296,7 +296,7 @@ private struct AgentSettings: View {
             } header: {
                 Text("Bağlantı")
             } footer: {
-                Text("Codex’te onaylar terminaldeki Codex CLI’de çalışır; ChatGPT uygulamasının soruları kendi penceresinde yanıtlanır.")
+                Text("Codex’te kullanıcı onayı gereken istekler çentikte gösterilir. Otomatik inceleme sessizce sürer; durum doğrulanamazsa Codex kendi sorar.")
             }
             .onAppear { approvalHooks = AgentSettings.checkApprovalHooks(); codexTrusted = HookInstaller.codexApprovalTrusted() }
         }

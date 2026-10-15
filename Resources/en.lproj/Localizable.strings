@@ -369,7 +369,7 @@
 "Claude Code" = "Claude Code";
 "Codex" = "Codex";
 "Codex’te /hooks ile güven ver" = "Trust it in Codex with /hooks";
-"Codex’te onaylar terminaldeki Codex CLI’de çalışır; ChatGPT uygulamasının soruları kendi penceresinde yanıtlanır." = "For Codex, approvals work in the Codex CLI in your terminal; the ChatGPT app’s own requests are answered in its window.";
+"Codex’te kullanıcı onayı gereken istekler çentikte gösterilir. Otomatik inceleme sessizce sürer; durum doğrulanamazsa Codex kendi sorar." = "Codex requests needing human approval appear in the notch. Automatic review stays quiet; if the mode cannot be verified, Codex handles the request.";
 "Dosyalar ve Pano" = "Files and Clipboard";
 "Duraklar, video bitince kaldığı yerden devam eder." = "Pauses, then picks up where it left off.";
 "Ekran görüntüleri rafa düşsün" = "Put new screenshots on the shelf";

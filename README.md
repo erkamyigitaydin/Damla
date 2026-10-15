@@ -60,7 +60,7 @@ Running Claude Code or Codex in the background? Damla shows every session: which
   <img src="docs/screenshots/approval.png" width="550" alt="A Claude Code permission request shown in the notch with Allow and Deny buttons">
 </p>
 
-When Claude Code or the Codex CLI asks for permission, the question drops out of the notch with the exact command (or, for a Codex patch, the files it touches). Hit **Allow** or **Deny** (or ⌃⌥↩ / ⌃⌥⌫), or **Always allow** to save the rule Claude Code suggests. When Claude Code asks you to pick between options, you can answer that from the notch too. If you're already looking at the terminal, Damla stays out of the way. The ChatGPT app's own permission requests can only be answered in its window; Damla shows them as waiting so you don't miss them.
+When Claude Code or the Codex CLI asks for permission, the question drops out of the notch with the exact command (or, for a Codex patch, the files it touches). Hit **Allow** or **Deny** (or ⌃⌥↩ / ⌃⌥⌫), or **Always allow** to save the rule Claude Code suggests. When Claude Code asks you to pick between options, you can answer that from the notch too. If you're already looking at the terminal, Damla stays out of the way. For Codex, Damla shows a card only when the matching session and turn explicitly use a human approval reviewer. Automatic-review requests continue silently. If that metadata is missing or cannot be matched, Codex handles the request in its own window or terminal.
 
 ### A shelf for your files
 
@@ -109,7 +109,7 @@ On first launch a short tour plays right inside the notch, one feature at a time
 
 Open the tour from the menu bar (**Tour…**) and, at the **Agents** step, click **Connect Claude Code** or **Connect Codex**. Or connect them any time in **Settings → Agents**.
 
-Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. For Claude Code it also sets a status line (model, context and five-hour use); if you already have one, yours keeps running and Damla only reads the data passing through. In Codex, approve the new hooks once with `/hooks`. While the notch is asking, Codex holds back its own prompt; switch to the session's app and the prompt shows up there right away. The hooks only record status (phase, tool name, timing). Your prompts, conversations and command output are never read.
+Damla keeps your existing `~/.claude/settings.json` and `~/.codex/hooks.json` and leaves a backup of every file it changes. For Claude Code it also sets a status line (model, context and five-hour use); if you already have one, yours keeps running and Damla only reads the data passing through. In Codex, approve the new hooks once with `/hooks`. While the notch is asking, Codex holds back its own prompt; switch to the session's app and the prompt shows up there right away. The hooks only retain status (phase, tool name, timing). To distinguish manual Codex approvals from automatic review, Damla also reads session identity and approval-mode metadata from a bounded part of the hook-provided session log; message and tool-output payloads are not decoded or retained.
 
 ## Privacy
 

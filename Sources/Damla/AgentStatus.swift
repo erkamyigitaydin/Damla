@@ -82,8 +82,7 @@ enum AgentPhase: String, Codable {
 /// Only state metadata is retained: no prompts, tool arguments, outputs or transcripts.
 struct AgentSession: Codable, Identifiable, Equatable {
     static let questionTools: Set<String> = ["AskUserQuestion", "request_user_input", "request_user_input_async"]
-    /// Codex's app asks for a turn's sandbox permissions through this tool, answered in its own window; no
-    /// PermissionRequest hook runs for it, so its start is the only sign the session is waiting for approval.
+    /// These tools can be auto-reviewed; only a confirmed human reviewer indicates a user wait.
     static let permissionTools: Set<String> = ["request_permissions"]
 
     var id: String
@@ -149,7 +148,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
         phase = result; pending = []; tool = nil; clearWaiting()
     }
 
-    mutating func apply(_ event: [String: Any], at now: Date) -> Bool {
+    mutating func apply(_ event: [String: Any], at now: Date, codexReviewer: CodexApprovalRouting.Reviewer? = nil) -> Bool {
         let name = event["hook_event_name"] as? String ?? ""
         let toolName = event["tool_name"] as? String
         let key = event["tool_use_id"] as? String ?? toolName ?? "permission"
@@ -161,6 +160,7 @@ struct AgentSession: Codable, Identifiable, Equatable {
             phase = .working; pending = []; tool = nil; clearWaiting(); recentTools = nil
             turnStarted = now; toolCalls = 0
         case "PermissionRequest":
+            guard provider != .codex || codexReviewer == .user else { return false }
             pending.insert(key); phase = .waiting; detail = String(localized: "Onay bekliyor")
             waitingTool = toolName; if waitingSince == nil { waitingSince = now }
         case "PermissionDenied":
@@ -168,7 +168,8 @@ struct AgentSession: Codable, Identifiable, Equatable {
             phase = pending.isEmpty ? .working : .waiting
             if pending.isEmpty { clearWaiting() }
         case "PreToolUse":
-            if let toolName, Self.questionTools.contains(toolName) || Self.permissionTools.contains(toolName) {
+            if let toolName, Self.questionTools.contains(toolName)
+                || (Self.permissionTools.contains(toolName) && (provider != .codex || codexReviewer == .user)) {
                 pending.insert(key); phase = .waiting
                 detail = Self.permissionTools.contains(toolName) ? String(localized: "Onay bekliyor") : String(localized: "Yanıt bekliyor")
                 waitingTool = toolName; if waitingSince == nil { waitingSince = now }
@@ -290,6 +291,9 @@ enum AgentEventStore {
         let id = AgentSession.identifier(provider: provider, session: session)
         let file = directory.appendingPathComponent(id + ".json")
         var completedTurn = false
+        let needsReviewer = event["hook_event_name"] as? String == "PermissionRequest"
+            || (event["hook_event_name"] as? String == "PreToolUse" && AgentSession.permissionTools.contains(event["tool_name"] as? String ?? ""))
+        let reviewer = provider == .codex && needsReviewer ? CodexApprovalRouting.reviewer(event) : nil
         try withLock(id + ".lock", in: directory) {
             let cwd = event["cwd"] as? String ?? ""
             let name = cwd.isEmpty ? String(localized: "Oturum") : URL(fileURLWithPath: cwd).lastPathComponent
@@ -298,7 +302,7 @@ enum AgentEventStore {
                 ?? AgentSession(id: id, provider: provider, project: project, updated: now)
             value.project = project
             if let host { value.host = host }
-            guard value.apply(event, at: now) else { return }
+            guard value.apply(event, at: now, codexReviewer: reviewer) else { return }
             completedTurn = (event["hook_event_name"] as? String) == "Stop"
             let data = try JSONEncoder().encode(value)
             try data.write(to: file, options: .atomic)
