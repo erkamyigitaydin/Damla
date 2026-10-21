@@ -209,7 +209,11 @@ final class AppState: ObservableObject {
     @Published var agentAttention = false   // brief pulse of the mascot when an agent starts waiting
     lazy var keys = MediaKeyInterceptor(monitor: monitor)
     private var timer: Timer?
+    private var clockTicks = 0
     private var clipboardTimer: Timer?
+    /// Re-encoding a copied screenshot and writing the clipboard history (up to 24 MB of images, as base64) are
+    /// tens of MB of work per copy; they run here so the notch and the clipboard poll never wait for them.
+    private let clipQueue = DispatchQueue(label: "app.local.damla.clips", qos: .utility)
     private var pasteboardCount = NSPasteboard.general.changeCount
     private var hudClear: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
@@ -464,8 +468,10 @@ final class AppState: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self else { return }
             let date = Date()
-            // Only republish the clock when something on screen depends on it; keeps the closed notch idle.
-            if self.expanded || self.session.running { self.now = date }
+            self.clockTicks += 1
+            // Only republish the clock when something on screen depends on it; keeps the closed notch idle. The
+            // closed notch shows whole seconds, so a running timer redraws it once a second there, not twice.
+            if self.expanded || (self.session.running && self.clockTicks.isMultiple(of: 2)) { self.now = date }
             self.updateFocus(at: date)
         }
         clipboardTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in self?.captureClipboard() }
@@ -650,22 +656,31 @@ final class AppState: ObservableObject {
         pasteboardCount = board.changeCount
         let types = Set((board.types ?? []).map(\.rawValue))
         guard ClipRules.shouldCapture(types: types) else { return }
-        var entry: ClipEntry?
+        // Polled every 0.8 s, so whatever is in front now is almost always the app that copied.
+        let source = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let text = board.string(forType: .string).flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || $0.utf8.count > 200_000 ? nil : $0 }
         // Files first: Finder also puts the file's icon on the board, which is not what was copied.
         if let urls = board.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
-            entry = ClipEntry(kind: .file, text: urls.map(\.path).joined(separator: "\n"))
+            addClip(ClipEntry(kind: .file, text: urls.map(\.path).joined(separator: "\n"), sourceBundleID: source))
         } else if let data = board.data(forType: .png), data.count <= 4 * 1024 * 1024 {
-            entry = ClipEntry(kind: .image, imageData: data)
-        } else if let tiff = board.data(forType: .tiff), tiff.count < 20 * 1024 * 1024,
-                  let rep = NSBitmapImageRep(data: tiff), let data = rep.representation(using: .png, properties: [:]), data.count <= 4 * 1024 * 1024 {
-            entry = ClipEntry(kind: .image, imageData: data)
-        } else if let text = board.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  text.utf8.count <= 200_000 {
-            entry = ClipEntry(kind: .text, text: text)
+            addClip(ClipEntry(kind: .image, imageData: data, sourceBundleID: source))
+        } else if let tiff = board.data(forType: .tiff), tiff.count < 20 * 1024 * 1024 {
+            // A screenshot's TIFF is tens of MB: it becomes a PNG off the main thread, the text (if any) standing in
+            // when it is no image after all.
+            clipQueue.async { [weak self] in
+                let data = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+                let entry = data.flatMap { $0.count <= 4 * 1024 * 1024 ? ClipEntry(kind: .image, imageData: $0, sourceBundleID: source) : nil }
+                    ?? text.map { ClipEntry(kind: .text, text: $0, sourceBundleID: source) }
+                guard let entry else { return }
+                DispatchQueue.main.async { self?.addClip(entry) }
+            }
+        } else if let text {
+            addClip(ClipEntry(kind: .text, text: text, sourceBundleID: source))
         }
-        guard var entry else { return }
-        // Polled every 0.8 s, so whatever is in front now is almost always the app that copied.
-        entry.sourceBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+    }
+    /// Puts a copy at the top; one copied again keeps its pin and loses its older card.
+    private func addClip(_ entry: ClipEntry) {
+        var entry = entry
         if let old = clips.first(where: { $0.kind == entry.kind && $0.text == entry.text && $0.imageData == entry.imageData }) {
             entry.pinned = old.pinned
             clips.removeAll { $0.id == old.id }
@@ -699,7 +714,7 @@ final class AppState: ObservableObject {
         clips[index].pinned.toggle(); clips = ClipRules.trimmed(clips); saveClips()
     }
     func removeClip(_ entry: ClipEntry) { clips.removeAll { $0.id == entry.id }; saveClips() }
-    private func saveClips() { DiskStore.save(clips, name: "clipboard.json") }
+    private func saveClips() { let clips = clips; clipQueue.async { DiskStore.save(clips, name: "clipboard.json") } }
     /// Puts files on the shelf. `open` shows the shelf; screenshots and conversions arrive quietly instead.
     func addFiles(_ urls: [URL], open: Bool = true) {
         var added = 0

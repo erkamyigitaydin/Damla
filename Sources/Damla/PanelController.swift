@@ -388,6 +388,10 @@ final class PanelManager {
     private var lastMenuBarCheck: CFAbsoluteTime = 0
     private var lastMenuBarScreens: [UInt32] = []
     private var revealedNotchBars = Set<UInt32>()
+    /// The Window Server's menu bar windows (one per display), from the last full window-list read that saw all
+    /// of them; emptied with every change of screens.
+    private var menuBarWindows: [CGWindowID] = []
+    private var menuBarWindowsRead: CFAbsoluteTime = 0
     private var lastDragCount = NSPasteboard(name: .drag).changeCount
     private weak var quickLookOwner: PanelController?
     var holdBasket = false // debug: keep the basket open without a real drag
@@ -421,7 +425,7 @@ final class PanelManager {
         model.$externalStyle.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.controllers.forEach { $0.chooseScreen(); $0.layout() } }.store(in: &cancellables)
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
-            .receive(on: RunLoop.main).sink { [weak self] _ in self?.rebuild() }.store(in: &cancellables)
+            .receive(on: RunLoop.main).sink { [weak self] _ in self?.menuBarWindows.removeAll(); self?.rebuild() }.store(in: &cancellables)
         // Something opened the panel without naming a screen (drop, shortcut, file picker): use the mouse's.
         model.$expanded.removeDuplicates().receive(on: RunLoop.main).sink { [weak self] expanded in
             guard let self, expanded, self.model.activeScreenID == nil else { return }
@@ -534,13 +538,7 @@ final class PanelManager {
     /// pointer reveals it (measured on macOS 27). Owner name and layer need no screen-recording permission.
     private func updateMenuBars() {
         lastMenuBarCheck = CFAbsoluteTimeGetCurrent()
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return }
-        let menuLevel = Int(CGWindowLevelForKey(.mainMenuWindow))
-        let bars: [CGRect] = list.compactMap { info in
-            guard info[kCGWindowLayer as String] as? Int == menuLevel, info[kCGWindowOwnerName as String] as? String == "Window Server",
-                  let bounds = info[kCGWindowBounds as String] as? NSDictionary else { return nil }
-            return CGRect(dictionaryRepresentation: bounds)
-        }
+        guard let bars = menuBarFrames(now: lastMenuBarCheck) else { return }
         let fullScreen = controllers.contains { ($0.screen?.safeAreaInsets.top ?? 0) > 0 } ? FullScreenSpaces.current() : nil
         let mouse = NSEvent.mouseLocation
         for controller in controllers {
@@ -564,6 +562,40 @@ final class PanelManager {
                 : !bars.isEmpty
             controller.menuBarHidden = !visible
         }
+    }
+
+    /// The menu bar windows on screen right now. This runs every second, and several times a second with the
+    /// pointer near the top of a screen, where the notch is. Describing every window on screen (bounds and owner
+    /// of each, as dictionaries) takes the Window Server milliseconds; once the bars have been found that way,
+    /// only they are asked about. The full read returns when a bar is gone or off screen, since a hidden bar
+    /// could also be a window the server replaced, and once a minute regardless.
+    private func menuBarFrames(now: CFAbsoluteTime) -> [CGRect]? {
+        let expected = NSScreen.screensHaveSeparateSpaces ? NSScreen.screens.count : 1
+        if menuBarWindows.count == expected, now - menuBarWindowsRead < 60, let described = Self.describe(menuBarWindows) {
+            let frames = described.compactMap { info -> CGRect? in
+                guard info[kCGWindowIsOnscreen as String] as? Bool == true, let bounds = info[kCGWindowBounds as String] as? NSDictionary else { return nil }
+                return CGRect(dictionaryRepresentation: bounds)
+            }
+            if frames.count == menuBarWindows.count { return frames }
+        }
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return nil }
+        let menuLevel = Int(CGWindowLevelForKey(.mainMenuWindow))
+        var found: [CGWindowID: CGRect] = [:]
+        for info in list {
+            guard info[kCGWindowLayer as String] as? Int == menuLevel, info[kCGWindowOwnerName as String] as? String == "Window Server",
+                  let number = info[kCGWindowNumber as String] as? NSNumber, let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
+            found[CGWindowID(number.uint32Value)] = frame
+        }
+        if found.count == expected { menuBarWindows = Array(found.keys); menuBarWindowsRead = now }
+        return Array(found.values)
+    }
+
+    /// The Window Server's descriptions of just these windows; the array holds the ids as raw values, as the API wants.
+    private static func describe(_ windows: [CGWindowID]) -> [[String: Any]]? {
+        var values: [UnsafeRawPointer?] = windows.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+        guard let array = CFArrayCreate(nil, &values, values.count, nil) else { return nil }
+        return CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]]
     }
 
     /// The controller showing the panel, else the one under the mouse.

@@ -15,15 +15,19 @@ enum AgentProvider: String, Codable, CaseIterable {
 }
 
 /// Runtime app (and file) icons, cached per path and per bundle id: views that redraw with the clock ask on
-/// every frame, and a Launch Services lookup is not free.
+/// every frame, and a Launch Services lookup is not free. Paths are also what copied files bring (one per file
+/// ever copied), so the oldest go once there are a few hundred.
 enum AppIcons {
     nonisolated(unsafe) private static var cache: [String: NSImage] = [:]
+    nonisolated(unsafe) private static var order: [String] = []
     nonisolated(unsafe) private static var bundles: [String: NSImage?] = [:]
+    private static let limit = 200
     static func icon(for url: URL) -> NSImage {
         if let cached = cache[url.path] { return cached }
         let image = NSWorkspace.shared.icon(forFile: url.path)
         image.size = NSSize(width: 64, height: 64)
-        cache[url.path] = image
+        cache[url.path] = image; order.append(url.path)
+        if order.count > limit { cache.removeValue(forKey: order.removeFirst()) }
         return image
     }
     /// Nil when no such app is installed (remembered too, until relaunch).
@@ -329,22 +333,37 @@ enum AgentEventStore {
         return Int(stats["turns"] ?? "0") ?? 0
     }
 
+    /// Decoded records by path: the app reads the folder every second, and a tick decodes only the files whose
+    /// date or size changed since the last one. The sweep of week-old files runs every few minutes per folder.
+    nonisolated(unsafe) private static var decoded: [String: (modified: Date, size: Int, record: AgentSession)] = [:]
+    nonisolated(unsafe) private static var swept: [String: Date] = [:]
+
     static func read(directory: URL = directory, now: Date = Date()) -> [AgentSession] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey], options: [.skipsHiddenFiles])) ?? []
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])) ?? []
         // Records and their lock files from sessions older than a week are garbage.
-        for url in files where url.lastPathComponent != "stats.json" && url.lastPathComponent != "stats.lock" && url.lastPathComponent != AgentUsage.fileName {
-            if let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-               now.timeIntervalSince(modified) > 7 * 24 * 3600 { try? FileManager.default.removeItem(at: url) }
+        if now.timeIntervalSince(swept[directory.path] ?? .distantPast) >= 600 {
+            swept[directory.path] = now
+            for url in files where url.lastPathComponent != "stats.json" && url.lastPathComponent != "stats.lock" && url.lastPathComponent != AgentUsage.fileName {
+                if let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                   now.timeIntervalSince(modified) > 7 * 24 * 3600 { try? FileManager.default.removeItem(at: url) }
+            }
         }
-        return files.filter { $0.pathExtension == "json" && $0.lastPathComponent != "stats.json" && $0.lastPathComponent != AgentUsage.fileName }.compactMap { url -> (URL, Date)? in
-            guard let attrs = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+        var live = Set<String>()
+        let records = files.filter { $0.pathExtension == "json" && $0.lastPathComponent != "stats.json" && $0.lastPathComponent != AgentUsage.fileName }.compactMap { url -> (URL, Date, Int)? in
+            guard let attrs = try? url.resourceValues(forKeys: keys),
                   let modified = attrs.contentModificationDate, now.timeIntervalSince(modified) < 24 * 3600,
-                  (attrs.fileSize ?? Int.max) < 32_768 else { return nil }
-            return (url, modified)
-        }.sorted { $0.1 > $1.1 }.prefix(64).compactMap {
-            guard let data = try? Data(contentsOf: $0.0), let record = try? JSONDecoder().decode(AgentSession.self, from: data) else { return nil }
+                  let size = attrs.fileSize, size < 32_768 else { return nil }
+            return (url, modified, size)
+        }.sorted { $0.1 > $1.1 }.prefix(64).compactMap { url, modified, size -> AgentSession? in
+            live.insert(url.path)
+            if let cached = decoded[url.path], cached.modified == modified, cached.size == size { return cached.record }
+            guard let data = try? Data(contentsOf: url), let record = try? JSONDecoder().decode(AgentSession.self, from: data) else { return nil }
+            decoded[url.path] = (modified, size, record)
             return record
-        }.sorted {
+        }
+        for path in decoded.keys where !live.contains(path) { decoded.removeValue(forKey: path) }
+        return records.sorted {
             let p0 = $0.effectivePhase(at: now).priority, p1 = $1.effectivePhase(at: now).priority
             return p0 == p1 ? $0.updated > $1.updated : p0 < p1
         }

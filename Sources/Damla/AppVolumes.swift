@@ -21,6 +21,7 @@ final class AppVolumeController: ObservableObject {
     @Published private(set) var permissionDenied = false
     private var taps: [String: ProcessTap] = [:]
     private var processListener: AudioObjectPropertyListenerBlock?
+    private var refreshWork: DispatchWorkItem?
     private var timer: Timer?
     private var traceTimer: Timer?
     private static let excluded: Set<String> = Set(MusicSource.allCases.map(\.bundleID))   // own volume, see MediaService
@@ -32,10 +33,21 @@ final class AppVolumeController: ObservableObject {
     func start() {
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
                                                  mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
-        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.refresh() }
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.processesChanged() }
         processListener = block
         AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, DispatchQueue.main, block)
         refresh()
+    }
+
+    /// Audio processes come and go in bursts all day (a browser's helpers, a notification sound). Walking them
+    /// costs milliseconds of main-thread time, so: one refresh half a second after the last change, and none
+    /// while nothing is turned down and nobody is looking at the mixer (which refreshes as it opens).
+    private func processesChanged() {
+        guard timer != nil || !levels.isEmpty || !taps.isEmpty else { return }
+        refreshWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.refresh() }
+        refreshWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
     /// While the mixer is open, apps starting and stopping sound show up within two seconds.

@@ -134,7 +134,7 @@ final class NowPlayingBridge {
         if artworkKey != lastArtworkKey {
             lastArtworkKey = artworkKey
             artworkChanged = true
-            if let decoded = Data(base64Encoded: artworkData) { image = NSImage(data: decoded) }
+            if let decoded = Data(base64Encoded: artworkData) { image = Thumbnails.decode(decoded, maxPixelSize: Thumbnails.artworkSize) }
         }
         let timestamp = (state["timestamp"] as? String).flatMap { Self.isoFractional.date(from: $0) ?? Self.iso.date(from: $0) } ?? Date()
         let playing = state["playing"] as? Bool ?? false

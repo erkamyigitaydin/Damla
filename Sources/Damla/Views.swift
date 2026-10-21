@@ -1389,14 +1389,18 @@ struct ClipboardView: View {
 }
 
 /// Decoded clip images, kept by clip id: the open panel redraws twice a second and decoding a screenshot each
-/// time was the card's whole cost.
+/// time was the card's whole cost. Only a thumbnail is kept: the card is 128 × 100 pt, while a 5K screenshot
+/// decoded whole is 59 MB, and a dozen of those outweighed the rest of the app after a day of copying.
 enum ClipThumbnails {
-    private static let cache: NSCache<NSUUID, NSImage> = { let cache = NSCache<NSUUID, NSImage>(); cache.countLimit = 60; return cache }()
+    static let maxPixelSize = 512
+    private static let cache: NSCache<NSUUID, NSImage> = {
+        let cache = NSCache<NSUUID, NSImage>(); cache.countLimit = 60; cache.totalCostLimit = 48 * 1024 * 1024; return cache
+    }()
     static func image(for entry: ClipEntry) -> NSImage? {
         guard let data = entry.imageData else { return nil }
         if let image = cache.object(forKey: entry.id as NSUUID) { return image }
-        guard let image = NSImage(data: data) else { return nil }
-        cache.setObject(image, forKey: entry.id as NSUUID)
+        guard let image = Thumbnails.decode(data, maxPixelSize: maxPixelSize) else { return nil }
+        cache.setObject(image, forKey: entry.id as NSUUID, cost: Int(image.size.width * image.size.height) * 4)
         return image
     }
 }

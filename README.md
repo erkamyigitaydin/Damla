@@ -135,7 +135,7 @@ zsh build.sh                                  # builds and signs ../Damla.app, t
 
 - **Code map:** `Layout.swift` is the single source of truth for shapes and window sizes. `PanelController.swift` runs one window per display. `MediaSessionStore` keeps the media logic free of AppKit so it can be tested.
 - **Localization:** keys are the Turkish source strings; the English text lives in `Resources/en.lproj/Localizable.strings`.
-- **Automation:** launched with `--debug`, the app listens for `app.local.damla.debug` distributed notifications (`open`, `tab-agents`, `media-showcase`, `files:<paths>`…). With `DAMLA_SUPPORT_DIR` set, a debug run keeps its data in that folder. The screenshots above were made this way with demo data.
+- **Automation:** launched with `--debug`, the app listens for `app.local.damla.debug` distributed notifications (`open`, `tab-agents`, `media-showcase`, `files:<paths>`…). With `DAMLA_SUPPORT_DIR` set, a debug run keeps its data in that folder. The screenshots above were made this way with demo data. `scripts/soak.sh` drives such a run through the pages, HUDs and copied screenshots for a few minutes while sampling its memory footprint.
 - **Hooks from the command line:** `python3 scripts/install-agent-hooks.py --binary <path to Damla binary> [--approvals] --apply` does what connecting in Damla does (without `--apply` it only prints the plan). Tests: `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-agent-hooks.py`.
 - **Releasing:**
   1. Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` and commit.

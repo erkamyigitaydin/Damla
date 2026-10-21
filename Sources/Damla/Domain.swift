@@ -198,7 +198,8 @@ enum ClipRules {
 }
 
 enum DiskStore {
-    static var directory: URL {
+    /// Resolved (and created) once: the agent heartbeat asks for it every second.
+    static let directory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         var url = base.appendingPathComponent("Damla", isDirectory: true)
         // `--debug` runs can keep their data elsewhere (README screenshots with demo agents, shelf and clips).
@@ -208,7 +209,7 @@ enum DiskStore {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
         return url
-    }
+    }()
     static func load<T: Decodable>(_ type: T.Type, name: String) -> T? {
         guard let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else { return nil }
         return try? JSONDecoder().decode(type, from: data)

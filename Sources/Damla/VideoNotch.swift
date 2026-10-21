@@ -326,8 +326,7 @@ final class VideoNotch: NSObject, ObservableObject, SCStreamOutput, SCStreamDele
     }
 
     static func appleScript(_ source: String) -> (value: String?, error: String?, code: Int?) {
-        var error: NSDictionary?
-        let result = NSAppleScript(source: source)?.executeAndReturnError(&error)
+        let (result, error) = AppleScriptRunner.run(source)
         return (result?.stringValue, error?[NSAppleScript.errorMessage] as? String, error?[NSAppleScript.errorNumber] as? Int)
     }
 

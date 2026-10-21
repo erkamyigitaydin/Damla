@@ -153,7 +153,7 @@ final class NotificationMirror: ObservableObject {
         var created: AXObserver?
         let callback: AXObserverCallback = { _, _, _, context in
             guard let context else { return }
-            Unmanaged<NotificationMirror>.fromOpaque(context).takeUnretainedValue().sweep()
+            Unmanaged<NotificationMirror>.fromOpaque(context).takeUnretainedValue().sweepSoon()
         }
         guard AXObserverCreate(app.processIdentifier, callback, &created) == .success, let created else { return }
         let context = Unmanaged.passUnretained(self).toOpaque()
@@ -212,6 +212,24 @@ final class NotificationMirror: ObservableObject {
     }
 
     // MARK: Reading banners
+
+    private var trailingSweep: DispatchWorkItem?
+    private var lastSweep: CFAbsoluteTime = 0
+
+    /// Notification Center's layout changes come in bursts (a banner sliding in, the sidebar's widgets refreshing),
+    /// each one a walk of its windows over the Accessibility API. The first of a burst is read at once, so the
+    /// notch still beats the system banner; the rest fold into one more sweep right after.
+    private func sweepSoon() {
+        let now = CFAbsoluteTimeGetCurrent()
+        if now - lastSweep >= 0.05 { lastSweep = now; sweep(); return }
+        guard trailingSweep == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.trailingSweep = nil; self.lastSweep = CFAbsoluteTimeGetCurrent(); self.sweep()
+        }
+        trailingSweep = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
+    }
 
     private func sweep() {
         guard enabled, let centerApp else { return }

@@ -168,6 +168,7 @@ func runSelfTests() -> Int32 {
         try AgentEventStore.receive(provider: .claude, input: stopEvent, directory: isolated)
         try AgentEventStore.receive(provider: .claude, input: stopEvent, directory: isolated)
         check(AgentEventStore.todayTurns(directory: isolated) == 2, "Completed turns are counted per day")
+        check(AgentEventStore.read(directory: isolated).first?.phase == .done, "A record rewritten since the last read is decoded again, not served from the cache")
         check(AgentEventStore.todayTurns(directory: isolated, now: Date().addingTimeInterval(2 * 24 * 3600)) == 0, "Turn counter resets on a new day")
         let encoded = try JSONEncoder().encode(records)
         let text = String(decoding: encoded, as: UTF8.self)

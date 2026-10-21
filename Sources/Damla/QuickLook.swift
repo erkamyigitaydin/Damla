@@ -9,6 +9,10 @@ final class ThumbnailStore: ObservableObject {
     static let shared = ThumbnailStore()
     @Published private(set) var thumbs: [String: Thumb] = [:]
     private var pending = Set<String>()
+    /// Paths in the order their thumbnails arrived. Past the limit the oldest go: every file dragged anywhere
+    /// while the basket was up asked for one, and a day of drags and shelved screenshots must not keep them all.
+    private var order: [String] = []
+    private static let limit = 160
 
     func thumbnail(for url: URL, size: CGSize = CGSize(width: 72, height: 58)) -> Thumb? {
         let key = url.path
@@ -20,11 +24,10 @@ final class ThumbnailStore: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.pending.remove(key)
-                if let representation {
-                    self.thumbs[key] = Thumb(image: representation.nsImage, isPreview: representation.type != .icon)
-                } else {
-                    self.thumbs[key] = Thumb(image: NSWorkspace.shared.icon(forFile: url.path), isPreview: false)
-                }
+                self.thumbs[key] = representation.map { Thumb(image: $0.nsImage, isPreview: $0.type != .icon) }
+                    ?? Thumb(image: NSWorkspace.shared.icon(forFile: url.path), isPreview: false)
+                self.order.append(key)
+                if self.order.count > Self.limit { self.thumbs.removeValue(forKey: self.order.removeFirst()) }
             }
         }
         return nil

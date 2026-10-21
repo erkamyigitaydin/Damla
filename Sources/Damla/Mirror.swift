@@ -174,7 +174,8 @@ final class MirrorAlbum: ObservableObject {
         var id: URL { url }
         static func == (a: Photo, b: Photo) -> Bool { a.url == b.url }
     }
-    static let context = CIContext()
+    /// Snapshots are one-offs: cached intermediates would stay resident as Metal textures after every shot.
+    static let context = CIContext(options: [.cacheIntermediates: false])
     static let extensions: Set<String> = ["jpg", "jpeg", "png", "heic"]
     @Published private(set) var latest: Photo?
     @Published private(set) var total = 0

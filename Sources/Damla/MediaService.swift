@@ -171,27 +171,43 @@ final class MediaService: ObservableObject {
 
     func select(_ bundleID: String) { perform(store.select(bundleID)) }
 
-    /// Copies the shown session into the flat properties the views read.
+    /// Copies the shown session into the flat properties the views read. Each is published only on change: a poll
+    /// or bridge report that found nothing new (every few seconds, all day) must not redraw the panel.
     private func applyDisplay() {
-        sessions = store.sessions
+        if sessions.count != store.sessions.count || !zip(sessions, store.sessions).allSatisfy({ Self.sameOnScreen($0, $1) }) { sessions = store.sessions }
         guard let session = store.displayed else {
-            hasTrack = false; playing = false; artwork = nil; accent = nil; sourceBundleID = nil; controllable = true
-            title = String(localized: "Müzik"); artist = String(localized: "Bir şey çal: Müzik, Spotify, Safari…")
+            if hasTrack { hasTrack = false }
+            if playing { playing = false }
+            if artwork != nil { artwork = nil }
+            if accent != nil { accent = nil }
+            if sourceBundleID != nil { sourceBundleID = nil }
+            if !controllable { controllable = true }
+            let idleTitle = String(localized: "Müzik"), idleArtist = String(localized: "Bir şey çal: Müzik, Spotify, Safari…")
+            if title != idleTitle { title = idleTitle }
+            if artist != idleArtist { artist = idleArtist }
             return
         }
         let live = store.isLive(session)
-        hasTrack = true
-        title = session.title; artist = session.artist
+        if !hasTrack { hasTrack = true }
+        if title != session.title { title = session.title }
+        if artist != session.artist { artist = session.artist }
         if album != session.album { album = session.album }
         if artistKnown != session.artistKnown { artistKnown = session.artistKnown }
         refreshFavorite(session)
-        playing = session.playing && live
-        duration = session.duration
-        position = session.position; positionDate = session.positionDate
+        let nowPlaying = session.playing && live
+        if playing != nowPlaying { playing = nowPlaying }
+        if duration != session.duration { duration = session.duration }
+        if position != session.position || positionDate != session.positionDate { position = session.position; positionDate = session.positionDate }
         if artwork !== session.artwork { artwork = session.artwork }
         if accent != session.accent { accent = session.accent }
         if sourceBundleID != session.bundleID { sourceBundleID = session.bundleID }
         if controllable != live { controllable = live }
+    }
+    /// What the views draw from a session; `lastSeen` only matters to the store.
+    private static func sameOnScreen(_ a: MediaSession, _ b: MediaSession) -> Bool {
+        a.bundleID == b.bundleID && a.title == b.title && a.artist == b.artist && a.album == b.album && a.artistKnown == b.artistKnown
+            && a.playing == b.playing && a.duration == b.duration && a.position == b.position && a.positionDate == b.positionDate
+            && a.artwork === b.artwork && a.artworkKey == b.artworkKey && a.accent == b.accent
     }
 
     /// Debug builds only: two fake players (a paused Music track behind a playing Chrome tab) for screenshots.
@@ -483,11 +499,12 @@ final class MediaService: ObservableObject {
             let command = isMusic ? "return raw data of artwork 1 of current track" : "return artwork url of current track"
             let (value, _) = Self.run(command, bundleID: bundleID)
             if isMusic {
-                let image = value.flatMap { NSImage(data: $0.data) }
+                // Music hands over the full cover (1400–3000 px): decoded whole it would sit at up to 36 MB per session.
+                let image = value.flatMap { Thumbnails.decode($0.data, maxPixelSize: Thumbnails.artworkSize) }
                 DispatchQueue.main.async { completion(image) }
             } else if let string = value?.stringValue, let url = URL(string: string), url.scheme == "https" {
                 URLSession.shared.dataTask(with: url) { data, _, _ in
-                    let image = data.flatMap { $0.count < 8_000_000 ? NSImage(data: $0) : nil }
+                    let image = data.flatMap { $0.count < 8_000_000 ? Thumbnails.decode($0, maxPixelSize: Thumbnails.artworkSize) : nil }
                     DispatchQueue.main.async { completion(image) }
                 }.resume()
             } else {
@@ -555,8 +572,7 @@ final class MediaService: ObservableObject {
     }
     private static func run(_ body: String, bundleID: String) -> (NSAppleEventDescriptor?, Int?) {
         let text = "with timeout of 4 seconds\ntell application id \"\(bundleID)\"\n\(body)\nend tell\nend timeout"
-        var error: NSDictionary?
-        let result = NSAppleScript(source: text)?.executeAndReturnError(&error)
+        let (result, error) = AppleScriptRunner.run(text)
         return (result, error?[NSAppleScript.errorNumber] as? Int)
     }
     deinit { timer?.invalidate(); pollTimer?.invalidate(); bridge.stop() }

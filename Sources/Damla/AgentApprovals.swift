@@ -270,9 +270,12 @@ enum AgentApprovals {
             for path in AgentApprovals.cleanupOnTerm { unlink(path) }
             _exit(0)
         }
+        var turn = 0
         while env.now() < request.deadline {
-            // A changed permission mode must take effect even while the notch is open.
-            if provider == .codex, env.codexReviewer(event) != .user { return nil }
+            turn += 1
+            // A changed permission mode must take effect even while the notch is open. It is read from the session's
+            // rollout, megabytes by then, so every couple of seconds (ten turns of this loop) rather than every turn.
+            if provider == .codex, turn.isMultiple(of: 10), env.codexReviewer(event) != .user { return nil }
             if let raw = try? String(contentsOf: decisionFile, encoding: .utf8), let decision = ApprovalDecision(fileText: raw) {
                 // A question only takes answers; a permission prompt never does.
                 return (questions != nil) == (decision.isAnswer) ? decision : nil
@@ -307,11 +310,11 @@ enum AgentApprovals {
 
     /// The app touches this file every second; a hook only waits when Damla is there to answer.
     static func heartbeat(directory: URL = directory, now: Date = Date()) {
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let file = directory.appendingPathComponent("app.alive")
-        if !FileManager.default.fileExists(atPath: file.path) {
-            FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
-        }
+        // One touch a second in the steady state; the folder and the file are made only when the touch finds none.
+        guard (try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: file.path)) == nil else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        FileManager.default.createFile(atPath: file.path, contents: nil, attributes: [.posixPermissions: 0o600])
         try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: file.path)
     }
 
