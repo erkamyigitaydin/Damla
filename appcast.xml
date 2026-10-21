@@ -5,6 +5,15 @@
     <description>Damla güncellemeleri</description>
     <language>tr</language>
     <item>
+      <title>Damla 0.8.10</title>
+      <pubDate>Wed, 21 Oct 2026 09:48:34 +0000</pubDate>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>0.8.10</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<p>Daha hafif Damla: gün boyu açık kalınca büyüyen bellek ve boşta harcanan CPU azaltıldı.</p><p>- Pano: kopyalanan görsellerin küçük resimleri artık çizildikleri boyutta tutulur (5K ekran görüntüsü başına 59 MB yerine yaklaşık 1 MB); görsel kopyalarken çentik takılmaz.</p><p>- Müzik: albüm kapakları da çizildikleri boyutta çözülür; arka plandaki Music/Spotify yoklamaları bir kez derlenen betiklerle, tek sırada çalışır.</p><p>- Boşta daha az iş: agent kayıtları yalnızca değişince okunur, menü çubuğu denetimi ve uygulama sesi taraması daha seyrek, bildirim taramaları birleştirildi, odak sayacı kapalı çentiği saniyede bir yeniler.</p><p>- Raf küçük resimleri ve simge önbellekleri sınırlandı; Ayna artık ara görüntü dokularını biriktirmez.</p>]]></description>
+      <enclosure url="https://damla.erkamaydin.com/download/Damla-0.8.10.dmg" length="7297341" type="application/octet-stream" sparkle:edSignature="mAGLTysSpLw2oDdzUzrTIowg1aI7KN/TY6QuQALBxdZHgCRyDACNW728hT82uvPz0RVhSWk2JwroB0HC4BqCDQ=="/>
+    </item>
+    <item>
       <title>Damla 0.8.9</title>
       <pubDate>Thu, 15 Oct 2026 22:59:51 +0000</pubDate>
       <sparkle:version>22</sparkle:version>
