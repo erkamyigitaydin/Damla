@@ -89,7 +89,7 @@ final class NotificationMirror: ObservableObject {
     }
     /// The card was clicked open: the banner's buttons or reply field show under the text, with "Aç" beside them.
     @Published private(set) var revealed = false
-    /// Whether the notch can take a notification now (not open, not hidden by a full-screen app).
+    /// Whether the notch can take a notification now (not open on a page; a full-screen app does not stop it).
     var canTakeOver: () -> Bool = { true }
 
     private var observer: AXObserver?
@@ -246,9 +246,9 @@ final class NotificationMirror: ObservableObject {
             record(note)   // on the page whether or not the notch shows it
             let hidden = Self.isOffScreen(window), alert = Self.isAlert(newest)
             MediaService.trace("notifications: banner \(id) takeOver=\(canTakeOver()) replying=\(replying) hidden=\(hidden) alert=\(alert)")
-            // The notch is busy (open, hidden by full screen, or a reply is being written, whose draft must not be
-            // lost): no card. The system banner shows as usual, or, in a window already off screen, times out
-            // there and waits on the Bildirimler page, unread. An alert never times out, so its window comes back
+            // The notch is busy (open, or a reply is being written, whose draft must not be lost): no card. The
+            // system banner shows as usual, or, in a window already off screen, times out there and waits on the
+            // Bildirimler page, unread. An alert never times out, so its window comes back
             // (its glass then shows a stale backdrop for a moment; better than an alert nobody can see).
             guard canTakeOver(), !replying else {
                 if alert && hidden { Self.restore(window) }

@@ -56,7 +56,6 @@ final class PanelController {
     /// The closed notch follows it away and comes back when the menu bar slides in.
     var menuBarHidden = false { didSet { if menuBarHidden != oldValue { updateVisibility() } } }
     private var concealed = false
-    var isConcealed: Bool { concealed }
 
     init(model: AppState, fixedScreen: NSScreen?) {
         self.model = model
@@ -166,7 +165,7 @@ final class PanelController {
         layout()
     }
 
-    /// Hidden only while closed: a HUD, the drop basket or an open panel still shows over a full-screen app.
+    /// Hidden only while closed: a HUD, a notification card, the drop basket or an open panel still shows over a full-screen app.
     func updateVisibility() {
         let conceal = menuBarHidden && state == .closed && !model.pinnedOpen
         let changed = conceal != concealed
@@ -399,10 +398,11 @@ final class PanelManager {
     init(model: AppState) {
         self.model = model
         model.requestKeyFocus = { [weak self] in self?.focusController?.panel.makeKeyAndOrderFront(nil) }
-        // A notification needs a notch someone can see: not open on a page, not hidden by a full-screen app.
+        // A notification needs a notch free to show it: not open on a page, not taken by the video. A notch hidden by a
+        // full-screen app comes back for the card (as it does for a HUD), so the system banner stays away there too.
         model.notifications.canTakeOver = { [weak self] in
             guard let self else { return false }
-            return !self.model.expanded && !self.model.cleaning.active && self.controllers.contains { !$0.isConcealed && !self.model.videoShown(on: $0.id) }
+            return !self.model.expanded && !self.model.cleaning.active && self.controllers.contains { !self.model.videoShown(on: $0.id) }
         }
         model.video.dockTarget = { [weak self] in
             guard let self else { return nil }
