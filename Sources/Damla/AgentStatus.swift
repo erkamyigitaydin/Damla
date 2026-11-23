@@ -341,13 +341,13 @@ enum AgentEventStore {
     static func read(directory: URL = directory, now: Date = Date()) -> [AgentSession] {
         let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])) ?? []
-        // Records and their lock files from sessions older than a week are garbage.
+        // Records older than a day are never shown (see the 24 h check below), and this folder is listed every
+        // second, so keeping a week of them made each tick list tens of thousands of files under heavy agent use.
+        // Sweep records and their lock files a little after they stop being shown. Only session .json/.lock files
+        // are touched: the approvals folder, stats and usage files stay.
         if now.timeIntervalSince(swept[directory.path] ?? .distantPast) >= 600 {
             swept[directory.path] = now
-            for url in files where url.lastPathComponent != "stats.json" && url.lastPathComponent != "stats.lock" && url.lastPathComponent != AgentUsage.fileName {
-                if let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                   now.timeIntervalSince(modified) > 7 * 24 * 3600 { try? FileManager.default.removeItem(at: url) }
-            }
+            sweep(files, now: now)
         }
         var live = Set<String>()
         let records = files.filter { $0.pathExtension == "json" && $0.lastPathComponent != "stats.json" && $0.lastPathComponent != AgentUsage.fileName }.compactMap { url -> (URL, Date, Int)? in
@@ -366,6 +366,23 @@ enum AgentEventStore {
         return records.sorted {
             let p0 = $0.effectivePhase(at: now).priority, p1 = $1.effectivePhase(at: now).priority
             return p0 == p1 ? $0.updated > $1.updated : p0 < p1
+        }
+    }
+
+    static let sweepAge: TimeInterval = 26 * 3600
+    private static let kept: Set<String> = ["stats.json", "stats.lock", AgentUsage.fileName, "usage.lock"]
+
+    /// Deletes session records and lock files untouched for `sweepAge`. A lock goes only together with its record,
+    /// so a session that is still being written keeps the file it locks.
+    static func sweep(_ files: [URL], now: Date = Date()) {
+        func age(_ url: URL) -> TimeInterval? {
+            (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate).map { now.timeIntervalSince($0) }
+        }
+        let candidates = files.filter { !kept.contains($0.lastPathComponent) && ($0.pathExtension == "json" || $0.pathExtension == "lock") }
+        let fresh = Set(candidates.filter { $0.pathExtension == "json" && (age($0) ?? 0) <= sweepAge }
+                                  .map { $0.deletingPathExtension().lastPathComponent })
+        for url in candidates where !fresh.contains(url.deletingPathExtension().lastPathComponent) {
+            if let age = age(url), age > sweepAge { try? FileManager.default.removeItem(at: url) }
         }
     }
 

@@ -207,6 +207,11 @@ final class AppState: ObservableObject {
     let updater = UpdateService()
     @Published private(set) var agentBadge: AgentSession?
     @Published var agentAttention = false   // brief pulse of the mascot when an agent starts waiting
+    /// True when two badges look the same in the notch (mascot, tab dot, help text): the fields the views read.
+    static func sameBadge(_ a: AgentSession?, _ b: AgentSession?) -> Bool {
+        a?.id == b?.id && a?.provider == b?.provider && a?.project == b?.project && a?.phase == b?.phase
+            && a?.host == b?.host && a?.waitingSince == b?.waitingSince
+    }
     lazy var keys = MediaKeyInterceptor(monitor: monitor)
     private var timer: Timer?
     private var clockTicks = 0
@@ -426,8 +431,15 @@ final class AppState: ObservableObject {
                 if !self.enabledTabs.contains(self.selectedTab), let first = self.visibleTabs.first { self.selectedTab = first }
                 if !self.pinnedOpen { self.expanded = false }
             }
-            let badge = self.agents.sessions.first { $0.visibleInNotch(at: Date()) }
-            if self.agentBadge != badge { self.agentBadge = badge }
+            let now = Date()
+            let visible = self.agents.sessions.filter { $0.visibleInNotch(at: now) }
+            // With several agents at work, keep the one already shown while it is still among the most urgent,
+            // instead of jumping to whichever agent made the latest tool call.
+            let top = visible.first?.effectivePhase(at: now).priority
+            let badge = visible.first { $0.id == self.agentBadge?.id && $0.effectivePhase(at: now).priority == top } ?? visible.first
+            // The notch draws only who and which phase. Every hook event changes `updated`, `tool`, `toolCalls`…,
+            // and publishing those redrew every notch window on each tool call.
+            if !Self.sameBadge(self.agentBadge, badge) { self.agentBadge = badge }
         }
         agents.onChange = { [weak self] record in
             guard let self, !self.cleaning.active else { return }
