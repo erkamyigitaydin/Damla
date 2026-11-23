@@ -200,6 +200,25 @@ func runSelfTests() -> Int32 {
         check(warnings == [81, 96], "Five-hour use warns once at 80 % and once at 95 %")
         AgentEventStore.remove(id: records[0].id, directory: isolated)
         check(AgentEventStore.read(directory: isolated).count == 1, "Removed session leaves the store")
+        // Sweep: day-old session files go, current ones, their locks, stats/usage and the approvals folder stay.
+        let fm = FileManager.default
+        let old = Date().addingTimeInterval(-(AgentEventStore.sweepAge + 3600))
+        let approvals = isolated.appendingPathComponent("approvals", isDirectory: true)
+        try fm.createDirectory(at: approvals, withIntermediateDirectories: true)
+        for name in ["old.json", "old.lock", "orphan.lock", "stats.json", "stats.lock", "usage.lock", "busy.lock"] {
+            let url = isolated.appendingPathComponent(name)
+            if !fm.fileExists(atPath: url.path) { try Data("{}".utf8).write(to: url) }
+            try fm.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+        }
+        try Data("{}".utf8).write(to: isolated.appendingPathComponent("busy.json"))
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: approvals.path)
+        let listed = try fm.contentsOfDirectory(at: isolated, includingPropertiesForKeys: [.contentModificationDateKey])
+        AgentEventStore.sweep(listed)
+        let left = Set(try fm.contentsOfDirectory(atPath: isolated.path))
+        check(!left.contains("old.json") && !left.contains("old.lock") && !left.contains("orphan.lock"), "Day-old session records and locks are swept")
+        check(left.isSuperset(of: ["stats.json", "stats.lock", "usage.lock", "busy.json", "busy.lock", "approvals"]),
+              "Sweep keeps stats, usage, approvals and the lock of a record still in use")
+        check(AgentEventStore.read(directory: isolated).count == 1, "Sweep leaves current sessions readable")
     } catch { failures.append("Agent fixture: \(error)") }
     check(AudioOutput.icon(name: "Erkam’s AirPods Pro", transport: kAudioDeviceTransportTypeBluetooth) == "airpods.pro"
           && AudioOutput.icon(name: "MacBook Pro Speakers", transport: kAudioDeviceTransportTypeBuiltIn) == "laptopcomputer"
